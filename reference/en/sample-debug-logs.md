@@ -7,14 +7,14 @@ description: >-
 
 # Sample debug logs
 
-These are genuine CrackProof debug logs, captured by creating the per-executable 12-hex-character folder under `%temp%` and launching a protected title (see [Runtime behavior](https://launchcore.gitbook.io/crackproof-research/internals/en/runtime-behavior#debug-logging)). Paths and product names are replaced with generic placeholders; everything else — option flags, status codes, addresses, hook lists — is verbatim.
+These are genuine CrackProof debug logs, captured by creating the per-executable 12-hex-character folder under `%temp%` and launching a protected title (see [Runtime behavior](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime-behavior#debug-logging)). Paths and product names are replaced with generic placeholders; everything else — option flags, status codes, addresses, hook lists — is verbatim.
 
 ## Reading a log
 
 * **Line 1** — the protected module's path.
 * **Line 2** — the protection option flags the build was packed with (each `-XX` token is one packer option).
 * **Line 3/4** — timestamp and the module's load base.
-* **Following lines** — 12-bit [status codes](https://launchcore.gitbook.io/crackproof-research/internals/en/runtime-behavior#the-boot-sequence-and-status-codes), one per stage; indented `000`– `00N` lines carry stage-specific detail (addresses, counts, hooked functions).
+* **Following lines** — 12-bit [status codes](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime-behavior#the-boot-sequence-and-status-codes), one per stage; indented `000`– `00N` lines carry stage-specific detail (addresses, counts, hooked functions).
 * **Final lines** — completion timestamp and the 9-digit error code (`000-000-000` = success).
 
 ## Host EXE — fully featured, page-encrypted
@@ -99,7 +99,7 @@ A06
 
 Points of interest:
 
-* `C03` names the driver generation: `Htsysm7679` — the second-generation Htsysm (see [Kernel drivers and submodules](https://launchcore.gitbook.io/crackproof-research/internals/en/kernel-components)).
+* `C03` names the driver generation: `Htsysm7679` — the second-generation Htsysm (see [Kernel drivers and submodules](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/kernel-components)).
 * `C04` lists every API hooked for the Protected-Process toggle (`NtCreateSection`, `NtAlpcSendWaitReceivePort`, `NtDuplicateObject`, `NtConnectPort`, `NtOpenProcess`, `NtOpenThread`, …) plus loader-interception hooks (`CreateProcessInternal*`, `CreateRemoteThread*`, `LdrLoadDll`, `CreateActCtxW`).
 * `640 … 840` — this module is **page-encrypted**: bulk decrypt, then re-encrypt with the exception-handler hook installed. The `002` line after `840` carries three addresses (the re-encrypted range and handler data).
 * `570` and `A06` hook additional APIs late in the boot (`user32!SetFocus`, `CreateWindowExA/W`, `uxtheme!ThemeInitApiHook`).

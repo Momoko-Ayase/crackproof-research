@@ -6,7 +6,7 @@ description: >-
 
 # bytecode\_vm.py
 
-The bytecode VM that decodes each build's unique x86 stub, as documented in [Data transformation primitives](https://launchcore.gitbook.io/crackproof-research/internals/en/primitives#the-per-build-bytecode-permutation).
+The bytecode VM that decodes each build's unique x86 stub, as documented in [Data transformation primitives](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/primitives#the-per-build-bytecode-permutation).
 
 ```python
 """The per-build custom byte transform ("bytecode VM").

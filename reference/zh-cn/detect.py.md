@@ -4,7 +4,7 @@ description: "基于内容识别并分类受保护文件（KONN magic、EXE/DLL�
 
 # detect.py
 
-[受保护文件格式](https://launchcore.gitbook.io/crackproof-research/internals/en/file-format#recognition-and-classification)中记载的识别与分类逻辑。
+[受保护文件格式](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/file-format#shi-bie-yu-fen-lei)中记载的识别与分类逻辑。
 
 ```python
 """Content-based detection and classification of a protected PE file.

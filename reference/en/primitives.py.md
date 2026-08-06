@@ -6,7 +6,7 @@ description: >-
 
 # primitives.py
 
-Every data transform except the block cipher, the decompressor, and the bytecode VM — the ciphers and checksums documented in [Data transformation primitives](https://launchcore.gitbook.io/crackproof-research/internals/en/primitives).
+Every data transform except the block cipher, the decompressor, and the bytecode VM — the ciphers and checksums documented in [Data transformation primitives](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/primitives).
 
 ```python
 """Reference implementations of the protection scheme's data transforms.

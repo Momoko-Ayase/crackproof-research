@@ -82,4 +82,4 @@ ModR/M 必须是寄存器直接寻址的 `AL`（`mod=3, rm=0`）；其余一律�
 
 ## 验证套件
 
-本文档中的每个 Python 片段在发布前都经过验证：每个函数的输出在相同输入上与算法的独立参考移植逐字节比对（30 个测试向量，全部一致）。完整可运行的片段文件与比对工具发布在本站的[验证与参考](https://launchcore.gitbook.io/crackproof-research/reference/)栏目中——运行 `python run_tests.py` 可重跑全部比对。
+本文档中的每个 Python 片段在发布前都经过验证：每个函数的输出在相同输入上与算法的独立参考移植逐字节比对（30 个测试向量，全部一致）。完整可运行的片段文件与比对工具发布在本站的[验证与参考](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/)栏目中——运行 `python run_tests.py` 可重跑全部比对。

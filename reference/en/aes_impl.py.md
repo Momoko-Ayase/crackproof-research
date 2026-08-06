@@ -6,7 +6,7 @@ description: >-
 
 # aes\_impl.py
 
-The block cipher: AES-CBC decryption with the key schedule embedded in the data buffer, as documented in [Data transformation primitives](https://launchcore.gitbook.io/crackproof-research/internals/en/primitives#the-block-cipher-aes-cbc-with-an-in-buffer-key-schedule).
+The block cipher: AES-CBC decryption with the key schedule embedded in the data buffer, as documented in [Data transformation primitives](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/primitives#the-block-cipher-aes-cbc-with-an-in-buffer-key-schedule).
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.
