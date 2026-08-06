@@ -1,5 +1,5 @@
 ---
-description: Crackproof 的映像外组件——按双字母模块代码加载的手动映射辅助 DLL，以及提供受保护进程状态与句柄限制的三代 Htsysm 内核驱动。
+description: "Crackproof 的映像外组件——按双字母模块代码加载的手动映射辅助 DLL，以及提供受保护进程状态与句柄限制的三代 Htsysm 内核驱动。"
 ---
 
 # 内核驱动与子模块

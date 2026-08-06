@@ -1,5 +1,5 @@
 ---
-description: The on-disk container layout of a Crackproof-protected PE file, the encrypted header and its key derivation, and how protected files are recognized, classified, and split across stub/companion pairs.
+description: "The on-disk container layout of a Crackproof-protected PE file, the encrypted header and its key derivation, and how protected files are recognized, classified, and split across stub/companion pairs."
 ---
 
 # The protected file format

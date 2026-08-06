@@ -1,5 +1,5 @@
 ---
-description: What a Crackproof-protected binary does when it runs — the boot sequence and its status codes, debug logging, environment and anti-analysis checks, on-demand page decryption, and the obfuscation techniques used by the loader's own code.
+description: "What a Crackproof-protected binary does when it runs — the boot sequence and its status codes, debug logging, environment and anti-analysis checks, on-demand page decryption, and the obfuscation techniques used by the loader's own code."
 ---
 
 # Runtime behavior

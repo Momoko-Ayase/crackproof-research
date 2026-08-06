@@ -1,5 +1,5 @@
 ---
-description: How Crackproof's loader bootstraps itself: loader code is split into encrypted stages that decrypt each other in a strict order, with each stage's key derived from checksums of previously decrypted content — and how each build family then recovers the original program sections.
+description: "How Crackproof's loader bootstraps itself: loader code is split into encrypted stages that decrypt each other in a strict order, with each stage's key derived from checksums of previously decrypted content — and how each build family then recovers the original program sections."
 ---
 
 # The staged loader

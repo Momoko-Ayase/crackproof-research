@@ -1,5 +1,5 @@
 ---
-description: Quick-reference tables of the constants, offsets, and encodings used across the Crackproof container format, loader, and runtime.
+description: "Quick-reference tables of the constants, offsets, and encodings used across the Crackproof container format, loader, and runtime."
 ---
 
 # Appendix: constants and offsets

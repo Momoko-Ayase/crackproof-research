@@ -1,5 +1,5 @@
 ---
-description: The complete family of data transforms Crackproof applies to protected content — rolling-key ciphers, byte-rotation ciphers, an LFSR keystream, the AES-CBC block cipher, the Huffman/LZ compression format, the per-build bytecode permutation, and the checksum chaining that ties stages together — with tested Python reference implementations.
+description: "The complete family of data transforms Crackproof applies to protected content — rolling-key ciphers, byte-rotation ciphers, an LFSR keystream, the AES-CBC block cipher, the Huffman/LZ compression format, the per-build bytecode permutation, and the checksum chaining that ties stages together — with tested Python reference implementations."
 ---
 
 # Data transformation primitives

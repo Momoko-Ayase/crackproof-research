@@ -1,5 +1,5 @@
 ---
-description: Crackproof 容器格式、加载器与运行时各处使用的常量、偏移与编码的速查表。
+description: "Crackproof 容器格式、加载器与运行时各处使用的常量、偏移与编码的速查表。"
 ---
 
 # 附录：常量与偏移
