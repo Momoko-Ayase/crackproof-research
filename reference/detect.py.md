@@ -1,7 +1,7 @@
 ---
 description: >-
-  Content-based detection and classification of protected files (KONN/KNKN
-  magic, EXE/DLL, managed/native).
+  Content-based detection and classification of protected files (KONN magic,
+  EXE/DLL, managed/native).
 ---
 
 # detect.py
@@ -17,9 +17,7 @@ info[1]. The PE header stays plaintext, so the usual PE fields classify
 the file further.
 """
 
-MAGIC_KONN = 0x4E4E4F4B  # the two supported shell stamps...
-MAGIC_KNKN = 0x4E4B4E4B  # ...identical algorithm, different build stamp
-MAGIC_CUSN = 0x4E535543  # a third, incompatible stamp (not covered here)
+MAGIC_KONN = 0x4E4E4F4B  # the shell stamp
 
 
 def get_u16(d, off):
@@ -50,7 +48,7 @@ def detect(file_data):
     if file_data[pe_off:pe_off + 4] != b"PE\0\0":
         return None
     info = header_kdf(file_data)
-    if info[1] not in (MAGIC_KONN, MAGIC_KNKN):
+    if info[1] != MAGIC_KONN:
         return None
 
     # IMAGE_FILE_HEADER.Characteristics, IMAGE_FILE_DLL bit
