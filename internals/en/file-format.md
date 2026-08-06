@@ -70,7 +70,7 @@ The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 +
 
 ## Recognition and classification
 
-Protected modules do not always carry `.exe`/`.dll` names — renamed copies (for example `.bak`) exist in the wild — so recognition must be content-based. A file is CrackProof-protected when:
+A protected file is recognized by content, never by name or extension. A file is CrackProof-protected when:
 
 1. It is at least 4128 bytes long and has a valid `PE\0\0` signature at `e_lfanew` (`u32@0x3C`).
 2. The KDF over offset 4096 yields `info[1] == KONN`.
