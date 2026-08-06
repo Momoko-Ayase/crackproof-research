@@ -1,5 +1,5 @@
 ---
-description: "A research write-up on how the Crackproof executable protection scheme works internally — the protected file format, its data transforms, the staged loader, and its runtime behavior."
+description: "How the Crackproof protection scheme works internally — protected file format, data transforms, staged loader, runtime behavior."
 ---
 
 # Crackproof internals

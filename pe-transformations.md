@@ -1,5 +1,5 @@
 ---
-description: "What Crackproof removes, encrypts, or relocates in the PE structure of a protected binary — entry point and data directories, imports, TLS, exports, relocations, and the .NET CLR structures — and what the loader rebuilds at runtime."
+description: "What Crackproof removes, encrypts, or relocates in the PE structure, and what the loader rebuilds at runtime."
 ---
 
 # PE transformations

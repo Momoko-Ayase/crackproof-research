@@ -1,5 +1,5 @@
 ---
-description: "The optional -GMD obfuscation Crackproof applies to Unity il2cpp titles — method tokens in global-metadata.dat are replaced with sparse values that only the protected loader remaps at runtime."
+description: "The optional -GMD method-token obfuscation applied to Unity il2cpp titles' global-metadata.dat."
 ---
 
 # il2cpp metadata obfuscation

@@ -1,5 +1,5 @@
 ---
-description: "Crackproof 对 Unity il2cpp 作品施加的可选 -GMD 混淆——global-metadata.dat 中的方法令牌被替换为稀疏值，只有受保护的加载器能在运行时将其映射回去。"
+description: "面向 Unity il2cpp 作品的可选 -GMD 方法令牌混淆。"
 ---
 
 # il2cpp 元数据混淆

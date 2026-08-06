@@ -1,5 +1,5 @@
 ---
-description: "Practical methodology for analyzing Crackproof-protected binaries — enabling the loader's own logging, mapping status codes to code, dumping page-encrypted modules correctly, verifying reconstructed images — and a catalogue of observed weaknesses in the protection."
+description: "Methodology for analyzing protected binaries, plus a catalogue of observed weaknesses in the protection."
 ---
 
 # Reverse engineering notes

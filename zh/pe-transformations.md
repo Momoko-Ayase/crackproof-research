@@ -1,5 +1,5 @@
 ---
-description: "Crackproof 在受保护二进制的 PE 结构中移除、加密或搬迁了什么——入口点与数据目录、导入、TLS、导出、重定位与 .NET CLR 结构——以及加载器在运行时重建了什么。"
+description: "Crackproof 在 PE 结构中移除、加密或搬迁了什么，以及加载器在运行时重建了什么。"
 ---
 
 # PE 变换

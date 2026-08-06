@@ -1,5 +1,5 @@
 ---
-description: "Crackproof's out-of-image components — the manually mapped helper DLLs loaded by two-letter module codes, and the three generations of the Htsysm kernel driver that provide protected-process status and handle restrictions."
+description: "The manually mapped helper DLLs and the three generations of the Htsysm kernel driver."
 ---
 
 # Kernel drivers and submodules
