@@ -6,7 +6,7 @@ description: >-
 
 # huffman.py
 
-The decompressor used for stages and section blocks, as documented in [Data transformation primitives](https://launchcore.gitbook.io/crackproof-research/docs/primitives#the-huffmanlz-compression-format).
+The decompressor used for stages and section blocks, as documented in [Data transformation primitives](https://launchcore.gitbook.io/crackproof-research/internals/en/primitives#the-huffmanlz-compression-format).
 
 ```python
 """The Huffman/LZ hybrid decompressor.

@@ -4,7 +4,7 @@ description: "CBC 模式的 AES 解密，密钥调度内置于数据缓冲区；
 
 # aes\_impl.py
 
-分组密码：AES-CBC 解密，密钥调度嵌入数据缓冲区，见[数据变换原语](https://launchcore.gitbook.io/crackproof-research/docs/primitives#the-block-cipher-aes-cbc-with-an-in-buffer-key-schedule)。
+分组密码：AES-CBC 解密，密钥调度嵌入数据缓冲区，见[数据变换原语](https://launchcore.gitbook.io/crackproof-research/internals/en/primitives#the-block-cipher-aes-cbc-with-an-in-buffer-key-schedule)。
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.

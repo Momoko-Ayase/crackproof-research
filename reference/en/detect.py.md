@@ -6,7 +6,7 @@ description: >-
 
 # detect.py
 
-The detection and classification logic documented in [The protected file format](https://launchcore.gitbook.io/crackproof-research/docs/file-format#recognition-and-classification).
+The detection and classification logic documented in [The protected file format](https://launchcore.gitbook.io/crackproof-research/internals/en/file-format#recognition-and-classification).
 
 ```python
 """Content-based detection and classification of a protected PE file.

@@ -4,14 +4,14 @@ description: "从受保护进程捕获的真实 CrackProof 调试日志——页
 
 # 调试日志示例
 
-这些是真实的 CrackProof 调试日志，捕获方式是在 `%temp%` 下创建该可执行文件对应的 12 位十六进制字符文件夹并启动受保护程序（见[运行时行为](https://launchcore.gitbook.io/crackproof-research/docs/runtime-behavior#debug-logging)）。路径与产品名已替换为通用占位符；其余一切——选项标志、状态码、地址、hook 列表——均为原文。
+这些是真实的 CrackProof 调试日志，捕获方式是在 `%temp%` 下创建该可执行文件对应的 12 位十六进制字符文件夹并启动受保护程序（见[运行时行为](https://launchcore.gitbook.io/crackproof-research/internals/en/runtime-behavior#debug-logging)）。路径与产品名已替换为通用占位符；其余一切——选项标志、状态码、地址、hook 列表——均为原文。
 
 ## 如何阅读日志
 
 * **第 1 行**——受保护模块的路径。
 * **第 2 行**——该构建打包时使用的保护选项标志（每个 `-XX` 记号对应一个打包器选项）。
 * **第 3/4 行**——时间戳与模块的加载基址。
-* **后续行**——12 位[状态码](https://launchcore.gitbook.io/crackproof-research/docs/runtime-behavior#the-boot-sequence-and-status-codes)，每个 stage 一行；缩进的 `000`–`00N` 行携带 stage 特定的细节（地址、计数、被 hook 的函数）。
+* **后续行**——12 位[状态码](https://launchcore.gitbook.io/crackproof-research/internals/en/runtime-behavior#the-boot-sequence-and-status-codes)，每个 stage 一行；缩进的 `000`–`00N` 行携带 stage 特定的细节（地址、计数、被 hook 的函数）。
 * **最后几行**——完成时间戳与 9 位错误码（`000-000-000` = 成功）。
 
 ## 宿主 EXE——功能完整，页加密
@@ -96,7 +96,7 @@ A06
 
 值得注意的点：
 
-* `C03` 给出驱动代际：`Htsysm7679`——第二代 Htsysm（见[内核驱动与子模块](https://launchcore.gitbook.io/crackproof-research/docs/kernel-components)）。
+* `C03` 给出驱动代际：`Htsysm7679`——第二代 Htsysm（见[内核驱动与子模块](https://launchcore.gitbook.io/crackproof-research/internals/en/kernel-components)）。
 * `C04` 列出为 Protected-Process 开关 hook 的全部 API（`NtCreateSection`、`NtAlpcSendWaitReceivePort`、`NtDuplicateObject`、`NtConnectPort`、`NtOpenProcess`、`NtOpenThread`……）以及加载器拦截 hook（`CreateProcessInternal*`、`CreateRemoteThread*`、`LdrLoadDll`、`CreateActCtxW`）。
 * `640 … 840`——该模块是**页加密**的：先整体解密，随后重新加密并安装异常处理 hook。`840` 之后的 `002` 行携带三个地址（重新加密的区间与处理程序数据）。
 * `570` 与 `A06` 在启动后期 hook 更多 API（`user32!SetFocus`、`CreateWindowExA/W`、`uxtheme!ThemeInitApiHook`）。

@@ -6,7 +6,7 @@ description: >-
 
 # Verification & reference
 
-This section publishes the reference material behind [CrackProof internals](https://launchcore.gitbook.io/crackproof-research/docs) in its complete, runnable form.
+This section publishes the reference material behind [CrackProof internals](https://launchcore.gitbook.io/crackproof-research/internals/en) in its complete, runnable form.
 
 ## Verification suite
 

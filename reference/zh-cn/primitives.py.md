@@ -4,7 +4,7 @@ description: "滚动密钥密码、字节旋转密码、LFSR 密钥流、字符�
 
 # primitives.py
 
-除分组密码、解压器与字节码 VM 之外的全部数据变换——[数据变换原语](https://launchcore.gitbook.io/crackproof-research/docs/primitives)中记载的各密码与校验和。
+除分组密码、解压器与字节码 VM 之外的全部数据变换——[数据变换原语](https://launchcore.gitbook.io/crackproof-research/internals/en/primitives)中记载的各密码与校验和。
 
 ```python
 """Reference implementations of the protection scheme's data transforms.

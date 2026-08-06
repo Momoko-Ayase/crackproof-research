@@ -4,7 +4,7 @@ description: "文档中 Python 片段的可运行验证套件，以及从真实�
 
 # 验证与参考
 
-本栏目以完整、可运行的形式发布 [CrackProof 内部机制](https://launchcore.gitbook.io/crackproof-research/docs)背后的参考材料。
+本栏目以完整、可运行的形式发布 [CrackProof 内部机制](https://launchcore.gitbook.io/crackproof-research/internals/en)背后的参考材料。
 
 ## 验证套件
 
