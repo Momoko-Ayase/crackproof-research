@@ -1,10 +1,10 @@
 ---
-description: "Real Crackproof debug logs captured from a protected process — a page-encrypted host EXE, a bulk-decrypted native DLL, and a managed DLL — desensitized and annotated."
+description: "Real CrackProof debug logs captured from a protected process — a page-encrypted host EXE, a bulk-decrypted native DLL, and a managed DLL — desensitized and annotated."
 ---
 
 # Sample debug logs
 
-These are genuine Crackproof debug logs, captured by creating the per-executable 12-hex-character folder under `%temp%` and launching a protected title (see [Runtime behavior](https://launchcore.gitbook.io/crackproof-research/docs/runtime-behavior#debug-logging)). Paths and product names are replaced with generic placeholders; everything else — option flags, status codes, addresses, hook lists — is verbatim.
+These are genuine CrackProof debug logs, captured by creating the per-executable 12-hex-character folder under `%temp%` and launching a protected title (see [Runtime behavior](https://launchcore.gitbook.io/crackproof-research/docs/runtime-behavior#debug-logging)). Paths and product names are replaced with generic placeholders; everything else — option flags, status codes, addresses, hook lists — is verbatim.
 
 ## Reading a log
 

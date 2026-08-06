@@ -4,7 +4,7 @@ description: "The 30 ground-truth vectors printed by the reference port, which r
 
 # `vectors.txt`
 
-The expected outputs. Each line is `name hex-value`; the first two lines are the standard CRC-32 known answer (`crc32(b"123456789") == 0xCBF43926`) and its chained form — a cheap sanity anchor independent of the rest.
+The expected outputs. Each line is `name hex-value`; the first two lines are the standard CRC-32 known answer (`crc32(b"123456789") == 0xCBF43926`) and its chained form — a cheap cross-check independent of the rest.
 
 ```text
 crc32_123456789 cbf43926

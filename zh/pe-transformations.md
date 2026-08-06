@@ -1,5 +1,5 @@
 ---
-description: "Crackproof 在 PE 结构中移除、加密或搬迁了什么，以及加载器在运行时重建了什么。"
+description: "CrackProof 在 PE 结构中移除、加密或搬迁了什么，以及加载器在运行时重建了什么。"
 ---
 
 # PE 变换

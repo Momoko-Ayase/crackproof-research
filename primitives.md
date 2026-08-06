@@ -1,10 +1,10 @@
 ---
-description: "The ciphers, compression format, per-build bytecode permutation, and checksum chaining Crackproof applies to protected content."
+description: "The ciphers, compression format, per-build bytecode permutation, and checksum chaining CrackProof applies to protected content."
 ---
 
 # Data transformation primitives
 
-Every layer of the container is built from a small set of primitives. Once each one is defined, the staged loader is just "apply primitive N at offset X with key Y" repeated in a strict order. This page defines each primitive precisely, with a Python implementation.
+Every layer of the container is built from a small set of primitives. Once each one is defined, the staged loader is "apply primitive N at offset X with key Y" repeated in a strict order. This page defines each primitive precisely, with a Python implementation.
 
 {% hint style="success" %}
 Every code snippet on this page has been executed and verified against the algorithms as implemented in protected binaries: each function's output was compared byte-for-byte with a reference port on identical inputs.
@@ -246,7 +246,7 @@ The seed is content read from the previously decrypted stage, so the advanced ke
 
 Bulk content — stages and section blocks — is protected with AES decryption in CBC mode. Two design choices are worth noting:
 
-- **The key schedule lives inside the data buffer itself.** A small header at `key_offset` holds the round count (little-endian u16 at `key_offset + 2`), followed by `(rounds + 1)` 16-byte round keys. There is no separate key material to extract; the schedule is unpacked along with everything else.
+- **The key schedule lives inside the data buffer itself.** A small header at `key_offset` holds the round count (little-endian u16 at `key_offset + 2`), followed by `(rounds + 1)` 16-byte round keys. No separate key material needs extracting; the schedule is unpacked along with everything else.
 - **The tables are the standard AES decryption T-tables** (InvSubBytes fused with InvMixColumns), generated below from GF(2⁸) arithmetic — public AES constants, not proprietary data. State words are loaded and stored big-endian.
 
 ```python
@@ -470,7 +470,7 @@ The boolean result is a corruption signal — and, importantly, an **oracle**: w
 
 ## The per-build bytecode permutation
 
-The most distinctive layer: Crackproof does not hardcode a fixed per-byte transform for payload data. At pack time it **generates a unique x86 stub for each build** — a function that takes one byte in `AL`, applies a short random sequence of arithmetic/rotate instructions, and returns. The loader runs this stub over every payload byte between the block-cipher pass and decompression. Two protected files from different builds therefore share no payload permutation.
+The most distinctive layer: CrackProof does not hardcode a fixed per-byte transform for payload data. At pack time it **generates a unique x86 stub for each build** — a function that takes one byte in `AL`, applies a short random sequence of arithmetic/rotate instructions, and returns. The loader runs this stub over every payload byte between the block-cipher pass and decompression. Two protected files from different builds therefore share no payload permutation.
 
 The stub is stored wrapped in the LFSR keystream (above). Rather than executing x86, the instruction bytes can be decoded into a tiny op list and interpreted — only a narrow instruction subset ever appears:
 

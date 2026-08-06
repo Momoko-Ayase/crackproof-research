@@ -1,5 +1,5 @@
 ---
-description: "What Crackproof removes, encrypts, or relocates in the PE structure, and what the loader rebuilds at runtime."
+description: "What CrackProof removes, encrypts, or relocates in the PE structure, and what the loader rebuilds at runtime."
 ---
 
 # PE transformations
@@ -54,7 +54,7 @@ A statically reconstructed image does not get that treatment — the ordinary Wi
 
 The export directory is never encrypted in the payload. Where it lives depends on the layout:
 
-- **Single-file layouts:** the export region sits in plaintext in the protected file at its RVA; the loader copies it into the image as-is. (The region is located via `DataDirectory[0]`, readable from the plaintext header.)
+- **Single-file layouts:** the export region sits in plaintext in the protected file at its RVA; the loader copies it into the image as-is. (The region is found from `DataDirectory[0]`, readable from the plaintext header.)
 - **External-companion layout:** the companion decrypts to garbage in the export area (`NumberOfFunctions` and friends are ciphertext). The runtime loader rebuilds exports from the plaintext copy retained in the stub's `.rdata`. A static reconstruction must likewise overlay the export-directory region from the stub, or analysis tools choke on the export table.
 
 ## Relocations and the /FIXED split

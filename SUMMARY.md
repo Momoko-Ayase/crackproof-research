@@ -1,6 +1,6 @@
 # Table of contents
 
-* [Crackproof internals](README.md)
+* [CrackProof for Windows internals](README.md)
 * [The protected file format](file-format.md)
 * [Data transformation primitives](primitives.md)
 * [The staged loader](staged-loader.md)

@@ -4,7 +4,7 @@ description: "What a protected binary does when it runs: boot sequence, anti-ana
 
 # Runtime behavior
 
-A protected binary's first thread of execution belongs to Crackproof, not the program. The loader walks a fixed pipeline: environment checks, anti-analysis sweeps, kernel-driver and submodule setup, then the staged decryption from [The staged loader](staged-loader.md), then — optionally — re-encryption of what it just decrypted, and only then a jump to the original entry point (OEP). This page describes that pipeline as observed at runtime.
+A protected binary's first thread of execution belongs to CrackProof, not the program. The loader walks a fixed pipeline: environment checks, anti-analysis sweeps, kernel-driver and submodule setup, then the staged decryption from [The staged loader](staged-loader.md), then — optionally — re-encryption of what it just decrypted, and only then a jump to the original entry point (OEP). This page describes that pipeline as observed at runtime.
 
 ## The boot sequence and status codes
 
@@ -21,7 +21,7 @@ The loader reports progress as 12-bit **status codes**, roughly one per stage. T
 | `C03` | Initialize the newer Htsysm driver |
 | `C04` | Set the Protected Process flag; install hooks |
 | `A0F` | Injected-DLL check |
-| `A09` | VM check via hardware registry strings |
+| `A09` | VM check using hardware registry strings |
 | `A08` | Copy clean ntdll/kernel32 code from disk to memory |
 | `A04` | Same, aborting if the on-disk copy is patched |
 | `A07` | Terminate injected threads |

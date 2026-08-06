@@ -26,7 +26,7 @@ Every stage after stage 2 is decrypted with the same composite, defined by a `(s
 3. If a per-build bytecode stub applies, translate every byte through it.
 4. If `src_len != dest_len`, **Huffman/LZ-decompress** `src → dest` with the stage Huffman table (`key_offsets[1]`).
 
-Stages 3–5 are just this composite applied to quads at computed offsets with keys from the checksum chain.
+Stages 3–5 are this composite applied to quads at computed offsets with keys from the checksum chain.
 
 ## The 64-bit EXE flow (marker layout)
 
@@ -120,7 +120,7 @@ The 32-bit family shares the header/payload phases, then diverges completely: di
 
 **EighthStage and its key search.** The Eighth stage key is not stored either: candidates are collected from gap heuristics around the stub (end-of-region gaps `0xD0…0x100`, stub-relative gaps, and a linear scan for non-printable dwords), each run through `advance_key(raw, 3)`, and each tried against the full stage-decrypt composite. The winner is the candidate whose result **decompresses cleanly and points inside the image** — the Huffman decoder's success/failure signal used as an oracle.
 
-**The configuration cluster.** The Eighth stage holds the final table cluster at fixed offsets from a base: import table `+0x18`, file checksum chain `+0x30`, section descriptors `+0x40`, zero-fill list `+0x48`, and the file-data **bytecode stub** at `+0x4B4`. Classic builds stamp the base with the dword `0x00007679` (a build-version value that recurs in driver names — see [Kernel drivers and submodules](kernel-components.md)); builds without the stamp are located by the checksum-chain slot's shape (a pointer just past `info[3]` with a small 16-aligned size).
+**The configuration cluster.** The Eighth stage holds the final table cluster at fixed offsets from a base: import table `+0x18`, file checksum chain `+0x30`, section descriptors `+0x40`, zero-fill list `+0x48`, and the file-data **bytecode stub** at `+0x4B4`. Classic builds stamp the base with the dword `0x00007679` (a build-version value that recurs in driver names — see [Kernel drivers and submodules](kernel-components.md)); builds without the stamp are located by the checksum-chain slot's shape (a pointer immediately past `info[3]` with a small 16-aligned size).
 
 **The file decryptor, proven.** The file-data bytecode stub is not trusted to the nearest scan hit: each candidate is validated by replaying the first *compressed* block's full transform (copy → AES → translate → decompress) on a snapshot and requiring decompression to succeed. Coincidental LFSR-shaped blocks that decode to a wrong translate exist in real builds — one sits a few dozen bytes before the real stub in an observed 32-bit family — so trial-and-validate is the only safe selection.
 

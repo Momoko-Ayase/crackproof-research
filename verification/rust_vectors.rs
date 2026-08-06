@@ -1,4 +1,4 @@
-// Vector generator for the Crackproof research documentation.
+// Vector generator for the CrackProof research documentation.
 // Every primitive below is copied VERBATIM from a reference port of the
 // algorithms as implemented in protected binaries, so the printed vectors
 // are authoritative ground truth for the Python snippets in the docs.

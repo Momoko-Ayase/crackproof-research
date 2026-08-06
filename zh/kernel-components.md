@@ -4,7 +4,7 @@ description: "手动映射的辅助 DLL 与三代 Htsysm 内核驱动。"
 
 # 内核驱动与子模块
 
-Crackproof 运行的内容并不都住在受保护模块内。存在两个支持生态：**手动映射的用户态 DLL**（由加载器加载，对 Windows 加载器不可见）和一条称为 Htsysm 的**内核驱动线**（三代设计迥异）。本页覆盖二者。
+CrackProof 运行的内容并不都住在受保护模块内。存在两个支持生态：**手动映射的用户态 DLL**（由加载器加载，对 Windows 加载器不可见）和一条称为 Htsysm 的**内核驱动线**（三代设计迥异）。本页覆盖二者。
 
 ## 手动映射子模块
 
@@ -23,13 +23,13 @@ Crackproof 运行的内容并不都住在受保护模块内。存在两个支持
 
 ## Htsysm 第一代：无鉴权的内核 shellcode（HtsysmNT）
 
-最旧驱动的招牌特性是一个**让任意进程执行内核态 shellcode 的无鉴权 IOCTL**。Crackproof 用它手动映射内核态 DLL（`HtsyskNT.dll`，然后是 `HtpecmNT.dll`），并调用它们的 `_FarEntry@0` 导出——其实现其余内核功能，包括按模块说明的监视并终止分析进程。
+最旧驱动的招牌特性是一个**让任意进程执行内核态 shellcode 的无鉴权 IOCTL**。CrackProof 用它手动映射内核态 DLL（`HtsyskNT.dll`，然后是 `HtpecmNT.dll`），并调用它们的 `_FarEntry@0` 导出——其实现其余内核功能，包括按模块说明的监视并终止分析进程。
 
 其安全姿态名副其实地糟糕：系统上的任何进程都能要求该驱动在 ring 0 运行任意代码。
 
-## Htsysm 第二代：EPROCESS 编辑（odd.sys / Htsysm7679）
+## Htsysm 第二代：EPROCESS 编辑（Htsysm7679）
 
-第二代在意图上受限得多：它让进程**写自己的 `EPROCESS`**，允许它编辑关于自身的信息。Crackproof 只使用其中一个特性：设置 **Protected Process（PP）标志**，使用户态工具无法打开、读取或注入受保护进程（状态 `C03`/`C04`）。
+第二代在意图上受限得多：它让进程**写自己的 `EPROCESS`**，允许它编辑关于自身的信息。CrackProof 只使用其中一个特性：设置 **Protected Process（PP）标志**，使用户态工具无法打开、读取或注入受保护进程（状态 `C03`/`C04`）。
 
 另外两个细节：
 
@@ -38,7 +38,7 @@ Crackproof 运行的内容并不都住在受保护模块内。存在两个支持
 
 解除 PP 标志需要内核级手段（内核或虚拟机监控器调试器、PP 切换驱动，或在标志设置前钩住 `DeviceIoControl`）。
 
-## Htsysm 第三代：句柄限制（io4.sys / Htsysm767901）
+## Htsysm 第三代：句柄限制（Htsysm767901）
 
 最新一代完全放弃了授予权限的做法。它改为**拒绝未批准进程以危险访问权打开受保护进程的句柄**：`PROCESS_CREATE_THREAD`、`PROCESS_VM_OPERATION`、`PROCESS_VM_READ` 与 `PROCESS_VM_WRITE`。获批进程是固定的系统二进制白名单（`svchost.exe`、`csrss.exe`、`lsass.exe`、`conhost.exe`）。
 
@@ -57,5 +57,5 @@ Crackproof 运行的内容并不都住在受保护模块内。存在两个支持
 | `HtsyskNT.dll` | 内核 DLL（经第一代驱动） | 内核手动映射器与 I/O（`B21`） |
 | `HtpecmNT.dll` | 内核 DLL（经第一代驱动） | 进程监控/终止（`BB0`） |
 | HtsysmNT | 内核驱动，第一代 | 无鉴权内核 shellcode IOCTL |
-| odd.sys / Htsysm7679 | 内核驱动，第二代 | `EPROCESS` 写；Protected Process 标志 |
-| io4.sys / Htsysm767901 | 内核驱动，第三代 | 句柄访问权限制 |
+| Htsysm7679 | 内核驱动，第二代 | `EPROCESS` 写；Protected Process 标志 |
+| Htsysm767901 | 内核驱动，第三代 | 句柄访问权限制 |

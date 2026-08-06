@@ -7,7 +7,7 @@ description: "The independent reference port of the algorithms; compiles to a pr
 The reference port used to produce the ground-truth vectors. Every primitive is a direct transcription of the algorithms as implemented in protected binaries. Build it with `rustc -O rust_vectors.rs` and run it to regenerate `vectors.txt`.
 
 ```rust
-// Vector generator for the Crackproof research documentation.
+// Vector generator for the CrackProof research documentation.
 // Every primitive below is copied VERBATIM from a reference port of the
 // algorithms as implemented in protected binaries, so the printed vectors
 // are authoritative ground truth for the Python snippets in the docs.

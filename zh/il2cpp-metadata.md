@@ -4,7 +4,7 @@ description: "面向 Unity il2cpp 作品的可选 -GMD 方法令牌混淆。"
 
 # il2cpp 元数据混淆
 
-独立于 PE 保护之外，Crackproof 提供一个选项（`-GMD`）来混淆 Unity il2cpp 作品的 **`global-metadata.dat`**。它只改变一样东西：每条 `Il2CppMethodDefinition` 记录的**方法令牌字段**。
+独立于 PE 保护之外，CrackProof 提供一个选项（`-GMD`）来混淆 Unity il2cpp 作品的 **`global-metadata.dat`**。它只改变一样东西：每条 `Il2CppMethodDefinition` 记录的**方法令牌字段**。
 
 ## 它做了什么，以及为什么有效
 

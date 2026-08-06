@@ -72,7 +72,7 @@ The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 +
 
 ## Recognition and classification
 
-Protected modules do not always carry `.exe`/`.dll` names — renamed copies (for example `.bak`) exist in the wild — so recognition must be content-based. A file is Crackproof-protected when:
+Protected modules do not always carry `.exe`/`.dll` names — renamed copies (for example `.bak`) exist in the wild — so recognition must be content-based. A file is CrackProof-protected when:
 
 1. It is at least 4128 bytes long and has a valid `PE\0\0` signature at `e_lfanew` (`u32@0x3C`).
 2. The KDF over offset 4096 yields `info[1] ∈ {KONN, KNKN}`.
@@ -144,10 +144,10 @@ A descriptor's `src` field therefore maps to file offset `src + section_data_fil
 
 Some builds — observed so far on il2cpp titles — split a protected module into two files:
 
-- **`Foo.dll`** — a thin on-disk **loader stub**. Its code sections are stripped down to a single page (the Crackproof loader itself), but its headers and `.rdata` are intact plaintext.
+- **`Foo.dll`** — a thin on-disk **loader stub**. Its code sections are stripped down to a single page (the CrackProof loader itself), but its headers and `.rdata` are intact plaintext.
 - **`Foo.dll._`** — the encrypted **companion**, holding the real payload. It contains no plaintext PE structures at all (entropy ≈ 8 bits/byte).
 
-The companion is byte-for-byte the stub's payload region starting at the Crackproof header (offset 4096) onward. At runtime the loader maps `Foo.dll._` and runs the ordinary unpack over it; the module that runs is effectively the splice `stub[..4096] ++ companion`.
+The companion is byte-for-byte the stub's payload region starting at the CrackProof header (offset 4096) onward. At runtime the loader maps `Foo.dll._` and runs the ordinary unpack over it; the module that runs is effectively the splice `stub[..4096] ++ companion`.
 
 The pairing is confirmed by a 32-byte exact match: `stub[4096..4128] == companion[0..32]`. These 32 bytes cover the encrypted info header (key table and magic), so a match proves the companion is this stub's payload and not an unrelated file.
 

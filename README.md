@@ -1,12 +1,12 @@
 ---
-description: "How the Crackproof protection scheme works internally — protected file format, data transforms, staged loader, runtime behavior."
+description: "How the CrackProof for Windows protection scheme works internally — protected file format, data transforms, staged loader, runtime behavior."
 ---
 
-# Crackproof internals
+# CrackProof for Windows internals
 
-Crackproof is a commercial software-protection product for Windows PE files (executables and DLLs), developed by Hypertech. It is applied to finished binaries after compilation: the original program image is encrypted, compressed, and re-packaged with a loader that reconstructs the program in memory when the file runs. It has shipped on a range of commercial software, including Unity/il2cpp games, native game middleware DLLs, and desktop applications.
+CrackProof® for Windows® is a commercial software-protection product for Windows PE files (executables and DLLs), developed by HyperTech. The CrackProof family also covers other platforms — Android (DEX and native libraries) and iOS — but those variants are out of scope here: this document analyzes only the Windows PE scheme. The protection is applied to finished binaries after compilation: the original program image is encrypted, compressed, and re-packaged with a loader that reconstructs the program in memory when the file runs. It has shipped on a range of commercial software, including Unity/il2cpp games, native game middleware DLLs, and desktop applications.
 
-This document is a research write-up of **how Crackproof works internally**, produced by static and dynamic analysis of protected binaries and of the loader code they carry. It covers:
+This document is a research write-up of **how CrackProof works internally**, produced by static and dynamic analysis of protected binaries and of the loader code they carry. It covers:
 
 - **What a protected file looks like on disk** — the container layout, the encrypted header, and how protected files are recognized and classified.
 - **The data transforms** — the family of ciphers, the checksum chaining, the compression format, and the per-build custom byte transform every protected file carries.
@@ -15,9 +15,16 @@ This document is a research write-up of **how Crackproof works internally**, pro
 - **What a protected binary does when it runs** — environment and anti-analysis checks, kernel drivers, manually mapped submodules, and on-demand page decryption.
 - **Observed weaknesses** — places where specific checks or mechanisms fall short, documented for research purposes.
 
-## What this document is not
+## Legal notice
 
-This is not a usage guide for any tool, and it contains no instructions for circumventing the protection on any specific product. All structures and algorithms are described at the format level, with reference implementations in Python where a precise definition helps. Build families are referred to generically ("older 64-bit EXE builds", "the marker-less layout"); no specific protected products are named.
+**Read this before using the information in this document.**
+
+- This document is a research publication. It exists to support lawful security research, preservation, and interoperability with software you legitimately possess, and it documents the protection scheme at the format level.
+- **Only analyze binaries you own or are explicitly authorized to analyze.** Depending on your jurisdiction and license agreements, circumventing technological protection measures may be restricted (for example under DMCA §1201 in the United States, which contains exemptions for security research and interoperability). It is your responsibility to ensure your use of this information is lawful.
+- This document contains no vendor code, keys, or copyrighted content. Every structure and algorithm described here is the result of original analysis, and the reference implementations are clean-room Python written from that analysis.
+- Nothing in this document enables online-play fraud, license fraud, or cheating, and it must not be used to redistribute decrypted binaries of any protected product.
+- This is an independent work. It is not affiliated with, endorsed by, or sponsored by HyperTech. CrackProof and Windows are trademarks of their respective owners.
+- The authors provide this document "as is", without warranty of any kind, and accept no liability for misuse.
 
 ## Conventions
 

@@ -4,13 +4,13 @@ description: "Methodology for analyzing protected binaries, plus a catalogue of 
 
 # Reverse engineering notes
 
-This page collects methodology that has proven effective against this protection, followed by an honest list of where specific mechanisms fall short. General-purpose analysis tools (disassemblers such as IDA or Ghidra, memory-forensics frameworks, debuggers) are named where relevant; the techniques themselves are tool-agnostic.
+This page collects methodology that has proven effective against this protection, followed by an honest list of where specific mechanisms fall short.
 
 ## Methodology
 
 ### Turn the loader's logging against itself
 
-The highest-leverage first step is enabling the debug log: create the per-executable 12-hex-character folder under `%temp%` (learn the name by breaking on `CreateFileW`), then run the binary. Every protected module narrates its own boot — status codes per stage, missing DLLs, hooked functions, addresses. Combined with the status table in [Runtime behavior](runtime-behavior.md#the-boot-sequence-and-status-codes), the log localizes any failure or behavior to a specific stage without any disassembly.
+The most productive first step is enabling the debug log: create the per-executable 12-hex-character folder under `%temp%` (learn the name by breaking on `CreateFileW`), then run the binary. Every protected module narrates its own boot — status codes per stage, missing DLLs, hooked functions, addresses. Combined with the status table in [Runtime behavior](runtime-behavior.md#the-boot-sequence-and-status-codes), the log localizes any failure or behavior to a specific stage without any disassembly.
 
 ### Map status codes back to code
 
@@ -46,11 +46,11 @@ A clean report is not proof of correctness — but a failed check is a reliable 
 
 For completeness and future research, the mechanisms that demonstrably fall short:
 
-**The VM checks are bypassable by configuration alone.** The registry check matches vendor strings only at the *start* of the BIOS/product values, while at least one major hypervisor places its marker at the *end* of its BIOS version — setting `SMBIOS.reflectHost = "TRUE"` hides it entirely. The VMware backdoor probe is neutralized by `monitor_control.restrict_backdoor = "TRUE"` (and by simply not installing guest tools), and other hypervisors allow overriding SMBIOS strings directly.
+**The VM checks are bypassable by configuration alone.** The registry check matches vendor strings only at the *start* of the BIOS/product values, while at least one major hypervisor places its marker at the *end* of its BIOS version — setting `SMBIOS.reflectHost = "TRUE"` hides it entirely. The VMware backdoor probe is neutralized by `monitor_control.restrict_backdoor = "TRUE"` (and by not installing guest tools), and other hypervisors allow overriding SMBIOS strings directly.
 
 **The debug log is a self-documenting loader.** The status-code design that helps the vendor's support also hands the analyst a stage-by-stage execution trace and a 2-byte search pattern per stage. The mailslot channel is encrypted, but the file log is not.
 
-**Page encryption yields to in-process readers.** The demand-decrypt handler services faults from any thread in the same process, so a helper inside the process can touch every page and copy the decrypted bytes. The anti-dump scribble is reversible, and on builds where it is disabled the pages are simply clean.
+**Page encryption yields to in-process readers.** The demand-decrypt handler services faults from any thread in the same process, so a helper inside the process can touch every page and copy the decrypted bytes. The anti-dump scribble is reversible, and on builds where it is disabled the pages are clean.
 
 **The kernel drivers weaken the host.** Generation 1 exposes unauthenticated kernel shellcode execution to any process. Generation 2's PID-encryption "authentication" grants its `EPROCESS`-write primitive to any program that reproduces it — a signed BYOVD — and the Protected Process flag it sets can be toggled off with kernel-level access or absorbed by injecting before it is set. Only generation 3 avoids granting attackers new powers.
 

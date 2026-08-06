@@ -1,6 +1,6 @@
 # Table of contents
 
-* [Crackproof 内部机制](README.md)
+* [CrackProof for Windows 内部机制](README.md)
 * [受保护文件格式](file-format.md)
 * [数据变换原语](primitives.md)
 * [分阶段加载器](staged-loader.md)

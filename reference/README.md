@@ -4,7 +4,7 @@ description: "The runnable verification suite behind the document's Python snipp
 
 # Verification & reference
 
-This section publishes the reference material behind [Crackproof internals](https://launchcore.gitbook.io/crackproof-research/docs) in its complete, runnable form.
+This section publishes the reference material behind [CrackProof internals](https://launchcore.gitbook.io/crackproof-research/docs) in its complete, runnable form.
 
 ## Verification suite
 
@@ -25,4 +25,4 @@ To re-run the full comparison, download the files and execute `python run_tests.
 
 ## Reference captures
 
-[Sample debug logs](debug-logs.md) — real Crackproof debug logs captured from a protected process, desensitized: a fully featured host EXE (page-encrypted), a native plugin DLL (bulk-decrypted only), and a managed DLL.
+[Sample debug logs](debug-logs.md) — real CrackProof debug logs captured from a protected process, desensitized: a fully featured host EXE (page-encrypted), a native plugin DLL (bulk-decrypted only), and a managed DLL.

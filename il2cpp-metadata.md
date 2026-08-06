@@ -4,7 +4,7 @@ description: "The optional -GMD method-token obfuscation applied to Unity il2cpp
 
 # il2cpp metadata obfuscation
 
-Separate from the PE protection, Crackproof offers an option (`-GMD`) that obfuscates Unity il2cpp titles' **`global-metadata.dat`**. It changes exactly one thing: the **method-token field** of every `Il2CppMethodDefinition` record.
+Separate from the PE protection, CrackProof offers an option (`-GMD`) that obfuscates Unity il2cpp titles' **`global-metadata.dat`**. It changes exactly one thing: the **method-token field** of every `Il2CppMethodDefinition` record.
 
 ## What it does and why it works
 
@@ -16,7 +16,7 @@ This matters whenever the metadata is consumed outside the protected loader: an 
 
 ## Reversal from structure alone
 
-The obfuscation needs no key and carries no secret — which means it is reversible from the metadata's own structure. Methods are laid out grouped by type, and types grouped by image (module), so a method's correct token row is simply its position within its module's method range:
+The obfuscation needs no key and carries no secret — which means it is reversible from the metadata's own structure. Methods are laid out grouped by type, and types grouped by image (module), so a method's correct token row is its position within its module's method range:
 
 ```
 local_index = method_index - module_first_method_index
