@@ -472,9 +472,9 @@ The boolean result is a corruption signal — and, importantly, an **oracle**: w
 
 The most distinctive layer: CrackProof does not hardcode a fixed per-byte transform for payload data. At pack time it **generates a unique x86 stub for each build** — a function that takes one byte in `AL`, applies a short random sequence of arithmetic/rotate instructions, and returns. The loader runs this stub over every payload byte between the block-cipher pass and decompression. Two protected files from different builds therefore share no payload permutation.
 
-The stub is stored wrapped in the LFSR keystream (above). Rather than executing x86, the instruction bytes can be decoded into a tiny op list and interpreted — only a narrow instruction subset ever appears:
+The stub is stored wrapped in the LFSR keystream (above). Only a narrow instruction subset ever appears:
 
-| Bytes | x86 instruction | VM operation |
+| Bytes | x86 instruction | Decoded op |
 | --- | --- | --- |
 | `04 ib` | `ADD AL, imm8` | `("add", imm)` |
 | `2C ib` | `SUB AL, imm8` | `("sub", imm)` |
