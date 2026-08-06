@@ -62,20 +62,18 @@ def header_kdf(file_data, offset=4096):
 
 ### 格式 magic
 
-`info[1]` 是构建的戳记。已知三个取值：
+`info[1]` 是构建的戳记，即格式 magic：
 
-| magic（LE 字节） | 值 | 状态 |
-| --- | --- | --- |
-| `KONN` | `0x4E4E4F4B` | 本文档完整覆盖 |
-| `KNKN` | `0x4E4B4E4B` | 容器算法一致；构建戳不同 |
-| `CUSN` | `0x4E535543` | 已知的第三种戳，布局不兼容；不在本文档范围内 |
+| magic（LE 字节） | 值 |
+| --- | --- |
+| `KONN` | `0x4E4E4F4B` |
 
 ## 识别与分类
 
 受保护模块不一定带 `.exe`/`.dll` 文件名——野外存在改名副本（例如 `.bak`）——因此识别必须基于内容。满足以下条件即为 CrackProof 保护文件：
 
 1. 至少 4128 字节长，且 `e_lfanew`（`u32@0x3C`）处有有效 `PE\0\0` 签名。
-2. 对偏移 4096 应用 KDF 得到 `info[1] ∈ {KONN, KNKN}`。
+2. 对偏移 4096 应用 KDF 得到 `info[1] == KONN`。
 
 分类则使用常规 PE 字段：
 
@@ -83,8 +81,7 @@ def header_kdf(file_data, offset=4096):
 - 对 DLL，COM 描述符（CLR）数据目录——第 14 项，位于可选头 PE32 `+96` 或 PE32+ `+112` 处——区分托管（.NET）与原生。
 
 ```python
-MAGIC_KONN = 0x4E4E4F4B  # the two supported shell stamps...
-MAGIC_KNKN = 0x4E4B4E4B  # ...identical algorithm, different build stamp
+MAGIC_KONN = 0x4E4E4F4B  # the shell stamp
 
 def detect(file_data):
     """Return ("exe" | "native-dll" | "managed-dll", magic) for a protected
@@ -95,7 +92,7 @@ def detect(file_data):
     if file_data[pe_off:pe_off + 4] != b"PE\0\0":
         return None
     info = header_kdf(file_data)
-    if info[1] not in (MAGIC_KONN, MAGIC_KNKN):
+    if info[1] != MAGIC_KONN:
         return None
 
     characteristics = get_u16(file_data, pe_off + 4 + 18)   # IMAGE_FILE_HEADER

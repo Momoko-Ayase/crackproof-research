@@ -8,9 +8,7 @@ description: "Quick-reference tables of constants, offsets, and encodings used a
 
 | Magic | Value | Meaning |
 | --- | --- | --- |
-| `KONN` | `0x4E4E4F4B` | Supported container stamp |
-| `KNKN` | `0x4E4B4E4B` | Supported container stamp (identical algorithm) |
-| `CUSN` | `0x4E535543` | Known third stamp; incompatible layout |
+| `KONN` | `0x4E4E4F4B` | Container stamp |
 
 ## Container constants
 

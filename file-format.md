@@ -62,20 +62,18 @@ The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 +
 
 ### Format magics
 
-`info[1]` stamps the build. Three values are known:
+`info[1]` stamps the build with the format magic:
 
-| Magic (LE bytes) | Value | Status |
-| --- | --- | --- |
-| `KONN` | `0x4E4E4F4B` | Fully documented here |
-| `KNKN` | `0x4E4B4E4B` | Identical container algorithm; different build stamp |
-| `CUSN` | `0x4E535543` | Known third stamp with an incompatible layout; not covered by this document |
+| Magic (LE bytes) | Value |
+| --- | --- |
+| `KONN` | `0x4E4E4F4B` |
 
 ## Recognition and classification
 
 Protected modules do not always carry `.exe`/`.dll` names — renamed copies (for example `.bak`) exist in the wild — so recognition must be content-based. A file is CrackProof-protected when:
 
 1. It is at least 4128 bytes long and has a valid `PE\0\0` signature at `e_lfanew` (`u32@0x3C`).
-2. The KDF over offset 4096 yields `info[1] ∈ {KONN, KNKN}`.
+2. The KDF over offset 4096 yields `info[1] == KONN`.
 
 Classification then uses ordinary PE fields:
 
@@ -83,8 +81,7 @@ Classification then uses ordinary PE fields:
 - For DLLs, the COM descriptor (CLR) data directory — entry 14, at optional-header `+96` on PE32 or `+112` on PE32+ — distinguishes managed (.NET) from native.
 
 ```python
-MAGIC_KONN = 0x4E4E4F4B  # the two supported shell stamps...
-MAGIC_KNKN = 0x4E4B4E4B  # ...identical algorithm, different build stamp
+MAGIC_KONN = 0x4E4E4F4B  # the shell stamp
 
 def detect(file_data):
     """Return ("exe" | "native-dll" | "managed-dll", magic) for a protected
@@ -95,7 +92,7 @@ def detect(file_data):
     if file_data[pe_off:pe_off + 4] != b"PE\0\0":
         return None
     info = header_kdf(file_data)
-    if info[1] not in (MAGIC_KONN, MAGIC_KNKN):
+    if info[1] != MAGIC_KONN:
         return None
 
     characteristics = get_u16(file_data, pe_off + 4 + 18)   # IMAGE_FILE_HEADER
