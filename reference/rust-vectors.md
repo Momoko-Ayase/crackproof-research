@@ -8,9 +8,9 @@ The reference port used to produce the ground-truth vectors. Every primitive is 
 
 ```rust
 // Vector generator for the Crackproof research documentation.
-// Every primitive below is copied VERBATIM from the reference implementation
-// (senbei/src/unpacker/*.rs) so the printed vectors are authoritative ground
-// truth for the Python snippets that ship in the docs.
+// Every primitive below is copied VERBATIM from a reference port of the
+// algorithms as implemented in protected binaries, so the printed vectors
+// are authoritative ground truth for the Python snippets in the docs.
 
 // ---------------------------------------------------------------------------
 // Byte-order accessors (primitives.rs)
