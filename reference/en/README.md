@@ -1,7 +1,5 @@
 ---
-description: >-
-  The runnable verification suite behind the document's Python snippets, plus
-  desensitized reference material captured from real protected binaries.
+description: "Runnable snippet verification and desensitized reference material from protected binaries."
 ---
 
 # Verification & reference

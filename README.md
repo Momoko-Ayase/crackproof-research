@@ -17,8 +17,3 @@ Windows PE files and Android native libraries.
 
 Each content directory is published through GitBook Git Sync. Editing rules
 for contributors and agents: see `AGENTS.md`.
-
-The legacy `internals/en/` and `internals/zh-cn/` directories remain temporarily
-so the existing Windows Spaces keep publishing while Git Sync is moved to the
-new project directories. Remove them only after both Windows Spaces have been
-rewired and a successful sync has been confirmed.

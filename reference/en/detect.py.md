@@ -1,12 +1,10 @@
 ---
-description: >-
-  Content-based detection and classification of protected files (KONN magic,
-  EXE/DLL, managed/native).
+description: "Content-based detection and classification of protected files (KONN magic, EXE/DLL, managed/native)."
 ---
 
 # detect.py
 
-The detection and classification logic documented in [The protected file format](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/file-format#recognition-and-classification).
+The detection and classification logic documented in [Recognition and build families](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/file-format/recognition.md).
 
 ```python
 """Content-based detection and classification of a protected PE file.

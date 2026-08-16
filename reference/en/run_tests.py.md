@@ -1,7 +1,5 @@
 ---
-description: >-
-  The comparison harness: replays every scenario in Python and compares
-  byte-for-byte with the reference vectors.
+description: "The comparison harness: replays every scenario in Python and compares byte-for-byte with the reference vectors."
 ---
 
 # run\_tests.py

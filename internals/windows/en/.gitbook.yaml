@@ -1,0 +1,16 @@
+root: ./
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md
+
+redirects:
+  file-format: file-format/README.md
+  primitives: data-transforms/README.md
+  staged-loader: loading/README.md
+  pe-transformations: pe-reconstruction/README.md
+  runtime-behavior: runtime/README.md
+  kernel-components: runtime/kernel-components.md
+  analysis-notes: analysis/README.md
+  il2cpp-metadata: analysis/il2cpp-metadata.md
+  appendix: analysis/constants.md

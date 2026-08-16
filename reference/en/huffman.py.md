@@ -1,12 +1,10 @@
 ---
-description: >-
-  The Huffman/LZ hybrid decompressor: 3-byte table entries,
-  literal/run-fill/back-reference tokens.
+description: "The Huffman/LZ hybrid decompressor: 3-byte table entries, literal/run-fill/back-reference tokens."
 ---
 
 # huffman.py
 
-The decompressor used for stages and section blocks, as documented in [Data transformation primitives](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/primitives#the-huffman-lz-compression-format).
+The decompressor used for stages and section blocks, as documented in [Huffman and LZ compression](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/compression.md).
 
 ```python
 """The Huffman/LZ hybrid decompressor.

@@ -1,7 +1,5 @@
 ---
-description: >-
-  The 30 ground-truth vectors printed by the reference port, which run_tests.py
-  compares against.
+description: "The 30 ground-truth vectors printed by the reference port, which run_tests.py compares against."
 ---
 
 # vectors.txt

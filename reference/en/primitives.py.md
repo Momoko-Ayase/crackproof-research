@@ -1,12 +1,10 @@
 ---
-description: >-
-  Rolling-key ciphers, byte-rotation ciphers, LFSR keystream, string cipher,
-  page scramble, CRC-32, checksums, and the triangular key schedule.
+description: "Rolling, rotation, LFSR, string, page, CRC-32, checksum, and key-schedule reference code."
 ---
 
 # primitives.py
 
-Every data transform except the block cipher, the decompressor, and the bytecode VM — the ciphers and checksums documented in [Data transformation primitives](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/primitives).
+Every data transform except the block cipher, the decompressor, and the bytecode VM — the ciphers and checksums documented in [Data transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/README.md).
 
 ```python
 """Reference implementations of the protection scheme's data transforms.

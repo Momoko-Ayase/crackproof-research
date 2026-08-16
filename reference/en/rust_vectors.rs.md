@@ -1,7 +1,5 @@
 ---
-description: >-
-  The independent reference port of the algorithms; compiles to a program that
-  prints ground-truth vectors.
+description: "The independent reference port of the algorithms; compiles to a program that prints ground-truth vectors."
 ---
 
 # rust\_vectors.rs
