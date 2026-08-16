@@ -4,7 +4,7 @@ description: "Huffman/LZ 混合解压器：3 字节表项，字面量/行程填�
 
 # huffman.py
 
-用于 stage 与节数据块的解压器，见 [Huffman 与 LZ 压缩](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/data-transforms/compression.md)。
+用于 stage 与节数据块的解压器，见 [Huffman 与 LZ 压缩](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/shu-ju-bian-huan/data-transforms/compression)。
 
 ```python
 """The Huffman/LZ hybrid decompressor.

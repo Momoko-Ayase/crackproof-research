@@ -4,7 +4,7 @@ description: "Content-based detection and classification of protected files (KON
 
 # detect.py
 
-The detection and classification logic documented in [Recognition and build families](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/file-format/recognition.md).
+The detection and classification logic documented in [Recognition and build families](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/file-structure/file-format/recognition).
 
 ```python
 """Content-based detection and classification of a protected PE file.

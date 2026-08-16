@@ -4,7 +4,7 @@ description: "The per-build custom byte transform: x86 stub decoder, interpreter
 
 # bytecode\_vm.py
 
-The bytecode VM that decodes each build's unique x86 stub, as documented in [Bytecode transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/bytecode-transform.md).
+The bytecode VM that decodes each build's unique x86 stub, as documented in [Bytecode transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/data-transforms/bytecode-transform).
 
 ```python
 """The per-build custom byte transform ("bytecode VM").
