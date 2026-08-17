@@ -1,12 +1,24 @@
 ---
-description: "Independent technical research into CrackProof protection formats and runtime behavior."
+description: >-
+  Independent technical research into CrackProof protection formats and runtime
+  behavior.
 layout:
-  width: default
+  width: wide
+  title:
+    visible: true
+  description:
+    visible: true
   tableOfContents:
     visible: false
   outline:
     visible: false
   pagination:
+    visible: false
+  metadata:
+    visible: false
+  tags:
+    visible: true
+  actions:
     visible: false
 ---
 
@@ -16,32 +28,7 @@ CrackProof® is a family of commercial binary-protection systems from HyperTech.
 
 The research currently covers Windows PE files and Android native libraries. Each platform has its own container format and restoration path, so their internals are documented separately.
 
-<table data-view="cards">
-  <thead>
-    <tr>
-      <th></th>
-      <th></th>
-      <th data-hidden data-card-target data-type="content-ref"></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>Windows internals</strong></td>
-      <td>Protected PE layout, transforms, staged loading, PE reconstruction, and runtime behavior.</td>
-      <td><a href="https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/readme">Windows internals</a></td>
-    </tr>
-    <tr>
-      <td><strong>Android SO internals</strong></td>
-      <td>Protected AArch64 ELF layout, module streams, container decoding, ELF restoration, and IL2CPP metadata.</td>
-      <td><a href="https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/readme">Android SO internals</a></td>
-    </tr>
-    <tr>
-      <td><strong>Verification and reference</strong></td>
-      <td>Executable test vectors and small reference implementations for the documented Windows transforms.</td>
-      <td><a href="https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/readme">Verification and reference</a></td>
-    </tr>
-  </tbody>
-</table>
+<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Windows internals</strong></td><td>Protected PE layout, transforms, staged loading, PE reconstruction, and runtime behavior.</td><td><a href="https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/">CrackProof for Windows internals</a></td></tr><tr><td><strong>Android SO internals</strong></td><td>Protected AArch64 ELF layout, module streams, container decoding, ELF restoration, and IL2CPP metadata.</td><td><a href="https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/">CrackProof for Android SO internals</a></td></tr><tr><td><strong>Verification and reference</strong></td><td>Executable test vectors and small reference implementations for the documented Windows transforms.</td><td><a href="https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/">Verification &#x26; reference</a></td></tr></tbody></table>
 
 ## Research boundaries
 
