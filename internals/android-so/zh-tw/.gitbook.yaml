@@ -1,0 +1,26 @@
+root: ./
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md
+
+redirects:
+  # Preserve old nested paths from the previous group layout.
+  file-format/file-format: file-format/README.md
+  file-format/file-format/protected-elf: file-format/protected-elf.md
+  file-format/file-format/stage1: file-format/stage1.md
+  file-format/file-format/stage2-streams: file-format/stage2-streams.md
+  data-transforms/data-transforms: data-transforms/README.md
+  data-transforms/data-transforms/module-config: data-transforms/module-config.md
+  data-transforms/data-transforms/container: data-transforms/container.md
+  data-transforms/data-transforms/compression: data-transforms/compression.md
+  restoration/restoration: restoration/README.md
+  restoration/restoration/module-streams: restoration/module-streams.md
+  restoration/restoration/dynamic-linking: restoration/dynamic-linking.md
+  restoration/restoration/elf-output: restoration/elf-output.md
+  metadata/metadata: metadata/README.md
+  metadata/metadata/method-tokens: metadata/method-tokens.md
+  metadata/metadata/storage-layouts: metadata/storage-layouts.md
+  analysis/analysis: analysis/README.md
+  analysis/analysis/validation: analysis/validation.md
+  analysis/analysis/constants: analysis/constants.md

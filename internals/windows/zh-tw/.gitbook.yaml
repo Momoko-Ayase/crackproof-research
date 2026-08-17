@@ -1,0 +1,36 @@
+root: ./
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md
+
+redirects:
+  file-format: file-format/README.md
+  primitives: data-transforms/README.md
+  staged-loader: loading/README.md
+  pe-transformations: pe-reconstruction/README.md
+  runtime-behavior: runtime/README.md
+  kernel-components: runtime/kernel-components.md
+  analysis-notes: analysis/README.md
+  il2cpp-metadata: analysis/il2cpp-metadata.md
+  appendix: analysis/constants.md
+
+  # Preserve old nested paths from the previous group layout.
+  file-structure/file-format/container-layout: file-format/container-layout.md
+  file-structure/file-format/recognition: file-format/recognition.md
+  file-structure/file-format/companion-layout: file-format/companion-layout.md
+  data-transforms/data-transforms/rolling-and-rotation: data-transforms/rolling-and-rotation.md
+  data-transforms/data-transforms/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
+  data-transforms/data-transforms/checksums: data-transforms/checksums.md
+  data-transforms/data-transforms/aes: data-transforms/aes.md
+  data-transforms/data-transforms/compression: data-transforms/compression.md
+  data-transforms/data-transforms/bytecode-transform: data-transforms/bytecode-transform.md
+  runtime/runtime/startup-status: runtime/startup-status.md
+  runtime/runtime/environment-checks: runtime/environment-checks.md
+  runtime/runtime/page-protection: runtime/page-protection.md
+  runtime/runtime/mapped-modules: runtime/mapped-modules.md
+  runtime/runtime/kernel-components: runtime/kernel-components.md
+  analysis/analysis/workflow: analysis/workflow.md
+  analysis/analysis/observed-limitations: analysis/observed-limitations.md
+  analysis/analysis/il2cpp-metadata: analysis/il2cpp-metadata.md
+  analysis/analysis/constants: analysis/constants.md
