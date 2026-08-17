@@ -10,9 +10,12 @@ Requires: pip install opencc-python-reimplemented
 
 The script:
 
-1. Scans every zh-cn Markdown file for GitBook numeric-entity corruption
-   (CJK next to symbols exported as ``&#x8D56;``) and rewrites those
-   characters back to readable text in the zh-cn source.
+1. Repairs GitBook Markdown damage in every zh-cn source file:
+   - numeric-entity corruption (CJK next to symbols exported as
+     ``&#x8D56;``) is decoded back to the character;
+   - underscore emphasis next to CJK (``依赖_原始_的``) is rewritten to
+     asterisk emphasis (``依赖*原始*的``), because CommonMark treats CJK
+     as word characters and will not render ``_…_`` there.
 2. Rebuilds each zh-tw directory from the matching zh-cn tree.
 3. Converts prose with OpenCC ``s2tw`` (Taiwan character standard, not
    ``s2twp`` phrase localization) so terminology stays aligned with zh-cn.
@@ -62,6 +65,8 @@ FENCE_RE = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 INLINE_RE = re.compile(r"`[^`\n]+`")
+# Single-underscore emphasis only. Do not touch __bold__ or snake_case.
+UNDERSCORE_EMPHASIS_RE = re.compile(r"(?<!_)_([^_\n]+?)_(?!_)")
 
 # OpenCC s2tw sometimes reads 干 as 幹 (work) instead of 乾 (dry).
 # 幹淨 is not a valid word; 干净 must become 乾淨.
@@ -81,6 +86,10 @@ def is_cjk(cp: int) -> bool:
     )
 
 
+def is_cjk_char(ch: str) -> bool:
+    return bool(ch) and is_cjk(ord(ch))
+
+
 def decode_cjk_entities(text: str) -> tuple[str, list[str]]:
     found: list[str] = []
 
@@ -94,6 +103,71 @@ def decode_cjk_entities(text: str) -> tuple[str, list[str]]:
         return ch
 
     return ENTITY_RE.sub(repl, text), found
+
+
+def rewrite_cjk_underscore_emphasis(text: str) -> tuple[str, list[str]]:
+    """Turn `_…_` into `*…*` when the span is next to or contains CJK.
+
+    CommonMark treats CJK as word characters, so `_原始_` between hanzi
+    is intra-word and does not become <em>. Asterisks do.
+    """
+    found: list[str] = []
+
+    def repl(match: re.Match[str]) -> str:
+        inner = match.group(1)
+        start, end = match.span()
+        prev = match.string[start - 1] if start > 0 else ""
+        nxt = match.string[end] if end < len(match.string) else ""
+        if not (
+            is_cjk_char(prev)
+            or is_cjk_char(nxt)
+            or any(is_cjk_char(ch) for ch in inner)
+        ):
+            return match.group(0)
+        found.append(f"_{inner}_ -> *{inner}*")
+        return f"*{inner}*"
+
+    return UNDERSCORE_EMPHASIS_RE.sub(repl, text), found
+
+
+def map_noncode(text: str, transform) -> tuple[str, list[str]]:
+    """Apply *transform* to Markdown outside fenced and inline code."""
+    notes: list[str] = []
+    fence_parts: list[str] = []
+    last = 0
+    for match in FENCE_RE.finditer(text):
+        chunk, extra = map_inline(text[last:match.start()], transform)
+        fence_parts.append(chunk)
+        notes.extend(extra)
+        fence_parts.append(match.group(0))
+        last = match.end()
+    chunk, extra = map_inline(text[last:], transform)
+    fence_parts.append(chunk)
+    notes.extend(extra)
+    return "".join(fence_parts), notes
+
+
+def map_inline(text: str, transform) -> tuple[str, list[str]]:
+    notes: list[str] = []
+    parts: list[str] = []
+    last = 0
+    for match in INLINE_RE.finditer(text):
+        chunk, extra = transform(text[last:match.start()])
+        parts.append(chunk)
+        notes.extend(extra)
+        parts.append(match.group(0))
+        last = match.end()
+    chunk, extra = transform(text[last:])
+    parts.append(chunk)
+    notes.extend(extra)
+    return "".join(parts), notes
+
+
+def repair_markdown(text: str) -> tuple[str, list[str]]:
+    decoded, notes = decode_cjk_entities(text)
+    rewritten, extra = map_noncode(decoded, rewrite_cjk_underscore_emphasis)
+    notes.extend(extra)
+    return rewritten, notes
 
 
 def convert_prose(text: str, cc: OpenCC) -> str:
@@ -144,13 +218,13 @@ def repair_zh_cn() -> int:
         src_root = REPO_ROOT / src_rel
         for path in sorted(src_root.rglob("*.md")):
             original, newline = read_text(path)
-            fixed, found = decode_cjk_entities(original)
+            fixed, found = repair_markdown(original)
             if not found:
                 continue
             write_text(path, fixed, newline)
             repaired += 1
             rel = path.relative_to(REPO_ROOT).as_posix()
-            print(f"repaired entities in {rel}")
+            print(f"repaired {rel}")
             for item in found:
                 print(f"  {item}")
     return repaired
@@ -194,7 +268,7 @@ def rebuild_zh_tw(cc: OpenCC) -> None:
 
 def main() -> int:
     repaired = repair_zh_cn()
-    print(f"entity repair: {repaired} file(s)")
+    print(f"zh-cn repair: {repaired} file(s)")
     rebuild_zh_tw(OpenCC("s2tw"))
     print("zh-tw regeneration complete")
     return 0
