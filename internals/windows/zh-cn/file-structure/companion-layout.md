@@ -1,5 +1,5 @@
 ---
-description: "如何定位节载荷，以及 stub 可执行文件如何引用外置伴生文件。"
+description: 如何定位节载荷，以及 stub 可执行文件如何引用外置伴生文件。
 ---
 
 # 节数据与伴生文件
@@ -18,8 +18,8 @@ section_data_file_base = (~u32@0x1080) + 0x1000      (32-bit wrapping)
 
 某些构建——目前仅在 il2cpp 作品上观察到——把受保护模块拆成一对文件：
 
-- **`Foo.dll`**——磁盘上的瘦**加载器 stub**。其代码节被裁剪到只剩一页（即 CrackProof 加载器本体），但其头部与 `.rdata` 是完整明文。
-- **`Foo.dll._`**——全加密的**伴生体**，持有真正的 payload。它不含任何明文 PE 结构（熵 ≈ 8 比特/字节）。
+* **`Foo.dll`**——磁盘上的瘦**加载器 stub**。其代码节被裁剪到只剩一页（即 CrackProof 加载器本体），但其头部与 `.rdata` 是完整明文。
+* **`Foo.dll._`**——全加密的**伴生体**，持有真正的 payload。它不含任何明文 PE 结构（熵 ≈ 8 比特/字节）。
 
 伴生体逐字节等于 stub 自 CrackProof 头部（偏移 4096）起的 payload 区。运行时加载器映射 `Foo.dll._` 并对其执行常规解包；实际运行的模块实际上就是拼接体 `stub[..4096] ++ companion`。
 
@@ -27,9 +27,8 @@ section_data_file_base = (~u32@0x1080) + 0x1000      (32-bit wrapping)
 
 stub 以明文保留的内容对后续重建很重要：
 
-- **导出目录**（伴生体在此处解密为密文；加载器运行时从 stub 的副本重建导出）。
-- **TLS 目录**——`IMAGE_TLS_DIRECTORY` 结构体、其原始数据模板与数据目录项，这些都被保护层从加密 payload 中剥离（见 [PE 变换](../pe-reconstruction/README.md)）。
-- 真实的 `DllCharacteristics` 字段与基址重定位表——伴生模块**不是** `/FIXED`，与较旧的单文件构建不同。
+* **导出目录**（伴生体在此处解密为密文；加载器运行时从 stub 的副本重建导出）。
+* **TLS 目录**——`IMAGE_TLS_DIRECTORY` 结构体、其原始数据模板与数据目录项，这些都被保护层从加密 payload 中剥离（见 [PE 变换](../loading-and-pe-repair/pe-reconstruction/)）。
+* 真实的 `DllCharacteristics` 字段与基址重定位表——伴生模块**不是** `/FIXED`，与较旧的单文件构建不同。
 
-关于此文件对在启动时如何加载，见[运行时行为](../runtime/README.md)；关于缺失部分如何被还原进重建映像，见 [PE 变换](../pe-reconstruction/README.md)。
-
+关于此文件对在启动时如何加载，见[运行时行为](../runtime/runtime.md)；关于缺失部分如何被还原进重建映像，见 [PE 变换](../loading-and-pe-repair/pe-reconstruction/)。
