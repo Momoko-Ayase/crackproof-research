@@ -5,50 +5,22 @@ structure:
   summary: SUMMARY.md
 
 redirects:
-  # Preserve URLs from the previous Overview nesting.
+  # Preserve old nested paths from the previous group layout.
+  file-format/file-format: file-format/README.md
   file-format/file-format/protected-elf: file-format/protected-elf.md
   file-format/file-format/stage1: file-format/stage1.md
   file-format/file-format/stage2-streams: file-format/stage2-streams.md
+  data-transforms/data-transforms: data-transforms/README.md
   data-transforms/data-transforms/module-config: data-transforms/module-config.md
   data-transforms/data-transforms/container: data-transforms/container.md
   data-transforms/data-transforms/compression: data-transforms/compression.md
+  restoration/restoration: restoration/README.md
   restoration/restoration/module-streams: restoration/module-streams.md
   restoration/restoration/dynamic-linking: restoration/dynamic-linking.md
   restoration/restoration/elf-output: restoration/elf-output.md
+  metadata/metadata: metadata/README.md
   metadata/metadata/method-tokens: metadata/method-tokens.md
   metadata/metadata/storage-layouts: metadata/storage-layouts.md
+  analysis/analysis: analysis/README.md
   analysis/analysis/validation: analysis/validation.md
   analysis/analysis/constants: analysis/constants.md
-
-  # Resolve paths copied from the Chinese variant during language switching.
-  wen-jian-ge-shi/file-format: file-format/README.md
-  wen-jian-ge-shi/protected-elf: file-format/protected-elf.md
-  wen-jian-ge-shi/stage1: file-format/stage1.md
-  wen-jian-ge-shi/stage2-streams: file-format/stage2-streams.md
-  wen-jian-ge-shi/file-format/protected-elf: file-format/protected-elf.md
-  wen-jian-ge-shi/file-format/stage1: file-format/stage1.md
-  wen-jian-ge-shi/file-format/stage2-streams: file-format/stage2-streams.md
-  shu-ju-bian-huan/data-transforms: data-transforms/README.md
-  shu-ju-bian-huan/module-config: data-transforms/module-config.md
-  shu-ju-bian-huan/container: data-transforms/container.md
-  shu-ju-bian-huan/compression: data-transforms/compression.md
-  shu-ju-bian-huan/data-transforms/module-config: data-transforms/module-config.md
-  shu-ju-bian-huan/data-transforms/container: data-transforms/container.md
-  shu-ju-bian-huan/data-transforms/compression: data-transforms/compression.md
-  hui-fu/restoration: restoration/README.md
-  hui-fu/module-streams: restoration/module-streams.md
-  hui-fu/dynamic-linking: restoration/dynamic-linking.md
-  hui-fu/elf-output: restoration/elf-output.md
-  hui-fu/restoration/module-streams: restoration/module-streams.md
-  hui-fu/restoration/dynamic-linking: restoration/dynamic-linking.md
-  hui-fu/restoration/elf-output: restoration/elf-output.md
-  yuan-shu-ju/metadata: metadata/README.md
-  yuan-shu-ju/method-tokens: metadata/method-tokens.md
-  yuan-shu-ju/storage-layouts: metadata/storage-layouts.md
-  yuan-shu-ju/metadata/method-tokens: metadata/method-tokens.md
-  yuan-shu-ju/metadata/storage-layouts: metadata/storage-layouts.md
-  fen-xi/analysis: analysis/README.md
-  fen-xi/validation: analysis/validation.md
-  fen-xi/constants: analysis/constants.md
-  fen-xi/analysis/validation: analysis/validation.md
-  fen-xi/analysis/constants: analysis/constants.md

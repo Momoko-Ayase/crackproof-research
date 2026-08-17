@@ -2,35 +2,30 @@
 
 * [CrackProof for Android SO internals](README.md)
 
-## File format
+* [File format](file-format.md)
+    * [Overview](file-format/README.md)
+    * [Protected ELF](file-format/protected-elf.md)
+    * [Stage 1 header](file-format/stage1.md)
+    * [Stage 2 streams](file-format/stage2-streams.md)
 
-* [Overview](file-format/README.md)
-* [Protected ELF](file-format/protected-elf.md)
-* [Stage 1 header](file-format/stage1.md)
-* [Stage 2 streams](file-format/stage2-streams.md)
+* [Data transforms](data-transforms.md)
+    * [Overview](data-transforms/README.md)
+    * [Module configuration](data-transforms/module-config.md)
+    * [Container transforms](data-transforms/container.md)
+    * [Huffman and LZ compression](data-transforms/compression.md)
 
-## Data transforms
+* [Restoration](restoration.md)
+    * [Overview](restoration/README.md)
+    * [Module streams](restoration/module-streams.md)
+    * [Dynamic linking](restoration/dynamic-linking.md)
+    * [ELF output](restoration/elf-output.md)
 
-* [Overview](data-transforms/README.md)
-* [Module configuration](data-transforms/module-config.md)
-* [Container transforms](data-transforms/container.md)
-* [Huffman and LZ compression](data-transforms/compression.md)
+* [Metadata](metadata.md)
+    * [Overview](metadata/README.md)
+    * [Method tokens](metadata/method-tokens.md)
+    * [Storage layouts](metadata/storage-layouts.md)
 
-## Restoration
-
-* [Overview](restoration/README.md)
-* [Module streams](restoration/module-streams.md)
-* [Dynamic linking](restoration/dynamic-linking.md)
-* [ELF output](restoration/elf-output.md)
-
-## Metadata
-
-* [Overview](metadata/README.md)
-* [Method tokens](metadata/method-tokens.md)
-* [Storage layouts](metadata/storage-layouts.md)
-
-## Analysis
-
-* [Overview](analysis/README.md)
-* [Validation checklist](analysis/validation.md)
-* [Constants](analysis/constants.md)
+* [Analysis](analysis.md)
+    * [Overview](analysis/README.md)
+    * [Validation checklist](analysis/validation.md)
+    * [Constants](analysis/constants.md)
