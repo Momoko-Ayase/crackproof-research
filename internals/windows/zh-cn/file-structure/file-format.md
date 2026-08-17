@@ -9,5 +9,5 @@ Windows 格式保留面向 PE 加载器的有效外层映像，但把原始映�
 | 主题 | 可确定的内容 |
 |---|---|
 | [容器与加密头](container-layout.md) | 大偏移范围、八个 dword 组成的 `info` 表及其密钥派生 |
-| [识别与构建家族](recognition.md) | 用于区分 PE32、PE32+、EXE、DLL、原生与 CLR 情况的证据 |
+| [识别与构建家族](recognition.md) | 用于区分 PE32、PE32+、原生/托管 EXE 与原生/托管 DLL 的证据 |
 | [节数据与伴生文件](companion-layout.md) | 节记录如何映射到载荷，以及外置 `._` 数据如何与 stub 组合 |

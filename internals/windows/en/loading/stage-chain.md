@@ -100,7 +100,7 @@ if len != plain_len: huffman_decompress(dst → dst, key_offsets[0], len, plain_
 
 ### Phase 8: import-name decryption
 
-walk5 entries (20 bytes each) point at encrypted DLL names (`+12`) and thunk chains (`+0` or `+16`). Each name is decrypted with the [string cipher](../data-transforms/lfsr-strings-pages.md#the-import-name-string-cipher), lowercased, and each by-name thunk (bit 63 clear on PE32+) has its hint/name string decrypted and its hint field zeroed. Ordinal imports (bit 63 set) are left alone.
+walk5 entries (20 bytes each) point at encrypted DLL names (`+12`) and thunk chains (`+0` or `+16`). Each name is decrypted with the [string cipher](../data-transforms/lfsr-strings-pages.md#the-import-name-string-cipher), lowercased, and each by-name thunk (bit 63 clear on PE32+) has its hint/name string decrypted and its hint field zeroed. Ordinal imports (bit 63 set) are left alone. A null walk5 pointer means there is no table to walk: managed assemblies leave the slot empty because their imports are the CLR bootstrap stub.
 
 ### Phase 9: PE reconstruction
 

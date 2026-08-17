@@ -100,7 +100,7 @@ if len != plain_len: huffman_decompress(dst → dst, key_offsets[0], len, plain_
 
 ### 阶段 8：导入名解密
 
-walk5 条目（每个 20 字节）指向加密的 DLL 名（`+12`）与 thunk 链（`+0` 或 `+16`）。每个名字用[字符串密码](../../data-transforms/lfsr-strings-pages.md#导入名字符串密码)解密并转小写；每个按名 thunk（PE32+ 上 bit 63 清零）的 hint/name 字符串被解密、hint 字段清零。序数导入（bit 63 置位）原样保留。
+walk5 条目（每个 20 字节）指向加密的 DLL 名（`+12`）与 thunk 链（`+0` 或 `+16`）。每个名字用[字符串密码](../../data-transforms/lfsr-strings-pages.md#导入名字符串密码)解密并转小写；每个按名 thunk（PE32+ 上 bit 63 清零）的 hint/name 字符串被解密、hint 字段清零。序数导入（bit 63 置位）原样保留。walk5 指针为 null 表示没有表可走：托管程序集把该槽留空，因为它们的导入只是 CLR 引导 stub。
 
 ### 阶段 9：PE 重建
 

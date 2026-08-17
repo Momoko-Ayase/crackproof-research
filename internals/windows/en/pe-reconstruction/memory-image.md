@@ -27,6 +27,8 @@ On 64-bit marker builds the placement is probed: trial-decrypt the dword after t
 
 The PE header fields the runtime loader does not use directly stay blanked in the on-disk header until this restoration runs — which is why PE tooling shows a garbage entry point (a common small value like `0x1B5C`) on a protected file.
 
+Managed images store 0 as the entry point in this block. The real entry is a property of the CLR header, not the PE. Reconstruction keeps the protected header's entry point when the decrypted value is 0; writing 0 would point the image at the DOS header.
+
 ## The zero-fill lists
 
 Not every region of the original image is stored: `.bss`-style regions are delivered as zero-fill lists — walk4's second chain on 64-bit, the zero-list cluster slot on 32-bit, and a trailing zero-fill chain in the dedicated DLL layout. Each entry is a `(dst, size)` pair, decrypted with the same 16-byte positional chain as the section descriptors, and zeroed after (32-bit: before) decompression.

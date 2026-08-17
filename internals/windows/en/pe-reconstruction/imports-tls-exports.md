@@ -14,8 +14,8 @@ Import names (DLL names and by-name function names) are encrypted with the [stri
 
 The table source differs:
 
-- **Marker layout (64-bit):** the walk5 encrypted-pointer table inside stage 5.
-- **Marker-less layout:** the PE import directory itself, driven by `DataDirectory[1]` — with a fallback to the anchor-stage import directory when the metadata's is zero (common on managed DLLs). Name decryption runs after the code-page scramble, because the import strings live inside `.text` on these builds.
+- **Marker layout (64-bit):** the walk5 encrypted-pointer table inside stage 5. A null walk5 pointer means there is no table to walk — managed assemblies leave the slot empty because their imports are the CLR bootstrap stub.
+- **Marker-less layout:** the PE import directory itself, driven by `DataDirectory[1]` — with a fallback to the anchor-stage import directory when the metadata's is zero (common on managed images). Name decryption runs after the code-page scramble, because the import strings live inside `.text` on these builds.
 - **Dedicated DLL layout:** in-place decryption of the existing table.
 - **32-bit:** the EighthStage import table, or the metadata directory's when it validates better.
 

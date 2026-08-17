@@ -1,10 +1,10 @@
 ---
-description: "基于内容识别并分类受保护文件（KONN magic、EXE/DLL、托管/原生）。"
+description: "基于内容识别并分类受保护文件（KONN、原生/托管 EXE 与 DLL）。"
 ---
 
 # detect.py
 
-[受保护文件格式](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/wen-jian-jie-gou/recognition)中记载的识别与分类逻辑。
+[识别与构建家族](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/file-structure/recognition)中记载的识别与分类逻辑。
 
 ```python
 """Content-based detection and classification of a protected PE file.
@@ -38,8 +38,9 @@ def header_kdf(file_data, offset=4096):
 
 
 def detect(file_data):
-    """Return ("exe" | "native-dll" | "managed-dll", magic) for a protected
-    file, or None when the file is not protected by this scheme."""
+    """Return ("native-exe" | "managed-exe" | "native-dll" | "managed-dll",
+    magic) for a protected file, or None when the file is not protected by
+    this scheme."""
     if len(file_data) < 4128:
         return None
     pe_off = get_u32(file_data, 0x3C)
@@ -49,15 +50,17 @@ def detect(file_data):
     if info[1] != MAGIC_KONN:
         return None
 
-    # IMAGE_FILE_HEADER.Characteristics, IMAGE_FILE_DLL bit
-    characteristics = get_u16(file_data, pe_off + 4 + 18)
-    if not characteristics & 0x2000:
-        return ("exe", info[1])
+    characteristics = get_u16(file_data, pe_off + 4 + 18)   # IMAGE_FILE_HEADER
+    is_dll = bool(characteristics & 0x2000)                 # IMAGE_FILE_DLL
 
-    # DLL: the COM descriptor (CLR) data directory decides managed vs native.
+    # COM descriptor (CLR) data directory: managed vs native, EXE and DLL alike.
     # Data directories start at optional-header +96 on PE32, +112 on PE32+.
-    opt_magic = get_u16(file_data, pe_off + 24)
+    opt_magic = get_u16(file_data, pe_off + 24)             # 0x10B / 0x20B
     dd_base = 112 if opt_magic == 0x20B else 96
     clr_rva = get_u32(file_data, pe_off + 24 + dd_base + 14 * 8)
-    return ("managed-dll" if clr_rva else "native-dll", info[1])
+    managed = bool(clr_rva)
+
+    if is_dll:
+        return ("managed-dll" if managed else "native-dll", info[1])
+    return ("managed-exe" if managed else "native-exe", info[1])
 ```
