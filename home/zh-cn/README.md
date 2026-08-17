@@ -1,12 +1,22 @@
 ---
-description: "CrackProof 保护格式与运行时行为的独立技术研究。"
+description: CrackProof 保护格式与运行时行为的独立技术研究。
 layout:
-  width: default
+  width: wide
+  title:
+    visible: true
+  description:
+    visible: true
   tableOfContents:
     visible: false
   outline:
     visible: false
   pagination:
+    visible: false
+  metadata:
+    visible: false
+  tags:
+    visible: true
+  actions:
     visible: false
 ---
 
@@ -16,32 +26,7 @@ CrackProof® 是 HyperTech 开发的一系列商用二进制保护系统。本�
 
 当前研究范围包括 Windows PE 文件和 Android 原生库。两个平台使用不同的容器格式与恢复路径，因此分别编写内部机制文档。
 
-<table data-view="cards">
-  <thead>
-    <tr>
-      <th></th>
-      <th></th>
-      <th data-hidden data-card-target data-type="content-ref"></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>Windows 内部机制</strong></td>
-      <td>受保护 PE 布局、数据变换、分阶段加载、PE 重建与运行时行为。</td>
-      <td><a href="https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/readme">Windows 内部机制</a></td>
-    </tr>
-    <tr>
-      <td><strong>Android SO 内部机制</strong></td>
-      <td>受保护 AArch64 ELF 布局、模块流、容器解码、ELF 恢复与 IL2CPP 元数据。</td>
-      <td><a href="https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/readme">Android SO 内部机制</a></td>
-    </tr>
-    <tr>
-      <td><strong>验证与参考</strong></td>
-      <td>文中 Windows 数据变换的可执行测试向量与小型参考实现。</td>
-      <td><a href="https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/readme">验证与参考</a></td>
-    </tr>
-  </tbody>
-</table>
+<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Windows 内部机制</strong></td><td>受保护 PE 布局、数据变换、分阶段加载、PE 重建与运行时行为。</td><td><a href="https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/">CrackProof for Windows 内部机制</a></td></tr><tr><td><strong>Android SO 内部机制</strong></td><td>受保护 AArch64 ELF 布局、模块流、容器解码、ELF 恢复与 IL2CPP 元数据。</td><td><a href="https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/">CrackProof for Android SO 内部机制</a></td></tr><tr><td><strong>验证与参考</strong></td><td>文中 Windows 数据变换的可执行测试向量与小型参考实现。</td><td><a href="https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/">验证与参考</a></td></tr></tbody></table>
 
 ## 研究边界
 
