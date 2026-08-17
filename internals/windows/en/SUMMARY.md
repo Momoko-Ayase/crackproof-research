@@ -5,19 +5,19 @@
 ## File structure
 
 * [Overview](file-format/README.md)
-    * [Container and encrypted header](file-format/container-layout.md)
-    * [Recognition and build families](file-format/recognition.md)
-    * [Section data and companion files](file-format/companion-layout.md)
+* [Container and encrypted header](file-format/container-layout.md)
+* [Recognition and build families](file-format/recognition.md)
+* [Section data and companion files](file-format/companion-layout.md)
 
 ## Data transforms
 
 * [Overview](data-transforms/README.md)
-    * [Rolling-key and rotation ciphers](data-transforms/rolling-and-rotation.md)
-    * [LFSR, string, and page transforms](data-transforms/lfsr-strings-pages.md)
-    * [Checksums and key progression](data-transforms/checksums.md)
-    * [AES-CBC layer](data-transforms/aes.md)
-    * [Huffman and LZ compression](data-transforms/compression.md)
-    * [Per-build byte transform](data-transforms/bytecode-transform.md)
+* [Rolling-key and rotation ciphers](data-transforms/rolling-and-rotation.md)
+* [LFSR, string, and page transforms](data-transforms/lfsr-strings-pages.md)
+* [Checksums and key progression](data-transforms/checksums.md)
+* [AES-CBC layer](data-transforms/aes.md)
+* [Huffman and LZ compression](data-transforms/compression.md)
+* [Per-build byte transform](data-transforms/bytecode-transform.md)
 
 ## Loading and PE repair
 
@@ -33,16 +33,16 @@
 ## Runtime
 
 * [Overview](runtime/README.md)
-    * [Startup sequence and status reporting](runtime/startup-status.md)
-    * [Environment and anti-analysis checks](runtime/environment-checks.md)
-    * [Page protection and loader code](runtime/page-protection.md)
-    * [Manually mapped helper modules](runtime/mapped-modules.md)
-    * [Htsysm kernel components](runtime/kernel-components.md)
+* [Startup sequence and status reporting](runtime/startup-status.md)
+* [Environment and anti-analysis checks](runtime/environment-checks.md)
+* [Page protection and loader code](runtime/page-protection.md)
+* [Manually mapped helper modules](runtime/mapped-modules.md)
+* [Htsysm kernel components](runtime/kernel-components.md)
 
 ## Analysis
 
 * [Overview](analysis/README.md)
-    * [Analysis workflow](analysis/workflow.md)
-    * [Observed limitations](analysis/observed-limitations.md)
-    * [il2cpp metadata obfuscation](analysis/il2cpp-metadata.md)
-    * [Constants and offsets](analysis/constants.md)
+* [Analysis workflow](analysis/workflow.md)
+* [Observed limitations](analysis/observed-limitations.md)
+* [il2cpp metadata obfuscation](analysis/il2cpp-metadata.md)
+* [Constants and offsets](analysis/constants.md)

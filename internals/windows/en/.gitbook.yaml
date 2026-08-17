@@ -14,3 +14,73 @@ redirects:
   analysis-notes: analysis/README.md
   il2cpp-metadata: analysis/il2cpp-metadata.md
   appendix: analysis/constants.md
+
+  # Preserve URLs from the previous Overview nesting.
+  file-structure/file-format/container-layout: file-format/container-layout.md
+  file-structure/file-format/recognition: file-format/recognition.md
+  file-structure/file-format/companion-layout: file-format/companion-layout.md
+  data-transforms/data-transforms/rolling-and-rotation: data-transforms/rolling-and-rotation.md
+  data-transforms/data-transforms/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
+  data-transforms/data-transforms/checksums: data-transforms/checksums.md
+  data-transforms/data-transforms/aes: data-transforms/aes.md
+  data-transforms/data-transforms/compression: data-transforms/compression.md
+  data-transforms/data-transforms/bytecode-transform: data-transforms/bytecode-transform.md
+  runtime/runtime/startup-status: runtime/startup-status.md
+  runtime/runtime/environment-checks: runtime/environment-checks.md
+  runtime/runtime/page-protection: runtime/page-protection.md
+  runtime/runtime/mapped-modules: runtime/mapped-modules.md
+  runtime/runtime/kernel-components: runtime/kernel-components.md
+  analysis/analysis/workflow: analysis/workflow.md
+  analysis/analysis/observed-limitations: analysis/observed-limitations.md
+  analysis/analysis/il2cpp-metadata: analysis/il2cpp-metadata.md
+  analysis/analysis/constants: analysis/constants.md
+
+  # Resolve paths copied from the Chinese variant during language switching.
+  wen-jian-jie-gou/file-format: file-format/README.md
+  wen-jian-jie-gou/container-layout: file-format/container-layout.md
+  wen-jian-jie-gou/recognition: file-format/recognition.md
+  wen-jian-jie-gou/companion-layout: file-format/companion-layout.md
+  wen-jian-jie-gou/file-format/container-layout: file-format/container-layout.md
+  wen-jian-jie-gou/file-format/recognition: file-format/recognition.md
+  wen-jian-jie-gou/file-format/companion-layout: file-format/companion-layout.md
+  shu-ju-bian-huan/data-transforms: data-transforms/README.md
+  shu-ju-bian-huan/rolling-and-rotation: data-transforms/rolling-and-rotation.md
+  shu-ju-bian-huan/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
+  shu-ju-bian-huan/checksums: data-transforms/checksums.md
+  shu-ju-bian-huan/aes: data-transforms/aes.md
+  shu-ju-bian-huan/compression: data-transforms/compression.md
+  shu-ju-bian-huan/bytecode-transform: data-transforms/bytecode-transform.md
+  shu-ju-bian-huan/data-transforms/rolling-and-rotation: data-transforms/rolling-and-rotation.md
+  shu-ju-bian-huan/data-transforms/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
+  shu-ju-bian-huan/data-transforms/checksums: data-transforms/checksums.md
+  shu-ju-bian-huan/data-transforms/aes: data-transforms/aes.md
+  shu-ju-bian-huan/data-transforms/compression: data-transforms/compression.md
+  shu-ju-bian-huan/data-transforms/bytecode-transform: data-transforms/bytecode-transform.md
+  jia-zai-yu-pe-xiu-fu/loading: loading/README.md
+  jia-zai-yu-pe-xiu-fu/loading/stage-chain: loading/stage-chain.md
+  jia-zai-yu-pe-xiu-fu/loading/layout-variants: loading/layout-variants.md
+  jia-zai-yu-pe-xiu-fu/loading/discovery-validation: loading/discovery-validation.md
+  jia-zai-yu-pe-xiu-fu/pe-reconstruction: pe-reconstruction/README.md
+  jia-zai-yu-pe-xiu-fu/pe-reconstruction/memory-image: pe-reconstruction/memory-image.md
+  jia-zai-yu-pe-xiu-fu/pe-reconstruction/imports-tls-exports: pe-reconstruction/imports-tls-exports.md
+  jia-zai-yu-pe-xiu-fu/pe-reconstruction/relocations-managed: pe-reconstruction/relocations-managed.md
+  yun-xing-shi/runtime: runtime/README.md
+  yun-xing-shi/startup-status: runtime/startup-status.md
+  yun-xing-shi/environment-checks: runtime/environment-checks.md
+  yun-xing-shi/page-protection: runtime/page-protection.md
+  yun-xing-shi/mapped-modules: runtime/mapped-modules.md
+  yun-xing-shi/kernel-components: runtime/kernel-components.md
+  yun-xing-shi/runtime/startup-status: runtime/startup-status.md
+  yun-xing-shi/runtime/environment-checks: runtime/environment-checks.md
+  yun-xing-shi/runtime/page-protection: runtime/page-protection.md
+  yun-xing-shi/runtime/mapped-modules: runtime/mapped-modules.md
+  yun-xing-shi/runtime/kernel-components: runtime/kernel-components.md
+  fen-xi/analysis: analysis/README.md
+  fen-xi/workflow: analysis/workflow.md
+  fen-xi/observed-limitations: analysis/observed-limitations.md
+  fen-xi/il2cpp-metadata: analysis/il2cpp-metadata.md
+  fen-xi/constants: analysis/constants.md
+  fen-xi/analysis/workflow: analysis/workflow.md
+  fen-xi/analysis/observed-limitations: analysis/observed-limitations.md
+  fen-xi/analysis/il2cpp-metadata: analysis/il2cpp-metadata.md
+  fen-xi/analysis/constants: analysis/constants.md

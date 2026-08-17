@@ -14,3 +14,73 @@ redirects:
   analysis-notes: analysis/README.md
   il2cpp-metadata: analysis/il2cpp-metadata.md
   appendix: analysis/constants.md
+
+  # Preserve URLs from the previous Overview nesting.
+  wen-jian-jie-gou/file-format/container-layout: file-format/container-layout.md
+  wen-jian-jie-gou/file-format/recognition: file-format/recognition.md
+  wen-jian-jie-gou/file-format/companion-layout: file-format/companion-layout.md
+  shu-ju-bian-huan/data-transforms/rolling-and-rotation: data-transforms/rolling-and-rotation.md
+  shu-ju-bian-huan/data-transforms/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
+  shu-ju-bian-huan/data-transforms/checksums: data-transforms/checksums.md
+  shu-ju-bian-huan/data-transforms/aes: data-transforms/aes.md
+  shu-ju-bian-huan/data-transforms/compression: data-transforms/compression.md
+  shu-ju-bian-huan/data-transforms/bytecode-transform: data-transforms/bytecode-transform.md
+  yun-xing-shi/runtime/startup-status: runtime/startup-status.md
+  yun-xing-shi/runtime/environment-checks: runtime/environment-checks.md
+  yun-xing-shi/runtime/page-protection: runtime/page-protection.md
+  yun-xing-shi/runtime/mapped-modules: runtime/mapped-modules.md
+  yun-xing-shi/runtime/kernel-components: runtime/kernel-components.md
+  fen-xi/analysis/workflow: analysis/workflow.md
+  fen-xi/analysis/observed-limitations: analysis/observed-limitations.md
+  fen-xi/analysis/il2cpp-metadata: analysis/il2cpp-metadata.md
+  fen-xi/analysis/constants: analysis/constants.md
+
+  # Resolve paths copied from the English variant during language switching.
+  file-structure/file-format: file-format/README.md
+  file-structure/container-layout: file-format/container-layout.md
+  file-structure/recognition: file-format/recognition.md
+  file-structure/companion-layout: file-format/companion-layout.md
+  file-structure/file-format/container-layout: file-format/container-layout.md
+  file-structure/file-format/recognition: file-format/recognition.md
+  file-structure/file-format/companion-layout: file-format/companion-layout.md
+  data-transforms/data-transforms: data-transforms/README.md
+  data-transforms/rolling-and-rotation: data-transforms/rolling-and-rotation.md
+  data-transforms/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
+  data-transforms/checksums: data-transforms/checksums.md
+  data-transforms/aes: data-transforms/aes.md
+  data-transforms/compression: data-transforms/compression.md
+  data-transforms/bytecode-transform: data-transforms/bytecode-transform.md
+  data-transforms/data-transforms/rolling-and-rotation: data-transforms/rolling-and-rotation.md
+  data-transforms/data-transforms/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
+  data-transforms/data-transforms/checksums: data-transforms/checksums.md
+  data-transforms/data-transforms/aes: data-transforms/aes.md
+  data-transforms/data-transforms/compression: data-transforms/compression.md
+  data-transforms/data-transforms/bytecode-transform: data-transforms/bytecode-transform.md
+  loading-and-pe-repair/loading: loading/README.md
+  loading-and-pe-repair/loading/stage-chain: loading/stage-chain.md
+  loading-and-pe-repair/loading/layout-variants: loading/layout-variants.md
+  loading-and-pe-repair/loading/discovery-validation: loading/discovery-validation.md
+  loading-and-pe-repair/pe-reconstruction: pe-reconstruction/README.md
+  loading-and-pe-repair/pe-reconstruction/memory-image: pe-reconstruction/memory-image.md
+  loading-and-pe-repair/pe-reconstruction/imports-tls-exports: pe-reconstruction/imports-tls-exports.md
+  loading-and-pe-repair/pe-reconstruction/relocations-managed: pe-reconstruction/relocations-managed.md
+  runtime/runtime: runtime/README.md
+  runtime/startup-status: runtime/startup-status.md
+  runtime/environment-checks: runtime/environment-checks.md
+  runtime/page-protection: runtime/page-protection.md
+  runtime/mapped-modules: runtime/mapped-modules.md
+  runtime/kernel-components: runtime/kernel-components.md
+  runtime/runtime/startup-status: runtime/startup-status.md
+  runtime/runtime/environment-checks: runtime/environment-checks.md
+  runtime/runtime/page-protection: runtime/page-protection.md
+  runtime/runtime/mapped-modules: runtime/mapped-modules.md
+  runtime/runtime/kernel-components: runtime/kernel-components.md
+  analysis/analysis: analysis/README.md
+  analysis/workflow: analysis/workflow.md
+  analysis/observed-limitations: analysis/observed-limitations.md
+  analysis/il2cpp-metadata: analysis/il2cpp-metadata.md
+  analysis/constants: analysis/constants.md
+  analysis/analysis/workflow: analysis/workflow.md
+  analysis/analysis/observed-limitations: analysis/observed-limitations.md
+  analysis/analysis/il2cpp-metadata: analysis/il2cpp-metadata.md
+  analysis/analysis/constants: analysis/constants.md
