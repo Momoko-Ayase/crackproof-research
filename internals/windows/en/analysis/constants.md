@@ -77,7 +77,7 @@ ModR/M must be register-direct `AL` (`mod=3, rm=0`); anything else is invalid.
 
 - Status codes and the boot sequence: [Runtime behavior](../runtime/startup-status.md#the-boot-sequence-and-status-codes)
 - Module codes and driver generations: [Kernel drivers and submodules](../runtime/kernel-components.md)
-- il2cpp metadata constants: [il2cpp metadata obfuscation](../analysis/il2cpp-metadata.md)
+- il2cpp metadata constants: [il2cpp metadata obfuscation](il2cpp-metadata.md)
 - Huffman table/token format: [Data transformation primitives](../data-transforms/compression.md#the-huffmanlz-compression-format)
 
 ## Verification suite

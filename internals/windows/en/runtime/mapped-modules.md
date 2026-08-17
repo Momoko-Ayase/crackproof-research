@@ -13,7 +13,7 @@ The loader maps auxiliary DLLs into the process itself through an internal modul
 | Code | Module | Status group | Role |
 | --- | --- | --- | --- |
 | `it` | `HtpecIt.dll` | `Axx` | Anti-tamper, anti-injection, anti-VM checks |
-| `dt` | `HtdpStub2.dll` | — | Additional loader code — including the demand-decrypt page-fault handler for [page-level encryption](../runtime/page-protection.md#page-level-encryption) |
+| `dt` | `HtdpStub2.dll` | — | Additional loader code — including the demand-decrypt page-fault handler for [page-level encryption](page-protection.md#page-level-encryption) |
 | `cm` | (usermode init) | `Bxx` | Old Htsysm driver initialization |
 | `dm` | (usermode init) | `Cxx` | New Htsysm driver initialization |
 | `sk` | `HtsyskNT.dll` | `B21` | Old driver path: kernel manual-mapper, basic kernel I/O and memory functions |

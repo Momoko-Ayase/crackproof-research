@@ -5,20 +5,36 @@ structure:
   summary: SUMMARY.md
 
 redirects:
-  file-format: file-format/README.md
-  primitives: data-transforms/README.md
-  staged-loader: loading/README.md
-  pe-transformations: pe-reconstruction/README.md
-  runtime-behavior: runtime/README.md
+  file-format: file-structure/file-format.md
+  primitives: data-transforms/data-transforms.md
+  staged-loader: loading-and-pe-repair/loading/README.md
+  pe-transformations: loading-and-pe-repair/pe-reconstruction/README.md
+  runtime-behavior: runtime/runtime.md
   kernel-components: runtime/kernel-components.md
-  analysis-notes: analysis/README.md
+  analysis-notes: analysis/analysis.md
   il2cpp-metadata: analysis/il2cpp-metadata.md
   appendix: analysis/constants.md
 
+  # Old EN-style source directories, in case a language switch lands on them.
+  file-format/container-layout: file-structure/container-layout.md
+  file-format/recognition: file-structure/recognition.md
+  file-format/companion-layout: file-structure/companion-layout.md
+  loading: loading-and-pe-repair/loading/README.md
+  loading/stage-chain: loading-and-pe-repair/loading/stage-chain.md
+  loading/layout-variants: loading-and-pe-repair/loading/layout-variants.md
+  loading/discovery-validation: loading-and-pe-repair/loading/discovery-validation.md
+  pe-reconstruction: loading-and-pe-repair/pe-reconstruction/README.md
+  pe-reconstruction/memory-image: loading-and-pe-repair/pe-reconstruction/memory-image.md
+  pe-reconstruction/imports-tls-exports: loading-and-pe-repair/pe-reconstruction/imports-tls-exports.md
+  pe-reconstruction/relocations-managed: loading-and-pe-repair/pe-reconstruction/relocations-managed.md
+  data-transforms/README: data-transforms/data-transforms.md
+  runtime/README: runtime/runtime.md
+  analysis/README: analysis/analysis.md
+
   # Preserve old nested paths from the previous group layout.
-  file-structure/file-format/container-layout: file-format/container-layout.md
-  file-structure/file-format/recognition: file-format/recognition.md
-  file-structure/file-format/companion-layout: file-format/companion-layout.md
+  file-structure/file-format/container-layout: file-structure/container-layout.md
+  file-structure/file-format/recognition: file-structure/recognition.md
+  file-structure/file-format/companion-layout: file-structure/companion-layout.md
   data-transforms/data-transforms/rolling-and-rotation: data-transforms/rolling-and-rotation.md
   data-transforms/data-transforms/lfsr-strings-pages: data-transforms/lfsr-strings-pages.md
   data-transforms/data-transforms/checksums: data-transforms/checksums.md

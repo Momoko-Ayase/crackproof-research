@@ -36,7 +36,7 @@ def calculate_checksum(d, pos):
     return crc32(d[offset:offset + length]) ^ length
 ```
 
-A second form chains over the **original file bytes** with a running initial value (`crc32_append` with the previous result as `initial`), used by the validation-only walk described in [The staged loader](../loading/README.md).
+A second form chains over the **original file bytes** with a running initial value (`crc32_append` with the previous result as `initial`), used by the validation-only walk described in [The staged loader](../loading-and-pe-repair/loading/README.md).
 
 ## The triangular key schedule
 

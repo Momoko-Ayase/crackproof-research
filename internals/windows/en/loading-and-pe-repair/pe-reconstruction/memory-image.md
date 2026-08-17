@@ -14,7 +14,7 @@ The 32-bit family adds the inverse transformation as its last step: the RVA-laid
 
 ## The entry point and data directories are encrypted
 
-`AddressOfEntryPoint` and all sixteen `IMAGE_DATA_DIRECTORY` entries are stored encrypted near the image base (`info[3]`), wrapped in the [position-keyed byte cipher](../data-transforms/rolling-and-rotation.md#triple-byte-rotation-ciphers). Two placements exist per bitness:
+`AddressOfEntryPoint` and all sixteen `IMAGE_DATA_DIRECTORY` entries are stored encrypted near the image base (`info[3]`), wrapped in the [position-keyed byte cipher](../../data-transforms/rolling-and-rotation.md#triple-byte-rotation-ciphers). Two placements exist per bitness:
 
 | Family | Block start | Entry point | Directories | Encrypted size |
 | --- | --- | --- | --- | --- |

@@ -4,7 +4,7 @@ description: "The common stage-decrypt pattern and the marker-based 64-bit loade
 
 # Stage chain and marker layout
 
-The payload body decrypted by the [rolling XOR chain](../data-transforms/rolling-and-rotation.md#the-rolling-key-family) is not the program — it is the loader's own world: configuration tables, encrypted stage code, and the descriptors that will eventually recover the program's sections. The loader is **self-decrypting**: its code is split into stages, each stage encrypted with a key derived from content that only exists after the previous stage decrypted correctly. Control (or, statically, analysis) must pass through the stages in order; there is no shortcut to the final stage's tables.
+The payload body decrypted by the [rolling XOR chain](../../data-transforms/rolling-and-rotation.md#the-rolling-key-family) is not the program — it is the loader's own world: configuration tables, encrypted stage code, and the descriptors that will eventually recover the program's sections. The loader is **self-decrypting**: its code is split into stages, each stage encrypted with a key derived from content that only exists after the previous stage decrypted correctly. Control (or, statically, analysis) must pass through the stages in order; there is no shortcut to the final stage's tables.
 
 ```mermaid
 flowchart LR
@@ -22,7 +22,7 @@ flowchart LR
 Every stage after stage 2 is decrypted with the same composite, defined by a `(src, src_len, dest, dest_len)` quad in the buffer:
 
 1. **AES-CBC decrypt** `src..src+src_len` with the stage AES schedule (`key_offsets[3]`).
-2. **XOR + rotate-right** over the descriptor with the stage key ([xor_ror_dwords, shift 19](../data-transforms/rolling-and-rotation.md#xor--rotate-right-dword-cipher)).
+2. **XOR + rotate-right** over the descriptor with the stage key ([xor_ror_dwords, shift 19](../../data-transforms/rolling-and-rotation.md#xor--rotate-right-dword-cipher)).
 3. If a per-build bytecode stub applies, translate every byte through it.
 4. If `src_len != dest_len`, **Huffman/LZ-decompress** `src → dest` with the stage Huffman table (`key_offsets[1]`).
 
@@ -34,7 +34,7 @@ This is the reference flow; the other families are variations on it. It proceeds
 
 ### Phase 1–2: header and payload
 
-Derive `info` with the [KDF](../file-format/container-layout.md#the-info-header-and-its-key-derivation), verify the magic, allocate a zeroed image buffer of `SizeOfImage` bytes, run the [payload XOR chain](../data-transforms/rolling-and-rotation.md#the-rolling-key-family) over `decrypt_size = info[6] - info[3] + 8192` bytes, copy the remaining `info[5] - decrypt_size` bytes verbatim, and overlay the first 4096 header bytes.
+Derive `info` with the [KDF](../../file-structure/container-layout.md#the-info-header-and-its-key-derivation), verify the magic, allocate a zeroed image buffer of `SizeOfImage` bytes, run the [payload XOR chain](../../data-transforms/rolling-and-rotation.md#the-rolling-key-family) over `decrypt_size = info[6] - info[3] + 8192` bytes, copy the remaining `info[5] - decrypt_size` bytes verbatim, and overlay the first 4096 header bytes.
 
 ### Phase 3: the configuration anchor
 
@@ -65,12 +65,12 @@ Each stage's quad sits at a fixed offset past `stage2_off`, and each key mixes t
 
 | Stage | Quad offset | Key composition |
 | --- | --- | --- |
-| stage 3 | `stage2_off + 88` | `xor_acc ^ chk2 ^ accum` — `accum` is a dword from `chk_src_start - 16` run through four rounds of the [triangular schedule](../data-transforms/checksums.md#the-triangular-key-schedule) |
+| stage 3 | `stage2_off + 88` | `xor_acc ^ chk2 ^ accum` — `accum` is a dword from `chk_src_start - 16` run through four rounds of the [triangular schedule](../../data-transforms/checksums.md#the-triangular-key-schedule) |
 | stage 3b | `stage2_off + 104` | `xor_acc ^ chk3 ^ v4` — `v4` is the last nonzero dword of stage 3, anchored by the `C3 CC CC CC` (function epilogue + `int3` padding) before it |
 | stage 4 | `stage2_off + 136` | `xor_acc ^ chk4 ^ ~v5` — `v5` is the dword 8 bytes before the first `"Virtual..."` API-name string in stage 3b |
 | stage 5 | `stage2_off + 216` | `xor_acc ^ chk4 ^ chk5 ^ accum2`, plus bytecode stub 1 |
 
-Stage 4 is where the first embedded **bytecode stub** appears. Its neighbors are the anti-debug API name strings (`IsDebuggerPresent`, `CheckRemoteDebuggerPresent`); the stub itself is located by [trial LFSR-decoding and parsing](../data-transforms/bytecode-transform.md#the-per-build-bytecode-permutation) rather than a fixed offset. The `accum2` seed sits after the last occurrence of the byte pattern `48 EB 01 B9` (plus any `CC` padding), advanced through three triangular rounds. Stage 5 is the only stage decrypted through a bytecode stub — stub 1 is baked into its transform.
+Stage 4 is where the first embedded **bytecode stub** appears. Its neighbors are the anti-debug API name strings (`IsDebuggerPresent`, `CheckRemoteDebuggerPresent`); the stub itself is located by [trial LFSR-decoding and parsing](../../data-transforms/bytecode-transform.md#the-per-build-bytecode-permutation) rather than a fixed offset. The `accum2` seed sits after the last occurrence of the byte pattern `48 EB 01 B9` (plus any `CC` padding), advanced through three triangular rounds. Stage 5 is the only stage decrypted through a bytecode stub — stub 1 is baked into its transform.
 
 ### Phase 6: the stage-5 tables
 
@@ -96,11 +96,11 @@ translate dst..dst+len through bytecode stub 2
 if len != plain_len: huffman_decompress(dst → dst, key_offsets[0], len, plain_len)
 ```
 
-`section_data_file_base` is the complement-encoded base from [the file format page](../file-format/companion-layout.md#locating-section-data-in-the-file). A second walk4 chain then lists regions to zero-fill (the `.bss`-equivalent). Because blocks write disjoint image spans and read only immutable file bytes, this phase is embarrassingly parallel — a property of the format, not of any tool.
+`section_data_file_base` is the complement-encoded base from [the file format page](../../file-structure/companion-layout.md#locating-section-data-in-the-file). A second walk4 chain then lists regions to zero-fill (the `.bss`-equivalent). Because blocks write disjoint image spans and read only immutable file bytes, this phase is embarrassingly parallel — a property of the format, not of any tool.
 
 ### Phase 8: import-name decryption
 
-walk5 entries (20 bytes each) point at encrypted DLL names (`+12`) and thunk chains (`+0` or `+16`). Each name is decrypted with the [string cipher](../data-transforms/lfsr-strings-pages.md#the-import-name-string-cipher), lowercased, and each by-name thunk (bit 63 clear on PE32+) has its hint/name string decrypted and its hint field zeroed. Ordinal imports (bit 63 set) are left alone. A null walk5 pointer means there is no table to walk: managed assemblies leave the slot empty because their imports are the CLR bootstrap stub.
+walk5 entries (20 bytes each) point at encrypted DLL names (`+12`) and thunk chains (`+0` or `+16`). Each name is decrypted with the [string cipher](../../data-transforms/lfsr-strings-pages.md#the-import-name-string-cipher), lowercased, and each by-name thunk (bit 63 clear on PE32+) has its hint/name string decrypted and its hint field zeroed. Ordinal imports (bit 63 set) are left alone. A null walk5 pointer means there is no table to walk: managed assemblies leave the slot empty because their imports are the CLR bootstrap stub.
 
 ### Phase 9: PE reconstruction
 

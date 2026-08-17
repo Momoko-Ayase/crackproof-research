@@ -4,7 +4,7 @@ description: "The runtime boot sequence, status values, and diagnostic logging l
 
 # Startup sequence and status reporting
 
-A protected binary's first thread of execution belongs to CrackProof, not the program. The loader walks a fixed pipeline: environment checks, anti-analysis sweeps, kernel-driver and submodule setup, then the staged decryption from [The staged loader](../loading/README.md), then — optionally — re-encryption of what it just decrypted, and only then a jump to the original entry point (OEP). This page describes that pipeline as observed at runtime.
+A protected binary's first thread of execution belongs to CrackProof, not the program. The loader walks a fixed pipeline: environment checks, anti-analysis sweeps, kernel-driver and submodule setup, then the staged decryption from [The staged loader](../loading-and-pe-repair/loading/README.md), then — optionally — re-encryption of what it just decrypted, and only then a jump to the original entry point (OEP). This page describes that pipeline as observed at runtime.
 
 ## The boot sequence and status codes
 

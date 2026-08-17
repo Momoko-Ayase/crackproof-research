@@ -6,7 +6,7 @@ description: "How import names, TLS state, and exported data are recovered from 
 
 ## Imports: encrypted names, rebuilt tables
 
-Import names (DLL names and by-name function names) are encrypted with the [string cipher](../data-transforms/lfsr-strings-pages.md#the-import-name-string-cipher), keyed by the low byte of each string's own RVA. The reconstruction walks differ by family but share the same finishing rules:
+Import names (DLL names and by-name function names) are encrypted with the [string cipher](../../data-transforms/lfsr-strings-pages.md#the-import-name-string-cipher), keyed by the low byte of each string's own RVA. The reconstruction walks differ by family but share the same finishing rules:
 
 - Each name is decrypted in place and lowercased.
 - By-name thunks have their hint/name string decrypted and the 2-byte hint field zeroed. Ordinal thunks (top bit set — bit 63 on PE32+, bit 31 on PE32) are skipped. Reading only the low dword of a PE32+ thunk would mistake an ordinal for a tiny RVA and corrupt the header — the 8-byte width matters.

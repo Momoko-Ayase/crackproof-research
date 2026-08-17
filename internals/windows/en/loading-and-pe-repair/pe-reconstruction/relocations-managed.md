@@ -14,7 +14,7 @@ Builds differ deliberately in whether the result may be rebased:
 
 ## The code-page scramble, ordered last
 
-The [per-page scramble](../data-transforms/lfsr-strings-pages.md#the-per-page-code-scramble) applies to `.text` after section recovery. Ordering constraints observed across families:
+The [per-page scramble](../../data-transforms/lfsr-strings-pages.md#the-per-page-code-scramble) applies to `.text` after section recovery. Ordering constraints observed across families:
 
 - **Marker layout:** scramble runs before the entry-point/data-directory restoration.
 - **Marker-less layout:** scramble is deferred until after import-name decryption and is re-selected over the final bytes — and only runs when the entry point falls inside `.text`. Managed images restore their CLR metadata **after** the scramble, because the metadata region lives inside `.text` but is not scrambled code: scrambling it would corrupt roughly one byte per 16 and produce an invalid COR20 signature.
@@ -28,5 +28,5 @@ The preserved metadata does **not** include a plaintext copy of every IL method 
 
 If the recovered COR20 directory points to a header whose `cb` is zero and no valid preserved header is available, clear the directory. Passing an empty header to the CLR startup path produces a failure that can be mistaken for bad section recovery. Mixed-mode images also need their native-entrypoint flag preserved; a pure managed image can be identified separately from that case.
 
-Unity il2cpp titles add a separate obfuscation outside the PE: method tokens inside `global-metadata.dat`. See [il2cpp metadata obfuscation](../analysis/il2cpp-metadata.md).
+Unity il2cpp titles add a separate obfuscation outside the PE: method tokens inside `global-metadata.dat`. See [il2cpp metadata obfuscation](../../analysis/il2cpp-metadata.md).
 

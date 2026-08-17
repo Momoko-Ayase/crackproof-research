@@ -58,7 +58,7 @@ The same KDF is used for every build family, EXE and DLL, 32-bit and 64-bit — 
 | `info[6]` | End marker of the decrypted region; the loader's configuration block is located relative to it |
 | `info[7]` | Reserved/variant |
 
-The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 + info[5])` → image range `[info[3], info[3] + info[5])`. The first `decrypt_size = info[6] - info[3] + 8192` bytes are decrypted with a rolling XOR chain (see [Data transformation primitives](../data-transforms/README.md)); the remainder is copied through verbatim. The first 4096 bytes of the file are then overlaid back onto the image as its headers.
+The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 + info[5])` → image range `[info[3], info[3] + info[5])`. The first `decrypt_size = info[6] - info[3] + 8192` bytes are decrypted with a rolling XOR chain (see [Data transformation primitives](../data-transforms/data-transforms.md)); the remainder is copied through verbatim. The first 4096 bytes of the file are then overlaid back onto the image as its headers.
 
 ### Format magics
 

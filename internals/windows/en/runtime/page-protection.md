@@ -36,5 +36,5 @@ The final stage does not do reflective in-memory loading. Its API string table c
 
 Runtime state is held in a context structure addressed through a reserved register: function pointers at fixed slots, a doubly indirect pointer to the image buffer, and a per-slot table built by an unrolled `lea`-and-store sequence. API addresses are read from the module's own OS-resolved import table — no PEB walk appears anywhere in the stage, so the module relies on the ordinary Windows loader having bound its imports, even though its stored `AddressOfEntryPoint` is junk and the OS never calls its real entry.
 
-The same stage contains its own `.reloc` walker: relocations are applied by the loader (status `655`), not the OS, consistent with the `/FIXED` handling in [PE transformations](../pe-reconstruction/README.md).
+The same stage contains its own `.reloc` walker: relocations are applied by the loader (status `655`), not the OS, consistent with the `/FIXED` handling in [PE transformations](../loading-and-pe-repair/pe-reconstruction/README.md).
 

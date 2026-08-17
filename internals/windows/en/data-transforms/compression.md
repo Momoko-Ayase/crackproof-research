@@ -117,5 +117,5 @@ def decompress(d, src, dest, key_offset, s_size, d_size):
     return written == d_size
 ```
 
-The boolean result is a corruption signal and a concrete validation signal: where the container does not record a key or shift choice, candidates are tried until one decompresses cleanly. Several such trial-and-validate points appear in [The staged loader](../loading/README.md).
+The boolean result is a corruption signal and a concrete validation signal: where the container does not record a key or shift choice, candidates are tried until one decompresses cleanly. Several such trial-and-validate points appear in [The staged loader](../loading-and-pe-repair/loading/README.md).
 
