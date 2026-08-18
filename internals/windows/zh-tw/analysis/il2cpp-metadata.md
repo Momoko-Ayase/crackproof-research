@@ -36,3 +36,5 @@ new_token   = 0x06000000 | ((local_index + 1) & 0x00FFFFFF)
 | 字段 | method `.token +0x18`；type `.methodStart +0x24`、`.method_count +0x40`（u16）；image `.typeStart +0x08`、`.typeCount +0x0C` |
 
 其他元數據版本使用不同的結構步長，必須按版本處理；把版本 31 的佈局套到未知版本上會損壞文件，因此任何實現都應在寫入任何一字節之前驗證魔數、版本與各表對步長的整除性。
+
+Android 原生庫家族也會改方法令牌，但不是這種無密鑰重映射。那條路徑是帶種子的五輪置換，由模塊 `0x0C` 在 `mmap` 時還原。見[方法令牌](https://app.gitbook.com/s/HezwIJwx0lhm5CUG7g8R/metadata/method-tokens)。

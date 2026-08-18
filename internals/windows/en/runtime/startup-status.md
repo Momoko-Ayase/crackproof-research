@@ -4,7 +4,7 @@ description: "The runtime boot sequence, status values, and diagnostic logging l
 
 # Startup sequence and status reporting
 
-A protected binary's first thread of execution belongs to CrackProof, not the program. The loader walks a fixed pipeline: environment checks, anti-analysis sweeps, kernel-driver and submodule setup, then the staged decryption from [The staged loader](../loading-and-pe-repair/loading/README.md), then — optionally — re-encryption of what it just decrypted, and only then a jump to the original entry point (OEP). This page describes that pipeline as observed at runtime.
+A protected binary's first thread of execution belongs to CrackProof, not the program. The loader walks a fixed pipeline: environment checks, anti-analysis sweeps, kernel-driver and submodule setup, then the staged decryption from [Loading and section recovery](../loading-and-pe-repair/loading/README.md), then — optionally — re-encryption of what it just decrypted, and only then a jump to the original entry point (OEP). This page describes that pipeline as observed at runtime.
 
 ## The boot sequence and status codes
 
@@ -23,7 +23,7 @@ The loader reports progress as 12-bit **status codes**, roughly one per stage. T
 | `561` | Select a support module (absent or unused on some newer builds) |
 | `C00` | OS minimum-version check |
 | `C01` | Boot-option check (`testsigning`, `disableintegritychecks`) |
-| `C02` | Install the Htsysm driver service |
+| `C02` | Install the Htsysm driver service. The log names the device (`Htsysm7679`, `Htsysm767901`, or `Htsysm1B4001`) and the on-disk driver file under `C:\Windows\System32` — that filename is a per-deployment artifact, not a format constant. |
 | `C03` | Initialize the newer Htsysm driver |
 | `C04` | Set the Protected Process flag; install hooks |
 | `A0F` | Injected-DLL check |

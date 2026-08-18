@@ -25,9 +25,9 @@ Three regions matter:
 | --- | --- | --- |
 | Header region | `0x0000`–`0x0FFF` | The original PE headers. The DOS/PE signatures, COFF header, optional header, and section table survive in plaintext, but the entry point, several data directories, and the section raw-data pointers are blanked or repurposed. |
 | Info header | `0x1000` | 32 bytes: eight dwords encrypted with the key-derivation function below. This is the master parameter block for the whole container. |
-| Payload | `0x1020` onward | The encrypted (and Huffman-compressed) section data of the original image, the loader's configuration tables, and the loader's own staged code. |
+| Payload | After the info header | Encrypted (and usually Huffman-compressed) section data, loader tables, and staged loader code. The rolling XOR chain starts at `info[4] + 4096`, which may be later than `0x1020`. |
 
-The split at exactly 4096 bytes (`0x1000`) is constant across every observed build — including the external-companion layout described at the end of this page, which separates the file at this exact boundary.
+The split at exactly 4096 bytes (`0x1000`) is constant across every observed build — including the [external-companion layout](companion-layout.md), which separates the stub from its payload at this exact boundary.
 
 ## The info header and its key derivation
 
@@ -58,7 +58,7 @@ The same KDF is used for every build family, EXE and DLL, 32-bit and 64-bit — 
 | `info[6]` | End marker of the decrypted region; the loader's configuration block is located relative to it |
 | `info[7]` | Reserved/variant |
 
-The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 + info[5])` → image range `[info[3], info[3] + info[5])`. The first `decrypt_size = info[6] - info[3] + 8192` bytes are decrypted with a rolling XOR chain (see [Data transformation primitives](../data-transforms/data-transforms.md)); the remainder is copied through verbatim. The first 4096 bytes of the file are then overlaid back onto the image as its headers.
+The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 + info[5])` → image range `[info[3], info[3] + info[5])`. The first `decrypt_size = info[6] - info[3] + 8192` bytes are decrypted with a rolling XOR chain (see [Rolling-key and rotation ciphers](../data-transforms/rolling-and-rotation.md)); the remainder is copied through verbatim. The reconstructed image then has `4096` written at `info[3]`, and the first 4096 file bytes are overlaid back onto the image as its headers.
 
 ### Format magics
 

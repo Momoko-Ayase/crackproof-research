@@ -4,7 +4,7 @@ description: "CBC 模式的 AES 解密，密鑰調度內置於數據緩衝區；
 
 # aes\_impl.py
 
-分組密碼：AES-CBC 解密，密鑰調度嵌入數據緩衝區，見 [AES 變換](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/shu-ju-bian-huan/aes)。
+分組密碼：AES-CBC 解密，密鑰調度嵌入數據緩衝區，見 [AES-CBC 層](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/aes)。
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.

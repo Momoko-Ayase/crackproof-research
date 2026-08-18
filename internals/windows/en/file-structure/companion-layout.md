@@ -28,8 +28,8 @@ The pairing is confirmed by a 32-byte exact match: `stub[4096..4128] == companio
 What the stub retains in plaintext matters for later reconstruction:
 
 - The **export directory** (the companion decrypts to ciphertext here; the loader rebuilds exports at runtime from the stub's copy).
-- The **TLS directory** — the `IMAGE_TLS_DIRECTORY` struct, its raw-data template, and the data-directory entry, all of which the packer strips from the encrypted payload (see [PE transformations](../loading-and-pe-repair/pe-reconstruction/README.md)).
+- The **TLS directory** — the `IMAGE_TLS_DIRECTORY` struct, its raw-data template, and the data-directory entry, all of which the packer strips from the encrypted payload (see [PE reconstruction](../loading-and-pe-repair/pe-reconstruction/README.md)).
 - A real `DllCharacteristics` field and base-relocation table — companion modules are **not** `/FIXED`, unlike the older single-file builds.
 
-For the boot-time view of how this pair is loaded, see [Runtime behavior](../runtime/runtime.md); for how the missing pieces are restored into a reconstructed image, see [PE transformations](../loading-and-pe-repair/pe-reconstruction/README.md).
+For the boot-time view of how this pair is loaded, see [Runtime behavior](../runtime/runtime.md); for how the missing pieces are restored into a reconstructed image, see [PE reconstruction](../loading-and-pe-repair/pe-reconstruction/README.md).
 

@@ -17,7 +17,7 @@ Do not accept the first match. Use several independent checks:
 - Replay the first compressed section record and require decompression to finish at the declared output size. A candidate that only works for raw-copy records has not yet been validated.
 - Verify the checksum chain where the layout supplies it.
 
-The sparse page transform needs a separate decision. A recognizable entry stub is strong evidence when its decoded call and jump targets both remain inside `.text`. Otherwise, compare how much each candidate restores expected `0xCC` padding across several pages and require a meaningful improvement over the unchanged bytes. Small gains are normal random noise and must not trigger a transform.
+The sparse page transform needs a separate decision. A recognizable CRT entry stub (`48 83 EC ib / E8 / 48 83 C4 ib / E9`, matching stack immediates) is strong evidence when it is the only candidate — including “no transform” — whose decoded `call` and `jmp` targets both remain inside `.text`. Otherwise, compare how much each candidate restores expected `0xCC` padding across several pages and require both a margin over the unchanged baseline and an absolute floor. Small gains are the noise of XORing 255 positions per page and must not trigger a transform. 32-bit images use the same padding test to choose `page+1` versus `0x8000*(page+1)`, or to skip the pass on already-plaintext `.text`.
 
 If no candidate passes its content check, stop at that stage. Returning a plausible but silently damaged PE makes later observations unreliable.
 

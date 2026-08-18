@@ -13,7 +13,7 @@ CrackProof for Windows 保护 PE32 与 PE32+ 可执行文件和 DLL。受保护�
 * 除非另有说明，所有偏移均为自文件起始的十六进制字节偏移。`u32@X` 表示偏移 X 处的小端 32 位值。
 * **RVA**（相对虚拟地址）按 PE 的通常含义使用。加载器在按 RVA 布局的内存映像上工作；在磁盘上，同一偏移也被用作解包后映像缓冲区内的文件偏移。
 * 整数运算为固定宽度（32 位或 8 位）回绕运算，与算法来源的 x86 环境一致。Python 参考代码中显式施加掩码。
-* 诸如 `info[3]` 的名称指从加密文件头派生的 8-dword 表中的条目（见[受保护文件格式](file-structure/file-format.md)）。
+* 诸如 `info[3]` 的名称指从加密文件头派生的 8-dword 表中的条目（见[受保护文件结构](file-structure/file-format.md)）。
 
 ## 内容索引
 
@@ -26,4 +26,4 @@ CrackProof for Windows 保护 PE32 与 PE32+ 可执行文件和 DLL。受保护�
 | 启动检查、页保护与内核组件   | [运行时行为](runtime/runtime.md)                       |
 | 分析流程、局限与常量      | [分析笔记](analysis/analysis.md)                      |
 
-Windows 数据变换页面对应的测试代码发布在[验证与参考](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/)中。
+Windows 数据变换页面对应的测试代码发布在[验证与参考](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/)中。Huffman/LZ 记号语言与缓冲区内 AES 日程也出现在 [Android 原生库格式](https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/)中。

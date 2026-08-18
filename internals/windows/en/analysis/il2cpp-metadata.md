@@ -36,3 +36,5 @@ Key format constants (metadata version 31, Unity 2022.3-era):
 | Fields | method `.token +0x18`; type `.methodStart +0x24`, `.method_count +0x40` (u16); image `.typeStart +0x08`, `.typeCount +0x0C` |
 
 Other metadata versions use different struct strides and must be handled per-version; applying the version-31 layout to an unknown version corrupts the file, so any implementation should validate magic, version, and exact table divisibility before writing a single byte.
+
+The Android native-library family also touches method tokens, but not with this keyless remap. That path is a seeded five-round permutation restored at `mmap` time by module `0x0C`. See [Method tokens](https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/metadata/method-tokens).

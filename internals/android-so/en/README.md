@@ -19,6 +19,4 @@ The format is related to the Windows family but is not a PE variant. Android-spe
 | [Metadata](metadata/README.md) | IL2CPP method tokens and metadata storage variants |
 | [Analysis](analysis/README.md) | Validation rules, failure handling, and observed constants |
 
-For the Windows PE format, see the [Windows internals Space](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy).
-
-This is a research reference. It records observed structures and validation behavior; it does not document a product workflow or a general-purpose unpacking procedure.
+For the Windows PE format, see the [Windows internals Space](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy). The Huffman/LZ token language and an in-buffer AES schedule are shared with that family; the word ciphers, record onion, and helper-library layout are not.

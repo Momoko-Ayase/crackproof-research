@@ -13,7 +13,7 @@ The observed layouts include native and managed images, older marker-based conta
 - All offsets are hexadecimal byte offsets from the start of the file unless noted otherwise. `u32@X` means the little-endian 32-bit value at offset X.
 - **RVA** (relative virtual address) is used in the usual PE sense. The loader works on a memory image laid out by RVA; on disk the same offsets are used as file offsets into the unpacked image buffer.
 - Integer arithmetic is fixed-width (32-bit or 8-bit) with wraparound, matching the x86 environment the algorithms come from. The Python reference code applies explicit masks for this.
-- Names like `info[3]` refer to entries of the 8-dword table derived from the encrypted file header (see [The protected file format](file-structure/file-format.md)).
+- Names like `info[3]` refer to entries of the 8-dword table derived from the encrypted file header (see [Protected file structure](file-structure/file-format.md)).
 
 ## Contents
 
@@ -26,4 +26,4 @@ The observed layouts include native and managed images, older marker-based conta
 | Startup checks, page protection, and kernel components | [Runtime behavior](runtime/runtime.md) |
 | Analysis workflow, limitations, and constants | [Analysis notes](analysis/analysis.md) |
 
-Tested code corresponding to the Windows transform pages is published in [Verification and reference](https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/readme).
+Tested code corresponding to the Windows transform pages is published in [Verification and reference](https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/readme). The Huffman/LZ token language and the in-buffer AES schedule also appear in the [Android native-library format](https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/).

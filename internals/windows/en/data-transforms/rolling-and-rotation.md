@@ -34,7 +34,7 @@ def ror8(x, n):  return ((x >> n) | (x << (8 - n))) & 0xFF
 
 ## The rolling-key family
 
-Two ciphers share one rolling-key design: the key starts from a seed, each cell is XORed with the current key, and the key then rolls forward by mixing in the cell value, the loop index, and the square of the index. The header KDF (see [The protected file format](../file-structure/file-format.md)) is the 8-cell instance; the payload body cipher is the long-form instance with a different seed and update rule:
+Two ciphers share one rolling-key design: the key starts from a seed, each cell is XORed with the current key, and the key then rolls forward by mixing in the cell value, the loop index, and the square of the index. The header KDF (see [Container and encrypted header](../file-structure/container-layout.md)) is the 8-cell instance; the payload body cipher is the long-form instance with a different seed and update rule:
 
 ```python
 def payload_xor_chain(file_data, out, info, decrypt_size):
@@ -64,7 +64,7 @@ def xor_ror_dwords(d, pos, key, shift):
         put_u32(d, off, (ror32(v, shift) - i) & MASK32)
 ```
 
-32-bit builds additionally brute-force the shift for one stage from the candidate set `[19, 21, 17, 23, 15, 25, 13, 11]`, accepting the shift whose output parses as a valid stage table (see [The staged loader](../loading-and-pe-repair/loading/README.md)).
+32-bit builds additionally brute-force the shift for one stage from the candidate set `[19, 21, 17, 23, 15, 25, 13, 11]`, accepting the shift whose output parses as a valid stage table (see [Loading and section recovery](../loading-and-pe-repair/loading/README.md)).
 
 ## Triple byte-rotation ciphers
 

@@ -10,7 +10,7 @@ This page collects methodology that has proven effective against this protection
 
 ### Turn the loader's logging against itself
 
-The most productive first step is enabling the debug log: create the per-executable 12-hex-character folder under `%temp%` (learn the name by breaking on `CreateFileW`), then run the binary. The folder's creation time must be within about two days, or that run writes no log. Every protected module narrates its own boot — status codes per stage, missing DLLs, hooked functions, addresses. Combined with the status table in [Runtime behavior](../runtime/startup-status.md#the-boot-sequence-and-status-codes), the log localizes any failure or behavior to a specific stage without any disassembly.
+The most productive first step is enabling the debug log: create the per-executable 12-hex-character folder under `%temp%` (learn the name by breaking on `CreateFileW`), then run the binary. The folder's creation time must be within about two days, or that run writes no log. Every protected module narrates its own boot — status codes per stage, missing DLLs, hooked functions, addresses. Combined with the status table in [Startup sequence and status reporting](../runtime/startup-status.md#the-boot-sequence-and-status-codes), the log localizes any failure or behavior to a specific stage without any disassembly.
 
 ### Map status codes back to code
 

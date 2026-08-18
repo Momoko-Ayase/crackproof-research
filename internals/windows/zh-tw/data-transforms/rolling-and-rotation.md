@@ -34,7 +34,7 @@ def ror8(x, n):  return ((x >> n) | (x << (8 - n))) & 0xFF
 
 ## 滾動密鑰家族
 
-兩個密碼共享同一滾動密鑰設計：密鑰從種子開始，每個單元與當前密鑰異或，隨後密鑰混入單元值、循環索引與索引平方向前滾動。頭部 KDF（見[受保護文件格式](../file-structure/file-format.md)）是 8 單元實例；payload 主體密碼是同族的長形式，種子與更新規則不同：
+兩個密碼共享同一滾動密鑰設計：密鑰從種子開始，每個單元與當前密鑰異或，隨後密鑰混入單元值、循環索引與索引平方向前滾動。頭部 KDF（見[容器與加密頭](../file-structure/container-layout.md)）是 8 單元實例；payload 主體密碼是同族的長形式，種子與更新規則不同：
 
 ```python
 def payload_xor_chain(file_data, out, info, decrypt_size):
@@ -64,7 +64,7 @@ def xor_ror_dwords(d, pos, key, shift):
         put_u32(d, off, (ror32(v, shift) - i) & MASK32)
 ```
 
-32 位構建還會對其中一個階段在候選集 `[19, 21, 17, 23, 15, 25, 13, 11]` 上爆破移位量，接受輸出能解析為合法階段表的那個（見[分階段加載器](../loading-and-pe-repair/loading/)）。
+32 位構建還會對其中一個階段在候選集 `[19, 21, 17, 23, 15, 25, 13, 11]` 上爆破移位量，接受輸出能解析為合法階段表的那個（見[加載與節恢復](../loading-and-pe-repair/loading/)）。
 
 ## 三重字節旋轉密碼
 

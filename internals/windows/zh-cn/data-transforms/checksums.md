@@ -36,7 +36,7 @@ def calculate_checksum(d, pos):
     return crc32(d[offset:offset + length]) ^ length
 ```
 
-第二种形式以滚动初值链式覆盖**原始文件字节**（用上一次结果作 `initial` 调用 `crc32_append`），用于[分阶段加载器](../loading-and-pe-repair/loading/)中那条只用于校验的遍历。
+第二种形式以滚动初值链式覆盖**原始文件字节**（用上一次结果作 `initial` 调用 `crc32_append`），用于[加载与节恢复](../loading-and-pe-repair/loading/)中那条只用于校验的遍历。
 
 ## 三角数密钥调度
 

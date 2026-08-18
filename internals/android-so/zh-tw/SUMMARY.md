@@ -12,6 +12,7 @@
 ## 數據變換 <a href="#data-transforms" id="data-transforms"></a>
 
 * [概覽](data-transforms/README.md)
+* [詞、流與記錄密碼](data-transforms/word-and-record.md)
 * [模塊配置](data-transforms/module-config.md)
 * [容器變換](data-transforms/container.md)
 * [Huffman 與 LZ 壓縮](data-transforms/compression.md)
@@ -28,6 +29,7 @@
 * [概覽](runtime/README.md)
 * [第一階段引導](runtime/stage1-bootstrap.md)
 * [第二階段解釋器](runtime/stage2-interpreter.md)
+* [環境與完整性檢查](runtime/environment-checks.md)
 * [運行時模塊](runtime/modules.md)
 
 ## 元數據 <a href="#metadata" id="metadata"></a>

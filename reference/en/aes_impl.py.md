@@ -4,7 +4,7 @@ description: "AES decryption in CBC mode with an in-buffer key schedule; T-table
 
 # aes\_impl.py
 
-The block cipher: AES-CBC decryption with the key schedule embedded in the data buffer, as documented in [AES transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/aes).
+The block cipher: AES-CBC decryption with the key schedule embedded in the data buffer, as documented in [AES-CBC layer](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/aes).
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.

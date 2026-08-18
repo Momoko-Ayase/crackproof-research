@@ -12,4 +12,5 @@ description: "第一阶段引导、第二阶段解释器与运行时模块的职
 | --- | --- |
 | [第一阶段引导](stage1-bootstrap.md) | `/proc/self/maps`、`SHT_LOUSER` 节，以及跳入第二阶段 |
 | [第二阶段解释器](stage2-interpreter.md) | 模块表、记录流，以及嵌套解释器 `0xE2`–`0xE8` |
+| [环境与完整性检查](environment-checks.md) | 翻译层、ptrace、包与内存可见性探测 |
 | [运行时模块](modules.md) | 物化后各命令标识的已观察职责 |

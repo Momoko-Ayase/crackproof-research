@@ -62,7 +62,7 @@ Each record is `0x5C` bytes (23 little-endian dwords) after an 8-byte stream hea
 
 The interpreter decrypts the stream header, then decrypts descriptors in index order. After each object is registered it calls init (if any) and then entry (if any), unless `0x100` is set. A zero record ends the table.
 
-Stream-header and descriptor ciphers use a per-stream identifier, an 8-byte seed, and a GF(2³²) word mix. The constants differ across families; treat them as family-specific material, not a single universal key. Structural checks in [Stage 2 streams](../file-format/stage2-streams.md) stay in force regardless of the constants.
+Stream-header and descriptor ciphers use a per-stream identifier, an 8-byte header, and a GF(2³²) word mix. The constants differ across families; the two observed sets and the shared descriptor walk are on [Word, stream, and record ciphers](../data-transforms/word-and-record.md). Structural checks in [Stage 2 streams](../file-format/stage2-streams.md) stay in force regardless of the constants.
 
 ## Layering
 

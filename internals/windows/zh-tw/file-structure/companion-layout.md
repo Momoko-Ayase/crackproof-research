@@ -28,7 +28,7 @@ section_data_file_base = (~u32@0x1080) + 0x1000      (32-bit wrapping)
 stub 以明文保留的內容對後續重建很重要：
 
 * **導出目錄**（伴生體在此處解密為密文；加載器運行時從 stub 的副本重建導出）。
-* **TLS 目錄**——`IMAGE_TLS_DIRECTORY` 結構體、其原始數據模板與數據目錄項，這些都被保護層從加密 payload 中剝離（見 [PE 變換](../loading-and-pe-repair/pe-reconstruction/)）。
+* **TLS 目錄**——`IMAGE_TLS_DIRECTORY` 結構體、其原始數據模板與數據目錄項，這些都被保護層從加密 payload 中剝離（見 [PE 重建](../loading-and-pe-repair/pe-reconstruction/)）。
 * 真實的 `DllCharacteristics` 字段與基址重定位表——伴生模塊**不是** `/FIXED`，與較舊的單文件構建不同。
 
-關於此文件對在啟動時如何加載，見[運行時行為](../runtime/runtime.md)；關於缺失部分如何被還原進重建映像，見 [PE 變換](../loading-and-pe-repair/pe-reconstruction/)。
+關於此文件對在啟動時如何加載，見[運行時行為](../runtime/runtime.md)；關於缺失部分如何被還原進重建映像，見 [PE 重建](../loading-and-pe-repair/pe-reconstruction/)。

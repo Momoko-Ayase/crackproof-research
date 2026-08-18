@@ -29,7 +29,7 @@ This generation has a more thorough authentication check than its predecessors, 
 
 ## The `0x7679` version stamp
 
-The driver names encode a build stamp: `Htsysm7679` and `Htsysm767901` (= `7679` variant `01`). The same dword `0x00007679` appears inside protected files as the **configuration-cluster stamp** in the 32-bit loader's final stage (see [The staged loader](../loading-and-pe-repair/loading/README.md)), and as half of an 8-byte tag inside stage-5 marker tables. It functions as a version identifier tying a protected build to its driver generation, and is a useful fingerprint when classifying unknown samples.
+The driver names encode a build stamp: `Htsysm7679` and `Htsysm767901` (= `7679` variant `01`). The same dword `0x00007679` appears inside protected files as the **configuration-cluster stamp** in the 32-bit loader's final stage (see [PE32, DLL, and marker-less layouts](../loading-and-pe-repair/loading/layout-variants.md)), and as half of an 8-byte tag inside stage-5 marker tables. It functions as a version identifier tying a protected build to its driver generation, and is a useful fingerprint when classifying unknown samples.
 
 ## The `Htsysm1B4001` device name
 

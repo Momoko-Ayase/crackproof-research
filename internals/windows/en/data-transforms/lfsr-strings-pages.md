@@ -80,6 +80,10 @@ def page_scramble_pe32(d, pa, page, big_formula):
 ```
 
 {% hint style="warning" %}
-The shift (64-bit: 0 or 15) and the formula choice (32-bit: `page+1` or `0x8000*(page+1)`) are **not recorded anywhere in the file**. Two builds can carry byte-identical configuration stamps yet require different choices. The only reliable discriminator is the code content itself: replay the scramble on sample pages under each candidate and count how many positions decode to `0xCC` (the MSVC `int3` padding byte). The correct choice restores padding disproportionately; a wrong one scrambles roughly one byte per 16. Some modules (native DLLs) have plaintext code and must not be descrambled at all.
+The shift (64-bit: 0 or 15) and the formula choice (32-bit: `page+1` or `0x8000*(page+1)`) are **not recorded anywhere in the file**. Two builds can carry byte-identical configuration stamps yet require different choices. A third outcome is also required: leave the bytes unchanged. Native DLLs often keep plaintext `.text`; applying either formula there still XORs about one byte per 16.
+
+On 64-bit images, a recognized CRT entry stub is stronger evidence than padding counts. The common shape is `48 83 EC ib / E8 rel32 / 48 83 C4 ib / E9 rel32` (the two stack immediates match). Accept a candidate only when it is the sole shift — including “no transform” — whose decoded `call` and `jmp` targets both land inside `.text`. Unrecognized entry code falls back to padding statistics: replay each shift on sample pages and count positions that become `0xCC`. Require a clear gain over the unchanged bytes (both a margin over the baseline and an absolute floor). Small gains are the noise of XORing 255 pseudo-random positions per page and must not trigger a transform.
+
+On 32-bit images the same `0xCC` comparison chooses between `page+1` and `0x8000*(page+1)`, and skips the pass when neither formula raises the padding count well above the unchanged baseline.
 {% endhint %}
 

@@ -12,4 +12,5 @@ Restoration still needs only modules `0x9B`, `0x9D`, and `0x9E`. The other ident
 | --- | --- |
 | [Stage 1 bootstrap](stage1-bootstrap.md) | `/proc/self/maps`, the `SHT_LOUSER` section, and the jump into stage 2 |
 | [Stage 2 interpreter](stage2-interpreter.md) | The module table, record streams, and nested interpreters `0xE2`–`0xE8` |
+| [Environment and integrity checks](environment-checks.md) | Translation-layer, ptrace, package, and memory-visibility probes |
 | [Runtime modules](modules.md) | Observed roles of command identifiers after they are materialized |

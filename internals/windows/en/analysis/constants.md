@@ -20,7 +20,7 @@ description: "Quick-reference tables of constants, offsets, and encodings used a
 | `decrypt_size` (payload chain length) | `info[6] - info[3] + 8192` |
 | Section-data file base | `(~u32@0x1080) + 0x1000` |
 | Companion pairing check | `stub[4096..4128] == companion[0..32]` |
-| File-integrity dword | `u32@0x38 + 0x76543211` (stored obfuscated at offset `0x38`) |
+| Dword written at image `info[3]` after the payload copy | `4096` |
 | Config-cluster version stamp (32-bit) | `0x00007679` |
 | Stage-5 markers (64-bit marker layout) | `70 6D 00 00 63 6D 00 00` and `00 00 00 40 01 00 00 00` |
 
@@ -75,11 +75,11 @@ ModR/M must be register-direct `AL` (`mod=3, rm=0`); anything else is invalid.
 
 ## Cross-references
 
-- Status codes and the boot sequence: [Runtime behavior](../runtime/startup-status.md#the-boot-sequence-and-status-codes)
-- Module codes and driver generations: [Kernel drivers and submodules](../runtime/kernel-components.md)
+- Status codes and the boot sequence: [Startup sequence and status reporting](../runtime/startup-status.md#the-boot-sequence-and-status-codes)
+- Module codes and driver generations: [Htsysm kernel components](../runtime/kernel-components.md)
 - On-demand page cipher: [Page protection and loader code](../runtime/page-protection.md#on-demand-page-cipher)
 - il2cpp metadata constants: [il2cpp metadata obfuscation](il2cpp-metadata.md)
-- Huffman table/token format: [Data transformation primitives](../data-transforms/compression.md#the-huffmanlz-compression-format)
+- Huffman table/token format: [Huffman and LZ compression](../data-transforms/compression.md#the-huffmanlz-compression-format)
 
 ## Verification suite
 

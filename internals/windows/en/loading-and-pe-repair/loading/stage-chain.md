@@ -38,7 +38,9 @@ Derive `info` with the [KDF](../../file-structure/container-layout.md#the-info-h
 
 ### Phase 3: the configuration anchor
 
-The configuration block floats between builds, so it is located by scanning the region `[info[6] + 1000, info[6] + 8000)` for the **anchor**: a dword equal to `info[3]`, followed at `+8` by a value slightly less than `info[6]` (delta ≤ `0x1000`, a multiple of `0x200`). A build-generation discriminator follows: the config-version stamp sits at `anchor + 104` in the older layout and `anchor + 112` in the newer one (its top nibble is always `0x4`), yielding `anchor_extra ∈ {0, 8}` — every field from offset 40 onward shifts by that amount.
+The configuration block floats between builds, so it is located by scanning the region `[info[6] + 1000, info[6] + 8000)` for the **anchor**: a dword equal to `info[3]`, followed at `+8` by a value slightly less than `info[6]` (delta ≤ `0x1000`, a multiple of `0x200`). Fields from offset 40 onward then shift by `anchor_extra ∈ {0, 8}`.
+
+The reliable discriminator is the stage-1 descriptor itself at `anchor + 120 + extra`: its `(base, length)` pair must satisfy `base ≥ info[3]`, `length ≥ 16`, and `base + length` inside the image. Try `extra = 0` then `extra = 8` and keep the first pair that validates. A nearby version-like dword (often at `anchor + 104` or `anchor + 112`, with top nibble `0x4`) is common on older families but is not stable across every build, so it is only a supporting signal.
 
 From the anchor:
 
@@ -104,5 +106,5 @@ walk5 entries (20 bytes each) point at encrypted DLL names (`+12`) and thunk cha
 
 ### Phase 9: PE reconstruction
 
-The final phase rebuilds the PE header — section table conversion, the encrypted entry-point/data-directory block, TLS handling, `/FIXED` policy, the code-page scramble, and managed-metadata handling. These are format transformations rather than loader stages, covered in [PE transformations](../pe-reconstruction/README.md).
+The final phase rebuilds the PE header — section table conversion, the encrypted entry-point/data-directory block, TLS handling, `/FIXED` policy, the code-page scramble, and managed-metadata handling. These are format transformations rather than loader stages, covered in [PE reconstruction](../pe-reconstruction/README.md).
 

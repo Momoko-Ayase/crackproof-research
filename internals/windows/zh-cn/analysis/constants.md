@@ -20,7 +20,7 @@ description: 容器格式、加载器与运行时各处使用的常量、偏移�
 | `decrypt_size`（payload 链长度） | `info[6] - info[3] + 8192`                            |
 | 节数据文件基址                     | `(~u32@0x1080) + 0x1000`                              |
 | 伴生体配对检查                     | `stub[4096..4128] == companion[0..32]`                |
-| 文件完整性 dword                 | `u32@0x38 + 0x76543211`（混淆存储于偏移 `0x38`）               |
+| payload 拷贝后写入映像 `info[3]` 的 dword | `4096`                                          |
 | 配置簇版本戳（32 位）                | `0x00007679`                                          |
 | stage-5 标记（64 位标记布局）        | `70 6D 00 00 63 6D 00 00` 与 `00 00 00 40 01 00 00 00` |
 
@@ -75,11 +75,11 @@ ModR/M 必须是寄存器直接寻址的 `AL`（`mod=3, rm=0`）；其余一律�
 
 ## 交叉引用
 
-* 状态码与启动序列：[运行时行为](../runtime/startup-status.md#启动序列与状态码)
-* 模块代码与驱动世代：[内核驱动与子模块](../runtime/kernel-components.md)
+* 状态码与启动序列：[启动序列与状态报告](../runtime/startup-status.md#启动序列与状态码)
+* 模块代码与驱动世代：[Htsysm 内核组件](../runtime/kernel-components.md)
 * 按需页密码：[页保护与加载器代码](../runtime/page-protection.md#按需页密码)
 * il2cpp 元数据常量：[il2cpp 元数据混淆](il2cpp-metadata.md)
-* Huffman 表/token 格式：[数据变换原语](../data-transforms/compression.md#huffmanlz-压缩格式)
+* Huffman 表/token 格式：[Huffman 与 LZ 压缩](../data-transforms/compression.md#huffmanlz-压缩格式)
 
 ## 验证套件
 

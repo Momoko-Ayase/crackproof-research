@@ -4,7 +4,7 @@ description: "Observed roles of runtime modules, listed by identifier."
 
 # Runtime modules
 
-Command identifiers below come from stage 2 records. Roles are taken from the functions those modules run after they are materialized. Identifiers required for ELF restoration stay on [Module streams](../restoration/module-streams.md).
+Command identifiers below come from stage 2 records. Roles are taken from the functions those modules run after they are materialized. Identifiers required for ELF restoration stay on [Module streams](../restoration/module-streams.md). Environment and integrity behavior is collected on [Environment and integrity checks](environment-checks.md).
 
 An identifier listed as “not reduced” was present as a record; its behavior has not been turned into a stable description.
 

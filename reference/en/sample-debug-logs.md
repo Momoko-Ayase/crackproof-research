@@ -96,7 +96,7 @@ A06
 
 Points of interest:
 
-* `C03` names the driver generation: `Htsysm7679` — the second-generation Htsysm (see [Kernel drivers and submodules](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/kernel-components)).
+* `C03` names the driver generation: `Htsysm7679` — the second-generation Htsysm (see [Htsysm kernel components](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/kernel-components)).
 * `C04` lists every API hooked for the Protected-Process toggle (`NtCreateSection`, `NtAlpcSendWaitReceivePort`, `NtDuplicateObject`, `NtConnectPort`, `NtOpenProcess`, `NtOpenThread`, …) plus loader-interception hooks (`CreateProcessInternal*`, `CreateRemoteThread*`, `LdrLoadDll`, `CreateActCtxW`).
 * `640 … 840` — this module is **page-encrypted**: bulk decrypt, then re-encrypt with the exception-handler hook installed. The `002` line after `840` carries three addresses (the re-encrypted range and handler data).
 * `570` and `A06` hook additional APIs late in the boot (`user32!SetFocus`, `CreateWindowExA/W`, `uxtheme!ThemeInitApiHook`).

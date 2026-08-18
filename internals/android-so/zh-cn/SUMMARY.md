@@ -12,6 +12,7 @@
 ## 数据变换 <a href="#data-transforms" id="data-transforms"></a>
 
 * [概览](data-transforms/README.md)
+* [词、流与记录密码](data-transforms/word-and-record.md)
 * [模块配置](data-transforms/module-config.md)
 * [容器变换](data-transforms/container.md)
 * [Huffman 与 LZ 压缩](data-transforms/compression.md)
@@ -28,6 +29,7 @@
 * [概览](runtime/README.md)
 * [第一阶段引导](runtime/stage1-bootstrap.md)
 * [第二阶段解释器](runtime/stage2-interpreter.md)
+* [环境与完整性检查](runtime/environment-checks.md)
 * [运行时模块](runtime/modules.md)
 
 ## 元数据 <a href="#metadata" id="metadata"></a>

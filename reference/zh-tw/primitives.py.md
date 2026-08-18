@@ -4,7 +4,7 @@ description: "滾動密鑰、旋轉、LFSR、字符串、頁置亂、按需頁�
 
 # primitives.py
 
-除分組密碼、解壓器與字節碼 VM 之外的全部數據變換——[數據變換](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/shu-ju-bian-huan/data-transforms)中記載的各密碼與校驗和。
+除分組密碼、解壓器與字節碼 VM 之外的全部數據變換——[數據變換](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/data-transforms)中記載的各密碼與校驗和。
 
 ```python
 """Reference implementations of the protection scheme's data transforms.

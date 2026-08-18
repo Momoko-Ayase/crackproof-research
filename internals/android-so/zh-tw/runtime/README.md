@@ -12,4 +12,5 @@ description: "第一階段引導、第二階段解釋器與運行時模塊的職
 | --- | --- |
 | [第一階段引導](stage1-bootstrap.md) | `/proc/self/maps`、`SHT_LOUSER` 節，以及跳入第二階段 |
 | [第二階段解釋器](stage2-interpreter.md) | 模塊表、記錄流，以及嵌套解釋器 `0xE2`–`0xE8` |
+| [環境與完整性檢查](environment-checks.md) | 翻譯層、ptrace、包與內存可見性探測 |
 | [運行時模塊](modules.md) | 物化後各命令標識的已觀察職責 |

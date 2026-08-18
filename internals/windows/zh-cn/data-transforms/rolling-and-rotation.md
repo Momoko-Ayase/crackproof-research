@@ -34,7 +34,7 @@ def ror8(x, n):  return ((x >> n) | (x << (8 - n))) & 0xFF
 
 ## 滚动密钥家族
 
-两个密码共享同一滚动密钥设计：密钥从种子开始，每个单元与当前密钥异或，随后密钥混入单元值、循环索引与索引平方向前滚动。头部 KDF（见[受保护文件格式](../file-structure/file-format.md)）是 8 单元实例；payload 主体密码是同族的长形式，种子与更新规则不同：
+两个密码共享同一滚动密钥设计：密钥从种子开始，每个单元与当前密钥异或，随后密钥混入单元值、循环索引与索引平方向前滚动。头部 KDF（见[容器与加密头](../file-structure/container-layout.md)）是 8 单元实例；payload 主体密码是同族的长形式，种子与更新规则不同：
 
 ```python
 def payload_xor_chain(file_data, out, info, decrypt_size):
@@ -64,7 +64,7 @@ def xor_ror_dwords(d, pos, key, shift):
         put_u32(d, off, (ror32(v, shift) - i) & MASK32)
 ```
 
-32 位构建还会对其中一个阶段在候选集 `[19, 21, 17, 23, 15, 25, 13, 11]` 上爆破移位量，接受输出能解析为合法阶段表的那个（见[分阶段加载器](../loading-and-pe-repair/loading/)）。
+32 位构建还会对其中一个阶段在候选集 `[19, 21, 17, 23, 15, 25, 13, 11]` 上爆破移位量，接受输出能解析为合法阶段表的那个（见[加载与节恢复](../loading-and-pe-repair/loading/)）。
 
 ## 三重字节旋转密码
 

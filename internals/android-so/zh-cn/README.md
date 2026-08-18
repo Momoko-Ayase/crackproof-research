@@ -19,6 +19,4 @@ description: "CrackProof 所保护 Android 原生库的内部结构与恢复规�
 | [元数据](metadata/README.md) | IL2CPP 方法令牌和元数据存储方式 |
 | [分析](analysis/README.md) | 校验规则、失败处理和已观察常量 |
 
-Windows PE 格式请参阅 [Windows internals Space](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt)。
-
-本文档是研究参考，记录已观察到的结构和校验行为，不提供产品操作流程或通用解包步骤。
+Windows PE 格式请参阅 [Windows internals Space](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt)。Huffman/LZ 记号语言与缓冲区内 AES 日程与该家族共享；词密码、记录洋葱与辅助库布局则不是。

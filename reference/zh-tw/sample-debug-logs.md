@@ -4,14 +4,14 @@ description: "受保護宿主、原生 DLL 和託管 DLL 的脫敏調試日誌�
 
 # 調試日誌示例
 
-這些是真實的 CrackProof 調試日誌，捕獲方式是在 `%temp%` 下創建該可執行文件對應的 12 位十六進制字符文件夾並啟動受保護程序（見[調試日誌](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/yun-xing-shi/startup-status)）。路徑與產品名已替換為通用佔位符；其餘一切——選項標誌、狀態碼、地址、hook 列表——均為原文。
+這些是真實的 CrackProof 調試日誌，捕獲方式是在 `%temp%` 下創建該可執行文件對應的 12 位十六進制字符文件夾並啟動受保護程序（見[調試日誌](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status)）。路徑與產品名已替換為通用佔位符；其餘一切——選項標誌、狀態碼、地址、hook 列表——均為原文。
 
 ## 如何閱讀日誌
 
 * **第 1 行**——受保護模塊的路徑。
 * **第 2 行**——該構建打包時使用的保護選項標誌（每個 `-XX` 記號對應一個打包器選項）。
 * **第 3/4 行**——時間戳與模塊的加載基址。
-* **後續行**——12 位[狀態碼](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/yun-xing-shi/startup-status)，每個 stage 一行；縮進的 `000`–`00N` 行攜帶 stage 特定的細節（地址、計數、被 hook 的函數）。
+* **後續行**——12 位[狀態碼](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status)，每個 stage 一行；縮進的 `000`–`00N` 行攜帶 stage 特定的細節（地址、計數、被 hook 的函數）。
 * **最後幾行**——完成時間戳與 9 位錯誤碼（`000-000-000` = 成功）。
 
 ## 宿主 EXE——功能完整，頁加密
@@ -96,7 +96,7 @@ A06
 
 值得注意的點：
 
-* `C03` 給出驅動代際：`Htsysm7679`——第二代 Htsysm（見[內核驅動與子模塊](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/yun-xing-shi/kernel-components)）。
+* `C03` 給出驅動代際：`Htsysm7679`——第二代 Htsysm（見 [Htsysm 內核組件](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/kernel-components)）。
 * `C04` 列出為 Protected-Process 開關 hook 的全部 API（`NtCreateSection`、`NtAlpcSendWaitReceivePort`、`NtDuplicateObject`、`NtConnectPort`、`NtOpenProcess`、`NtOpenThread`……）以及加載器攔截 hook（`CreateProcessInternal*`、`CreateRemoteThread*`、`LdrLoadDll`、`CreateActCtxW`）。
 * `640 … 840`——該模塊是**頁加密**的：先整體解密，隨後重新加密並安裝異常處理 hook。`840` 之後的 `002` 行攜帶三個地址（重新加密的區間與處理程序數據）。
 * `570` 與 `A06` 在啟動後期 hook 更多 API（`user32!SetFocus`、`CreateWindowExA/W`、`uxtheme!ThemeInitApiHook`）。

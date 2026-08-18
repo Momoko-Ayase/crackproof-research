@@ -4,9 +4,18 @@ description: "Decode and validate the fixed-size outer header before reading the
 
 # Stage 1 header
 
-The first stage uses a fixed-size parameter area. The observed default outer size is `0x23c` bytes (572 decimal). Two word-transform constants have been observed: `0xbf20165d` and `0xbf189bdd`. Each family uses one of them. Implementations must read the size and the constant from the protected section when a build supplies a different value; the defaults are recognition clues, not universal assumptions.
+The private `SHT_LOUSER` section is not a single blob. Observed layout:
 
-How the stub finds that section at load time is described in [Stage 1 bootstrap](../runtime/stage1-bootstrap.md).
+```
+[0x23C-byte outer wrapper]
+[0x1000-byte encrypted parameter area; only the first 32 bytes are the word header]
+[encrypted stage 2 image]
+[remaining record streams]
+```
+
+The observed default wrapper size is `0x23c` bytes (572 decimal). Two word-transform constants have been observed: `0xbf20165d` and `0xbf189bdd`. Each family uses one of them. Read the size and the constant from the protected section when a build supplies a different value; the defaults are recognition clues, not universal assumptions.
+
+How the stub finds that section at load time is described in [Stage 1 bootstrap](../runtime/stage1-bootstrap.md). The word cipher itself is on [Word, stream, and record ciphers](../data-transforms/word-and-record.md).
 
 ## Header fields
 
@@ -29,7 +38,7 @@ The words are restored with unsigned 32-bit arithmetic. For word index `i`, the 
 plain[i] = (cipher[i] + (i + 3) * key) XOR (C * (i + 1))
 ```
 
-`C` is the family word constant. All intermediate values wrap at 32 bits. The first word supplies `key`; implementations should restore the complete header and then apply the field checks rather than trusting a single decoded value.
+`C` is the family word constant. All intermediate values wrap at 32 bits. The first word supplies `key` and is written back after the 32-byte header is decrypted. Restore the complete header, then apply the field checks, rather than trusting a single decoded value. The remaining 0x1000 − 32 bytes of the parameter area are not part of this eight-word table.
 
 ## Fail-closed checks
 

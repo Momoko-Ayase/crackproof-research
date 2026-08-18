@@ -98,4 +98,4 @@ def demand_page_decrypt(buf, key):
 
 運行時狀態保存在一個由保留寄存器尋址的上下文結構中：固定槽位的函數指針、指向映像緩衝區的雙重間接指針，以及由展開的 `lea`-加-store 序列構建的逐槽表。API 地址從模塊自身經 OS 解析的導入表讀出——整個階段中沒有任何 PEB 遍歷，因此該模塊依賴普通 Windows 加載器已綁定其導入，儘管它存儲的 `AddressOfEntryPoint` 是垃圾、OS 從不調用其真實入口。
 
-同一階段內含自己的 `.reloc` 遍歷器：重定位由加載器施加（狀態 `655`），而非 OS——與 [PE 變換](../loading-and-pe-repair/pe-reconstruction/)中的 `/FIXED` 處理一致。
+同一階段內含自己的 `.reloc` 遍歷器：重定位由加載器施加（狀態 `655`），而非 OS——與 [PE 重建](../loading-and-pe-repair/pe-reconstruction/)中的 `/FIXED` 處理一致。
