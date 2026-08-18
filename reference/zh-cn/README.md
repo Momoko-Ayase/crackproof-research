@@ -12,12 +12,12 @@ description: "文档中 Python 片段的可运行验证套件，以及从真实�
 
 | 文件                | 作用                                         |
 | ----------------- | ------------------------------------------ |
-| `primitives.py`   | 滚动密钥密码、字节旋转、LFSR、字符串密码、页置乱、CRC-32、校验和、三角调度 |
+| `primitives.py`   | 滚动密钥密码、字节旋转、LFSR、字符串密码、页置乱、按需页密码、CRC-32、校验和、三角调度 |
 | `aes_impl.py`     | 带缓冲区内置密钥调度的 AES-CBC 解密                     |
 | `huffman.py`      | Huffman/LZ 混合解压器                           |
 | `bytecode_vm.py`  | 逐构建字节码桩解码器/解释器及其逆变换                        |
 | `detect.py`       | 基于内容的识别与分类                                 |
-| `run_tests.py`    | 比对工具（30 个向量）                               |
+| `run_tests.py`    | 比对工具（32 个向量）                               |
 | `rust_vectors.rs` | 打印基准真值的独立参考移植                              |
 | `vectors.txt`     | 比对工具所对照的期望输出                               |
 

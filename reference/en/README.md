@@ -12,12 +12,12 @@ Every Python snippet in the main document was verified before publication: each 
 
 | File              | Role                                                                                                            |
 | ----------------- | --------------------------------------------------------------------------------------------------------------- |
-| `primitives.py`   | Rolling-key ciphers, byte rotations, LFSR, string cipher, page scramble, CRC-32, checksums, triangular schedule |
+| `primitives.py`   | Rolling-key ciphers, byte rotations, LFSR, string cipher, page scramble, on-demand page cipher, CRC-32, checksums, triangular schedule |
 | `aes_impl.py`     | AES-CBC decryption with the in-buffer key schedule                                                              |
 | `huffman.py`      | Huffman/LZ hybrid decompressor                                                                                  |
 | `bytecode_vm.py`  | Per-build bytecode stub decoder/interpreter and inverse                                                         |
 | `detect.py`       | Content-based detection and classification                                                                      |
-| `run_tests.py`    | The comparison harness (30 vectors)                                                                             |
+| `run_tests.py`    | The comparison harness (32 vectors)                                                                             |
 | `rust_vectors.rs` | The independent reference port that prints ground truth                                                         |
 | `vectors.txt`     | The expected outputs the harness compares against                                                               |
 

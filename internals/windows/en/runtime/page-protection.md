@@ -18,6 +18,68 @@ A consequence for memory analysis: a naive dump of a page-encrypted module captu
 
 The page-fault handler does not live inside the protected module's image. It ships in a manually mapped support module (`HtdpStub2.dll` — see [Htsysm kernel components](kernel-components.md)), which is why handler signatures are absent when only the main module is dumped.
 
+## On-demand page cipher
+
+One observed handler walks this path after a fault:
+
+```mermaid
+flowchart TD
+    A["Fault in a PAGE_NOACCESS page"] --> B["Hooked ntdll!KiUserExceptionDispatcher"]
+    B --> C["Match the address to a region and page descriptor"]
+    C --> D["MapViewOfFile the ciphertext page"]
+    D --> E["On-demand page cipher"]
+    E --> F["Optional second pass if page-flag bit 20 is set"]
+    F --> G["VirtualProtect 4 KiB to PAGE_EXECUTE_READ"]
+    G --> H["Resume at the fault address"]
+```
+
+A table of region descriptors sits in the handler module. Each region is located by comparing the fault address with a base and size. The matching region's page table is an array of 16-byte page descriptors at `region_base + page_table_offset`. The page index is `(fault_address - region_base) >> 12`.
+
+Observed region-descriptor fields:
+
+| Offset | Size | Observed use |
+| --- | --- | --- |
+| `+0x08` | 8 | Region base |
+| `+0x10` | 4 | Region size |
+| `+0x20` | 4 | Page-table offset from the region base |
+| `+0x24` | 4 | Page count |
+| `+0x28` | 8 | Mapping handle passed to `MapViewOfFile` |
+| `+0x34` | 4 | Decrypt counter |
+
+Observed page-descriptor fields (16 bytes each):
+
+| Offset | Size | Observed use |
+| --- | --- | --- |
+| `+0x00` | 4 | Flags. Bit 20 (`0x14`) selects a second transform |
+| `+0x04` | 4 | Key material mixed into the page key |
+| `+0x08` | 4 | Last `GetTickCount` value |
+| `+0x0C` | 2 | Fault count |
+| `+0x0E` | 2 | 16-bit field; role not confirmed |
+
+The page key mixes the faulting page address, the low 32 bits of the region base, and the per-page key material. The first transform is a dword cipher over the 4 KiB view:
+
+```python
+def demand_page_key(page_va, region_base, key_part):
+    return ((page_va + region_base) ^ key_part) & MASK32
+
+
+def demand_page_decrypt(buf, key):
+    count = len(buf) >> 2
+    state = ((key << 16) ^ key) & MASK32
+    prev = state
+    for i in range(count):
+        enc = get_u32(buf, i * 4)
+        state = rol32((state + i) & MASK32, 3)
+        put_u32(buf, i * 4, enc ^ prev ^ state)
+        prev = enc
+```
+
+`get_u32`, `put_u32`, `rol32`, and `MASK32` are the helpers from [Data transforms](../data-transforms/data-transforms.md). The runnable copy lives in [primitives.py](https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/primitives.py).
+
+If page-flag bit 20 is set, a second transform runs on the same 4 KiB. That second function has not been reduced to a published formula. The handler then calls `VirtualProtect` on the page with `PAGE_EXECUTE_READ` and resumes execution.
+
+This cipher is a per-module option, the same one that produces the `640` then `840` sequence. It is not a title-specific extra.
+
 ## The loader's own code: polymorphism and decoys
 
 The loader defends its code as aggressively as its data. Techniques observed in the final stage (stage 5) and its bootstrap:

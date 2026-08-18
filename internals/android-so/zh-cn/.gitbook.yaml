@@ -24,3 +24,7 @@ redirects:
   analysis/analysis: analysis/README.md
   analysis/analysis/validation: analysis/validation.md
   analysis/analysis/constants: analysis/constants.md
+  runtime/runtime: runtime/README.md
+  runtime/runtime/stage1-bootstrap: runtime/stage1-bootstrap.md
+  runtime/runtime/stage2-interpreter: runtime/stage2-interpreter.md
+  runtime/runtime/modules: runtime/modules.md

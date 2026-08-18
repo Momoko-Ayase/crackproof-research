@@ -77,9 +77,10 @@ ModR/M 必须是寄存器直接寻址的 `AL`（`mod=3, rm=0`）；其余一律�
 
 * 状态码与启动序列：[运行时行为](../runtime/startup-status.md#启动序列与状态码)
 * 模块代码与驱动世代：[内核驱动与子模块](../runtime/kernel-components.md)
+* 按需页密码：[页保护与加载器代码](../runtime/page-protection.md#按需页密码)
 * il2cpp 元数据常量：[il2cpp 元数据混淆](il2cpp-metadata.md)
 * Huffman 表/token 格式：[数据变换原语](../data-transforms/compression.md#huffmanlz-压缩格式)
 
 ## 验证套件
 
-本文档中的每个 Python 片段在发布前都经过验证：每个函数的输出在相同输入上与算法的独立参考移植逐字节比对（30 个测试向量，全部一致）。完整可运行的片段文件与比对工具发布在本站的[验证与参考](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/L9bXLua8yrIPEUZOHO21/)栏目中——运行 `python run_tests.py` 可重跑全部比对。
+本文档中的每个 Python 片段在发布前都经过验证：每个函数的输出在相同输入上与算法的独立参考移植逐字节比对（32 个测试向量，全部一致）。完整可运行的片段文件与比对工具发布在本站的[验证与参考](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/)栏目中——运行 `python run_tests.py` 可重跑全部比对。

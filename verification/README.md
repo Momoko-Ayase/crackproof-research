@@ -6,7 +6,7 @@ This directory contains the complete, runnable form of every Python snippet in t
 
 | File | Contents |
 | --- | --- |
-| `primitives.py` | Rolling-key ciphers, byte-rotation ciphers, LFSR, string cipher, page scramble, CRC-32, checksum descriptors, triangular key schedule |
+| `primitives.py` | Rolling-key ciphers, byte-rotation ciphers, LFSR, string cipher, page scramble, on-demand page cipher, CRC-32, checksum descriptors, triangular key schedule |
 | `aes_impl.py` | AES-CBC decryption with the in-buffer key schedule (tables generated from GF(2⁸) arithmetic) |
 | `huffman.py` | The Huffman/LZ hybrid decompressor |
 | `bytecode_vm.py` | The per-build bytecode stub decoder/interpreter, translation table, and inverse |
@@ -28,4 +28,4 @@ rustc -O rust_vectors.rs -o rust_vectors
 ./rust_vectors > vectors.txt
 ```
 
-The test scenarios cover: the header KDF, both XOR-ROR shifts, both byte-rotation ciphers (including the non-mutating trial read), the LFSR keystream and block decrypt, the string cipher, both page-scramble forms, AES-CBC over three chained blocks, the checksum descriptor, all four Huffman token modes plus an internal-node walk, the bytecode VM (op decode, 256-entry translation table, inverse-chain identity), and the triangular key schedule — 30 vectors in total.
+The test scenarios cover: the header KDF, both XOR-ROR shifts, both byte-rotation ciphers (including the non-mutating trial read), the LFSR keystream and block decrypt, the string cipher, both page-scramble forms, the on-demand page cipher, AES-CBC over three chained blocks, the checksum descriptor, all four Huffman token modes plus an internal-node walk, the bytecode VM (op decode, 256-entry translation table, inverse-chain identity), and the triangular key schedule — 32 vectors in total.

@@ -4,7 +4,7 @@ description: "Dispatch nested records and apply the required Android decoder mod
 
 # Module streams
 
-The initial stream identifier is `0xE2`. The required module set for ELF restoration is:
+The initial stream identifier is `0xE2`. Stage 2 first registers itself as `0xE2` and the file-tail mapping as `0xD0` in a 256-entry table (`0x1800` bytes, 24 bytes per slot). The required module set for ELF restoration is:
 
 | Module | Role |
 | --- | --- |

@@ -4,7 +4,9 @@ description: "Decode and validate the fixed-size outer header before reading the
 
 # Stage 1 header
 
-The first stage uses a fixed-size parameter area. The observed default outer size is `0x23c` bytes and the word transform uses the constant `0xbf20165d`. Implementations must read the size from the protected section when a build supplies a different value; the defaults are recognition clues, not universal assumptions.
+The first stage uses a fixed-size parameter area. The observed default outer size is `0x23c` bytes (572 decimal). Two word-transform constants have been observed: `0xbf20165d` and `0xbf189bdd`. Each family uses one of them. Implementations must read the size and the constant from the protected section when a build supplies a different value; the defaults are recognition clues, not universal assumptions.
+
+How the stub finds that section at load time is described in [Stage 1 bootstrap](../runtime/stage1-bootstrap.md).
 
 ## Header fields
 
@@ -24,10 +26,10 @@ The decrypted word header contains eight 32-bit values:
 The words are restored with unsigned 32-bit arithmetic. For word index `i`, the observed form is:
 
 ```
-plain[i] = (cipher[i] + (i + 3) * key) XOR (0xbf20165d * (i + 1))
+plain[i] = (cipher[i] + (i + 3) * key) XOR (C * (i + 1))
 ```
 
-All intermediate values wrap at 32 bits. The first word supplies `key`; implementations should restore the complete header and then apply the field checks rather than trusting a single decoded value.
+`C` is the family word constant. All intermediate values wrap at 32 bits. The first word supplies `key`; implementations should restore the complete header and then apply the field checks rather than trusting a single decoded value.
 
 ## Fail-closed checks
 

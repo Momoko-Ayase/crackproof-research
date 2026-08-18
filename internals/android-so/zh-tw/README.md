@@ -15,6 +15,7 @@ description: "CrackProof 所保護 Android 原生庫的內部結構與恢復規�
 | [文件格式](file-format/README.md) | ELF 識別、私有節和兩階段記錄流 |
 | [數據變換](data-transforms/README.md) | 外層首部、模塊配置、容器變換和壓縮 |
 | [恢復](restoration/README.md) | 記錄分發、動態鏈接和 ELF 輸出 |
+| [運行時](runtime/README.md) | 第一階段引導、第二階段解釋器與運行時模塊 |
 | [元數據](metadata/README.md) | IL2CPP 方法令牌和元數據存儲方式 |
 | [分析](analysis/README.md) | 校驗規則、失敗處理和已觀察常量 |
 

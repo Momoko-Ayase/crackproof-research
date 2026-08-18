@@ -1,5 +1,5 @@
 ---
-description: "滚动密钥密码、字节旋转密码、LFSR 密钥流、字符串密码、页置乱、CRC-32、校验和与三角密钥调度。"
+description: "滚动密钥、旋转、LFSR、字符串、页置乱、按需页、CRC-32、校验和与三角调度。"
 ---
 
 # primitives.py
@@ -71,7 +71,7 @@ def header_kdf(file_data, offset=4096):
     for i in range(7):
         cell = get_u32(file_data, offset + 4 + 4 * i)
         info[i + 1] = k ^ cell
-        k = (i * i) ^ ((k + cell - i) & 0xFFFFFFFF)
+        k = (i * i) ^ ((k + cell - i) & MASK32)
     return info
 
 
@@ -235,6 +235,33 @@ def page_scramble_pe32(d, pa, page, big_formula):
         ri = (rk + bi) & MASK32
         key = (ri + bi) & MASK32
         d[pa + bi * 16 + (ri & 0xF)] ^= key & 0xFF
+
+
+# ---------------------------------------------------------------------------
+# On-demand page cipher (runtime page-fault handler)
+# ---------------------------------------------------------------------------
+
+def demand_page_key(page_va, region_base, key_part):
+    """Mix the faulting page VA, the region base, and per-page key material."""
+    return ((page_va + region_base) ^ key_part) & MASK32
+
+
+def demand_page_decrypt(buf, key):
+    """In-place dword cipher used after a PAGE_NOACCESS fault.
+
+    `buf` is the 4 KiB ciphertext page (or any multiple of 4 bytes). `key`
+    is `demand_page_key(...)`. Each dword is XORed with the previous
+    ciphertext dword and a rolling state that starts as
+    `(key << 16) ^ key` and advances with `rol32(state + i, 3)`.
+    """
+    count = len(buf) >> 2
+    state = ((key << 16) ^ key) & MASK32
+    prev = state
+    for i in range(count):
+        enc = get_u32(buf, i * 4)
+        state = rol32((state + i) & MASK32, 3)
+        put_u32(buf, i * 4, enc ^ prev ^ state)
+        prev = enc
 
 
 # ---------------------------------------------------------------------------

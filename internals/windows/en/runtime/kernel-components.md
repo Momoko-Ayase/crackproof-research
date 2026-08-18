@@ -31,6 +31,10 @@ This generation has a more thorough authentication check than its predecessors, 
 
 The driver names encode a build stamp: `Htsysm7679` and `Htsysm767901` (= `7679` variant `01`). The same dword `0x00007679` appears inside protected files as the **configuration-cluster stamp** in the 32-bit loader's final stage (see [The staged loader](../loading-and-pe-repair/loading/README.md)), and as half of an 8-byte tag inside stage-5 marker tables. It functions as a version identifier tying a protected build to its driver generation, and is a useful fingerprint when classifying unknown samples.
 
+## The `Htsysm1B4001` device name
+
+Some newer builds log the device name `Htsysm1B4001` at `C02`/`C03` instead of `Htsysm7679` or `Htsysm767901`. The `1B40` stamp also appears in the Android native-library family. This is another observed service and device name, not a fourth generation with its own documented privilege model. One observed log of this name listed fewer hooks at `C04` and continued into the `E`-series stages described in [Startup sequence and status reporting](startup-status.md).
+
 ## Quick reference
 
 | Component | Kind | Purpose |
@@ -42,4 +46,5 @@ The driver names encode a build stamp: `Htsysm7679` and `Htsysm767901` (= `7679`
 | HtsysmNT | Kernel driver, gen 1 | Unauthenticated kernel shellcode IOCTL |
 | Htsysm7679 | Kernel driver, gen 2 | `EPROCESS` write; Protected Process flag |
 | Htsysm767901 | Kernel driver, gen 3 | Handle access-right restriction |
+| Htsysm1B4001 | Device/service name | Observed on `1B40`-family Windows builds |
 

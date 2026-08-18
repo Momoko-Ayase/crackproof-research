@@ -18,6 +18,68 @@ description: 按需頁解密、加載器代碼變化、誘餌與自加載行為�
 
 頁錯誤處理器不在受保護模塊的映像內。它隨一個手動映射的支持模塊（`HtdpStub2.dll`——見 [Htsysm 內核組件](kernel-components.md)）分發，因此只轉儲主模塊時找不到處理器簽名。
 
+## 按需頁密碼
+
+一種已觀察的處理器在缺頁後走這條路徑：
+
+```mermaid
+flowchart TD
+    A["Fault in a PAGE_NOACCESS page"] --> B["Hooked ntdll!KiUserExceptionDispatcher"]
+    B --> C["Match the address to a region and page descriptor"]
+    C --> D["MapViewOfFile the ciphertext page"]
+    D --> E["On-demand page cipher"]
+    E --> F["Optional second pass if page-flag bit 20 is set"]
+    F --> G["VirtualProtect 4 KiB to PAGE_EXECUTE_READ"]
+    G --> H["Resume at the fault address"]
+```
+
+區域描述符表位於處理器模塊內。處理器用基址和大小匹配故障地址。命中區域的頁表是位於 `region_base + page_table_offset` 的 16 字節頁描述符數組。頁索引為 `(fault_address - region_base) >> 12`。
+
+已觀察的區域描述符字段：
+
+| 偏移 | 大小 | 已觀察用途 |
+| --- | --- | --- |
+| `+0x08` | 8 | 區域基址 |
+| `+0x10` | 4 | 區域大小 |
+| `+0x20` | 4 | 相對區域基址的頁表偏移 |
+| `+0x24` | 4 | 頁數 |
+| `+0x28` | 8 | 傳給 `MapViewOfFile` 的映射句柄 |
+| `+0x34` | 4 | 解密計數 |
+
+已觀察的頁描述符字段（各 16 字節）：
+
+| 偏移 | 大小 | 已觀察用途 |
+| --- | --- | --- |
+| `+0x00` | 4 | 標誌。第 20 位（`0x14`）選擇第二次變換 |
+| `+0x04` | 4 | 混入頁密鑰的材料 |
+| `+0x08` | 4 | 最近一次 `GetTickCount` |
+| `+0x0C` | 2 | 缺頁次數 |
+| `+0x0E` | 2 | 16 位字段；作用未確認 |
+
+頁密鑰混合故障頁地址、區域基址的低 32 位和逐頁密鑰材料。第一層變換是對 4 KiB 視圖的 dword 密碼：
+
+```python
+def demand_page_key(page_va, region_base, key_part):
+    return ((page_va + region_base) ^ key_part) & MASK32
+
+
+def demand_page_decrypt(buf, key):
+    count = len(buf) >> 2
+    state = ((key << 16) ^ key) & MASK32
+    prev = state
+    for i in range(count):
+        enc = get_u32(buf, i * 4)
+        state = rol32((state + i) & MASK32, 3)
+        put_u32(buf, i * 4, enc ^ prev ^ state)
+        prev = enc
+```
+
+`get_u32`、`put_u32`、`rol32` 和 `MASK32` 是[數據變換](../data-transforms/data-transforms.md)中的輔助函數。可運行副本在 [primitives.py](https://app.gitbook.com/s/2p7kzW649ZlKfmpYdJ87/primitives.py)。
+
+若頁標誌第 20 位被置位，同一 4 KiB 上再跑第二次變換。該函數尚未化成已發佈的公式。處理器隨後對這一頁調用 `VirtualProtect(..., PAGE_EXECUTE_READ)` 並恢復執行。
+
+該密碼是按模塊配置的選項，對應 `640` 再接 `840` 的序列，不是某一構建獨有的附加層。
+
 ## 加載器自身的代碼：多態與誘餌
 
 加載器保衛其代碼的力度不亞於其數據。在最終階段（stage 5）及其自舉代碼中觀察到的技術：

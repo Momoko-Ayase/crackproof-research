@@ -20,5 +20,7 @@ For completeness and future research, the mechanisms that demonstrably fall shor
 
 **Process-policy checks are coarse.** The parent-process policy (`A03`) is satisfied by launching from an approved parent, and the DLL host check (`A11`) keys on artifacts (a `peC` section, mixed-case `KeRnEl32.dLl` imports) that identify only unmodified hosts.
 
+**Usermode anti-debug is a short list.** The `410`/`520` path has been observed to use `IsDebuggerPresent` and `NtQueryInformationProcess`. The injected-DLL sweep (`A0F`) keys on a short list of well-known injection points and does not cover every common forwarded-export name.
+
 None of these make the protection trivial — the layered design still costs real effort to analyze end-to-end — but each is a documented, reproducible gap rather than a theoretical one.
 

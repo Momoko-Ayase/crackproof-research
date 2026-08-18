@@ -14,10 +14,16 @@ The loader reports progress as 12-bit **status codes**, roughly one per stage. T
 | --- | --- |
 | `200` | Startup |
 | `210` | Host architecture check |
+| `410` | Usermode anti-debug start |
+| `510` | CRC-32 of a loader memory region |
+| `520` | `NtQueryInformationProcess` check |
 | `52F` | Kernel-debugger check |
 | `540` | VMware backdoor probe (and/or CPU feature flags) |
+| `560` | Code-section decrypt setup |
+| `561` | Select a support module (absent or unused on some newer builds) |
 | `C00` | OS minimum-version check |
 | `C01` | Boot-option check (`testsigning`, `disableintegritychecks`) |
+| `C02` | Install the Htsysm driver service |
 | `C03` | Initialize the newer Htsysm driver |
 | `C04` | Set the Protected Process flag; install hooks |
 | `A0F` | Injected-DLL check |
@@ -33,19 +39,33 @@ The loader reports progress as 12-bit **status codes**, roughly one per stage. T
 | `BD0` | Ensure `C:\Windows\msc.log.log` does not exist |
 | `BE0` | SoftICE/Syser debugger check |
 | `BB0` | Load `HtpecmNT.dll` (old driver path) |
+| `5D0` `552` `570` `590` `5B0` `5B1` `598` `5A0` `5E1` `5E2` | Decrypt prelude stages |
+| `A06` | Late API hooks, when the stage is logged |
 | `5C0` | Load runtime DLLs (missing ones are logged) |
+| `610` | Decrypt the PE header |
 | `640` | Decrypt executable pages |
 | `655` | Relocation |
+| `6E1` | Tail work; some builds re-encrypt part of the executable range |
+| `800` `810` `820` | Page-encrypt setup |
 | `840` | Install the exception-handler hook; re-encrypt executable pages |
+| `E20` `E40` `E52`–`E59` | Later integrity stages on some `1B40`-family builds |
+| `E55` `E91` | Device-name checks for analysis-tool drivers |
+| `660` | Stage after page-encrypt setup, before the OEP jump |
 | `280` | Jump to the OEP |
 
 Observed sequences confirm features are per-module: in one title, the host EXE logs `640 … 840` (bulk decrypt, then page re-encryption), while a native plugin DLL in the same process goes from `610` (section decryption) straight to `655` — bulk-decrypted once, never page-encrypted.
 
+The `C00` line logs two dwords. Each is `0x01A0` plus a Windows build number: the first is the host build, the second is the minimum accepted build. Observed minima correspond to Windows 10.
+
+One observed `Htsysm1B4001` log listed fewer hooks at `C04` and continued into later `E`-series stages, including the device-name checks at `E55` and `E91`.
+
 ## Debug logging
 
-The loader's Achilles' heel: if a specific folder exists under `%temp%`, every protected module in the process writes a verbose debug log there as it unpacks. The folder name is 12 hexadecimal characters, differs per executable, and the easiest way to learn it is to break on or hook `CreateFileW`. Log lines carry the status codes above plus occasional free-form diagnostics (missing DLL names, hooked-function lists, addresses).
+The loader writes a verbose debug log for every protected module when a specific folder exists under `%temp%`. The folder name is 12 hexadecimal characters and differs per executable. The easiest way to learn the name is to break on or hook `CreateFileW`. The folder's creation time must be within about two days; an older folder is left in place, and that run writes no log.
 
-A second channel sends an encrypted log to the mailslot `\\.\mailslot\ErrLog-Pec<number>`. Both channels share a 9-digit error format, `AAA-BBB-CCC`: the recovery status code at failure, a sub-stage, and a third field.
+Log lines carry the status codes above plus occasional free-form diagnostics (missing DLL names, hooked-function lists, addresses).
+
+A second channel sends an encrypted log to the mailslot `\\.\mailslot\ErrLog-Pec<number>`. Both channels share a 9-digit error format, `AAA-BBB-CCC`: the recovery status code at failure, a sub-stage, and a third field. Observed values include `046-019-01F` (kernel callbacks disabled), `048-012-002` (Hyper-V), and `601-000-008` (an analysis-tool driver).
 
 {% hint style="info" %}
 **Locating a stage in the binary.** Status codes are written through a helper that encodes them as the 16-bit value `(code << 4) | 1`. Breaking at the log write, then searching the binary for that word as bytes (for example `0xC01` → `11 C0`), lands directly on the stage that emitted it — the fastest known way to map the loader's code.

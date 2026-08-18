@@ -10,7 +10,9 @@ Stage 2 begins with stream identifier `0xE2`. Its header is eight bytes, followe
 
 Each descriptor carries a command identifier, flags, image and metadata offsets, sizes, a copied identifier, and entry/initialization values. The exact payload starts after the descriptor; every offset and size is checked against the containing stream before the next record is read.
 
-The direct flag has value `2`. A direct record is not a compressed container: it points to a child stream whose identifier is `command_id - 0x10`. The child is interpreted only when the corresponding module definition is available. A registry keyed by `(stream id, content hash)` prevents the same child from being applied twice.
+The direct flag has value `2`. A direct record is not a compressed container: it points to a child stream whose identifier is `command_id - 0x10`. Observed pairs are `0xF3`→`0xE3` through `0xF8`→`0xE8`. The child is interpreted only when the corresponding module definition is available. Flag `0x100` skips that record's init and entry callbacks. A registry keyed by `(stream id, content hash)` prevents the same child from being applied twice.
+
+The runtime walk of this onion, including the 256-entry module table, is described in [Stage 2 interpreter](../runtime/stage2-interpreter.md).
 
 ## Nested containers
 

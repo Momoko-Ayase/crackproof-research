@@ -15,6 +15,7 @@ The format is related to the Windows family but is not a PE variant. Android-spe
 | [File format](file-format/README.md) | ELF recognition, the protected section, and the two-stage stream layout |
 | [Data transforms](data-transforms/README.md) | Header arithmetic, module configuration, container transforms, and compression |
 | [Restoration](restoration/README.md) | Stream dispatch, dynamic linking, and ELF output reconstruction |
+| [Runtime](runtime/README.md) | Stage 1 bootstrap, the stage 2 interpreter, and runtime module roles |
 | [Metadata](metadata/README.md) | IL2CPP method tokens and metadata storage variants |
 | [Analysis](analysis/README.md) | Validation rules, failure handling, and observed constants |
 

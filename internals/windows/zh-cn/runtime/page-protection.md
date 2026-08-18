@@ -18,6 +18,68 @@ description: 按需页解密、加载器代码变化、诱饵与自加载行为�
 
 页错误处理器不在受保护模块的映像内。它随一个手动映射的支持模块（`HtdpStub2.dll`——见 [Htsysm 内核组件](kernel-components.md)）分发，因此只转储主模块时找不到处理器签名。
 
+## 按需页密码
+
+一种已观察的处理器在缺页后走这条路径：
+
+```mermaid
+flowchart TD
+    A["Fault in a PAGE_NOACCESS page"] --> B["Hooked ntdll!KiUserExceptionDispatcher"]
+    B --> C["Match the address to a region and page descriptor"]
+    C --> D["MapViewOfFile the ciphertext page"]
+    D --> E["On-demand page cipher"]
+    E --> F["Optional second pass if page-flag bit 20 is set"]
+    F --> G["VirtualProtect 4 KiB to PAGE_EXECUTE_READ"]
+    G --> H["Resume at the fault address"]
+```
+
+区域描述符表位于处理器模块内。处理器用基址和大小匹配故障地址。命中区域的页表是位于 `region_base + page_table_offset` 的 16 字节页描述符数组。页索引为 `(fault_address - region_base) >> 12`。
+
+已观察的区域描述符字段：
+
+| 偏移 | 大小 | 已观察用途 |
+| --- | --- | --- |
+| `+0x08` | 8 | 区域基址 |
+| `+0x10` | 4 | 区域大小 |
+| `+0x20` | 4 | 相对区域基址的页表偏移 |
+| `+0x24` | 4 | 页数 |
+| `+0x28` | 8 | 传给 `MapViewOfFile` 的映射句柄 |
+| `+0x34` | 4 | 解密计数 |
+
+已观察的页描述符字段（各 16 字节）：
+
+| 偏移 | 大小 | 已观察用途 |
+| --- | --- | --- |
+| `+0x00` | 4 | 标志。第 20 位（`0x14`）选择第二次变换 |
+| `+0x04` | 4 | 混入页密钥的材料 |
+| `+0x08` | 4 | 最近一次 `GetTickCount` |
+| `+0x0C` | 2 | 缺页次数 |
+| `+0x0E` | 2 | 16 位字段；作用未确认 |
+
+页密钥混合故障页地址、区域基址的低 32 位和逐页密钥材料。第一层变换是对 4 KiB 视图的 dword 密码：
+
+```python
+def demand_page_key(page_va, region_base, key_part):
+    return ((page_va + region_base) ^ key_part) & MASK32
+
+
+def demand_page_decrypt(buf, key):
+    count = len(buf) >> 2
+    state = ((key << 16) ^ key) & MASK32
+    prev = state
+    for i in range(count):
+        enc = get_u32(buf, i * 4)
+        state = rol32((state + i) & MASK32, 3)
+        put_u32(buf, i * 4, enc ^ prev ^ state)
+        prev = enc
+```
+
+`get_u32`、`put_u32`、`rol32` 和 `MASK32` 是[数据变换](../data-transforms/data-transforms.md)中的辅助函数。可运行副本在 [primitives.py](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/primitives.py)。
+
+若页标志第 20 位被置位，同一 4 KiB 上再跑第二次变换。该函数尚未化成已发布的公式。处理器随后对这一页调用 `VirtualProtect(..., PAGE_EXECUTE_READ)` 并恢复执行。
+
+该密码是按模块配置的选项，对应 `640` 再接 `840` 的序列，不是某一构建独有的附加层。
+
 ## 加载器自身的代码：多态与诱饵
 
 加载器保卫其代码的力度不亚于其数据。在最终阶段（stage 5）及其自举代码中观察到的技术：

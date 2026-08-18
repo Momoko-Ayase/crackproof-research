@@ -181,6 +181,13 @@ def main():
     check("advance_key", f"{P.advance_key(0x1234, 4):08x}", v["advance_key"][0])
     check("advance_key3", f"{P.advance_key(0xDEADBEEF, 3):08x}", v["advance_key3"][0])
 
+    # --- on-demand page cipher ---
+    dp_key = P.demand_page_key(0x1000, 0x14000000, 0xA5A55A5A)
+    check("dpkey", f"{dp_key:08x}", v["dpkey"][0])
+    page = bytearray(range(64))
+    P.demand_page_decrypt(page, dp_key)
+    check("dpdec64", hexs(page), v["dpdec64"][0])
+
     print()
     if FAILURES:
         print(f"{len(FAILURES)} FAILURES: {FAILURES}")

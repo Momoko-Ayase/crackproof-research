@@ -655,6 +655,27 @@ fn advance_key(mut key: u32, iterations: u32) -> u32 {
 }
 
 // ---------------------------------------------------------------------------
+// On-demand page cipher (runtime page-fault handler)
+// ---------------------------------------------------------------------------
+
+fn demand_page_key(page_va: u32, region_base: u32, key_part: u32) -> u32 {
+    page_va.wrapping_add(region_base) ^ key_part
+}
+
+fn demand_page_decrypt(buf: &mut [u8], key: u32) {
+    let count = buf.len() / 4;
+    let mut state = key.wrapping_shl(16) ^ key;
+    let mut prev = state;
+    for i in 0..count {
+        let off = (i * 4) as u32;
+        let enc = get_u32(buf, off);
+        state = state.wrapping_add(i as u32).rotate_left(3);
+        write_u32(buf, off, enc ^ prev ^ state);
+        prev = enc;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Test vector emission
 // ---------------------------------------------------------------------------
 
@@ -853,4 +874,11 @@ fn main() {
     // --- advance_key (PE32 triangular accumulation) ---
     println!("advance_key {:08x}", advance_key(0x1234, 4));
     println!("advance_key3 {:08x}", advance_key(0xDEAD_BEEF, 3));
+
+    // --- on-demand page cipher (fixed input, independent of the LCG) ---
+    let mut page: Vec<u8> = (0u8..64).collect();
+    let key = demand_page_key(0x1000, 0x1400_0000, 0xA5A5_5A5A);
+    println!("dpkey {:08x}", key);
+    demand_page_decrypt(&mut page, key);
+    println!("dpdec64 {}", hex(&page));
 }

@@ -18,6 +18,8 @@ Recognition accepts ELF64, little-endian files for AArch64. The file must contai
 
 The private section is the distinguishing feature. More than one private section, a section whose file range is outside the file, or an ELF class/endianness mismatch is rejected before any decryption is attempted.
 
+`.init_array[0]` points at the stage 1 stub in the intact `.text` head. Later entries point into ranges that are hollow on disk and only become valid after restoration.
+
 ## What remains visible
 
 The protected file still has a usable ELF header, program headers, section headers, and dynamic section. Their values may describe the protected layout rather than the final in-memory image, so they are treated as input to recovery, not as proof that the output is already correct.
