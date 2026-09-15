@@ -4,7 +4,7 @@ description: "比对工具：用 Python 重放每个场景，并与参考向量�
 
 # run\_tests.py
 
-测试工具。它用与参考移植相同的 LCG 序列重新生成每个输入，运行全部 Python 实现，并将输出与 `vectors.txt` 对照。以 `python run_tests.py` 运行——预期输出：`all vectors match`。
+这是比对工具：它用与参考移植相同的 LCG 序列重新生成每个输入，运行全部 Python 实现，并将输出与 `vectors.txt` 对照。以 `python run_tests.py` 运行。预期输出：`all vectors match`。
 
 ```python
 """Cross-check every Python snippet against the vectors printed by the

@@ -4,11 +4,11 @@ description: 文档中 Python 片段的可运行验证套件，以及从真实�
 
 # 验证与参考
 
-本栏目以完整、可运行的形式发布 [CrackProof 内部机制](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/fEb9nKPvKsjkPAHMUbOt/)背后的参考材料。
+本栏目完整、可运行地发布 [CrackProof 内部机制](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/)所用的参考材料。
 
 ## 验证套件
 
-主文档中的每个 Python 片段在发布前都经过验证：每个函数的输出在相同输入上与算法的独立参考移植逐字节比对。完整套件——每个文件一页：
+[CrackProof 内部机制](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/) 中的每个 Python 片段在发布前都经过验证：每个函数的输出在相同输入上与算法的独立参考移植逐字节比对。完整套件中每个文件对应一页：
 
 | 文件                | 作用                                               |
 | ----------------- | ------------------------------------------------ |
@@ -25,4 +25,4 @@ description: 文档中 Python 片段的可运行验证套件，以及从真实�
 
 ## 参考捕获
 
-调试日志示例——从受保护进程捕获的真实 CrackProof 调试日志，已脱敏：一个功能完整的宿主 EXE（页加密）、一个原生插件 DLL（仅整体解密）与一个托管 DLL。
+[调试日志示例](sample-debug-logs.md) 页发布从受保护进程捕获并脱敏的真实 CrackProof 调试日志：一个功能完整的宿主 EXE（页加密）、一个原生插件 DLL（仅整体解密）与一个托管 DLL。

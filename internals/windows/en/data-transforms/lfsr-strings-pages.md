@@ -6,7 +6,7 @@ description: "The LFSR stream, import-name cipher, and sparse per-page code tran
 
 ## The LFSR keystream
 
-The per-build bytecode stubs (see below) are themselves wrapped in an LFSR keystream. The stream is data-independent — seed 1, feedback polynomial `0x8003`, eight bits emitted per byte, LSB first — so it can be replayed at any position, which is what makes trial-decoding candidate stub locations cheap:
+The [per-build bytecode stubs](bytecode-transform.md) are themselves wrapped in an LFSR keystream. The stream is data-independent (seed 1, feedback polynomial `0x8003`, eight bits emitted per byte, LSB first), so it can be replayed at any position. That is what makes trial-decoding candidate stub locations cheap:
 
 ```python
 def lfsr_keystream(n):
@@ -35,7 +35,7 @@ A stub block occupies a fixed 96-byte slot; the byte at `pos + 95` is the (unenc
 
 ## The import-name string cipher
 
-DLL names and imported function names are encrypted with a rolling byte cipher: nibble swap, subtract the key, step the key by 67. The initial key is the low byte of the string's RVA — so a name cannot be decrypted without knowing where it lives.
+DLL names and imported function names are encrypted with a rolling byte cipher: nibble swap, subtract the key, step the key by 67. The initial key is the low byte of the string's RVA, so a name can't be decrypted without knowing where it lives.
 
 ```python
 def string_cipher(d, pos, key):
@@ -51,7 +51,7 @@ def string_cipher(d, pos, key):
         i += 1
 ```
 
-The `b == 0` remap avoids producing a NUL mid-string (which would truncate the walk): if the subtraction lands on zero, the byte is replaced by the two's complement of the key instead.
+The `b == 0` remap avoids producing a NUL mid-string (which would truncate the walk): if the subtraction yields zero, the byte is replaced by the two's complement of the key instead.
 
 ## The per-page code scramble
 
@@ -82,8 +82,7 @@ def page_scramble_pe32(d, pa, page, big_formula):
 {% hint style="warning" %}
 The shift (64-bit: 0 or 15) and the formula choice (32-bit: `page+1` or `0x8000*(page+1)`) are **not recorded anywhere in the file**. Two builds can carry byte-identical configuration stamps yet require different choices. A third outcome is also required: leave the bytes unchanged. Native DLLs often keep plaintext `.text`; applying either formula there still XORs about one byte per 16.
 
-On 64-bit images, a recognized CRT entry stub is stronger evidence than padding counts. The common shape is `48 83 EC ib / E8 rel32 / 48 83 C4 ib / E9 rel32` (the two stack immediates match). Accept a candidate only when it is the sole shift — including “no transform” — whose decoded `call` and `jmp` targets both land inside `.text`. Unrecognized entry code falls back to padding statistics: replay each shift on sample pages and count positions that become `0xCC`. Require a clear gain over the unchanged bytes (both a margin over the baseline and an absolute floor). Small gains are the noise of XORing 255 pseudo-random positions per page and must not trigger a transform.
+On 64-bit images, a recognized CRT entry stub is stronger evidence than padding counts. The common shape is `48 83 EC ib / E8 rel32 / 48 83 C4 ib / E9 rel32` (the two stack immediates match). Accept a candidate only when it's the sole shift, including “no transform”, whose decoded `call` and `jmp` targets both remain inside `.text`. Unrecognized entry code falls back to padding statistics: replay each shift on sample pages and count positions that become `0xCC`. Require a clear gain over the unchanged bytes (both a margin over the baseline and an absolute floor). Small gains are the noise of XORing 255 pseudo-random positions per page and must not trigger a transform.
 
 On 32-bit images the same `0xCC` comparison chooses between `page+1` and `0x8000*(page+1)`, and skips the pass when neither formula raises the padding count well above the unchanged baseline.
 {% endhint %}
-

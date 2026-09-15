@@ -117,4 +117,4 @@ def decompress(d, src, dest, key_offset, s_size, d_size):
     return written == d_size
 ```
 
-布尔返回值是损坏信号，也提供了明确的校验条件：当容器没有记录某个密钥或移位选择时，就逐个尝试候选，直到某个能干净解压为止。[加载与节恢复](../loading-and-pe-repair/loading/)中有多处这样的“试解-验证”点。同一套 token 类别与 3 字节 Huffman 项也出现在 [Android 原生库格式](https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/data-transforms/compression)中。
+布尔返回值是损坏信号，也提供了明确的校验条件：当容器没有记录某个密钥或移位选择时，就逐个尝试候选，直到某个能干净解压为止。[加载与节恢复](../loading-and-pe-repair/loading/README.md)中有多处这样的「试解-验证」点。同一套 token 类别与 3 字节 Huffman 项也出现在 [Android 原生库格式](https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/data-transforms/compression)中。

@@ -4,17 +4,17 @@ description: "受保護宿主、原生 DLL 和託管 DLL 的脫敏調試日誌�
 
 # 調試日誌示例
 
-這些是真實的 CrackProof 調試日誌，捕獲方式是在 `%temp%` 下創建該可執行文件對應的 12 位十六進制字符文件夾並啟動受保護程序（見[調試日誌](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status)）。路徑與產品名已替換為通用佔位符；其餘一切——選項標誌、狀態碼、地址、hook 列表——均為原文。
+這些是真實的 CrackProof 調試日誌，捕獲方式是在 `%temp%` 下創建該可執行文件對應的 12 個十六進制字符文件夾並啟動受保護程序（見 [調試日誌](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status#調試日誌)）。路徑與產品名已替換為通用佔位符；選項標誌、狀態碼、地址、hook 列表等其餘內容均為原文。
 
 ## 如何閱讀日誌
 
 * **第 1 行**——受保護模塊的路徑。
 * **第 2 行**——該構建打包時使用的保護選項標誌（每個 `-XX` 記號對應一個打包器選項）。
 * **第 3/4 行**——時間戳與模塊的加載基址。
-* **後續行**——12 位[狀態碼](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status)，每個 stage 一行；縮進的 `000`–`00N` 行攜帶 stage 特定的細節（地址、計數、被 hook 的函數）。
+* **後續行**——12 位 [狀態碼](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status#啟動序列與狀態碼)，每個 stage 一行；縮進的 `000`–`00N` 行攜帶 stage 特定的細節（地址、計數、被 hook 的函數）。
 * **最後幾行**——完成時間戳與 9 位錯誤碼（`000-000-000` = 成功）。
 
-## 宿主 EXE——功能完整，頁加密
+## 宿主 EXE，頁加密
 
 ```
 E:\Package\app.exe
@@ -102,7 +102,7 @@ A06
 * `570` 與 `A06` 在啟動後期 hook 更多 API（`user32!SetFocus`、`CreateWindowExA/W`、`uxtheme!ThemeInitApiHook`）。
 * `660` 是一個不在公開狀態表中的 stage——在此處出現於 `840` 與最終的 `280`（跳轉 OEP）之間。
 
-## 原生插件 DLL——僅整體解密
+## 原生插件 DLL，僅整體解密
 
 ```
 E:\Package\app_Data\Plugins\native_plugin.dll
@@ -140,7 +140,7 @@ A15
 * **沒有 `640`/`840`**——該構建只整體解密一次（`610`），從不做頁加密；對比上面的宿主 EXE。頁加密是逐模塊的選項。
 * `800` 攜帶單個地址——新填充的映像區域。
 
-## 託管 DLL——最簡序列
+## 託管 DLL，最簡序列
 
 ```
 E:\Package\app_Data\Managed\Assembly-CSharp.dll

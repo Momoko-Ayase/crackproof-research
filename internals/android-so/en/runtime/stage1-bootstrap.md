@@ -35,7 +35,7 @@ It then reads the ELF header and enough of the program and section header tables
 
 ## The private section
 
-Section headers are scanned at `Elf64_Shdr` stride `0x40` for `sh_type == 0x80000000` (`SHT_LOUSER`). After the section start, the stub skips `0x23C` (572) bytes — the outer wrapper documented in [Stage 1 header](../file-format/stage1.md) — and treats the next 32 bytes as the encrypted parameter header.
+Section headers are scanned at `Elf64_Shdr` stride `0x40` for `sh_type == 0x80000000` (`SHT_LOUSER`). After the section start, the stub skips `0x23C` (572) bytes, the outer wrapper documented in [Stage 1 header](../file-format/stage1.md), and treats the next 32 bytes as the encrypted parameter header.
 
 Two word constants have been observed for the header and payload cipher: `0xbf20165d` and `0xbf189bdd`. Each family uses one of them. The first word is the key and is restored after the 32-byte header is decrypted.
 

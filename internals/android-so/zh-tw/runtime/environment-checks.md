@@ -4,11 +4,11 @@ description: "加載時已觀察的 Android 環境、完整性與轉儲相關檢
 
 # 環境與完整性檢查
 
-Windows 構建把用戶態探測與可選的內核支持疊在一起。Android 家族留在用戶態。下面的檢查來自第一階段、第二階段，以及[運行時模塊](modules.md)列出的模塊。它們在洋蔥仍在物化時運行，而不是在已恢復的 ELF 就位之後。
+Windows 構建把用戶態探測與可選的內核支持疊在一起。Android 家族留在用戶態。本頁的檢查來自第一階段、第二階段，以及[運行時模塊](modules.md)列出的模塊。它們在這些嵌套流仍在落地時運行，而不是在已恢復的 ELF 就位之後。
 
 ## 進程與翻譯環境
 
-第一階段已經遍歷 `/proc/self/maps` 以找到自己的文件。第二階段保留 maps 上下文，並查看 `/proc/self/environ`。一種已觀察探測通過陳述 `/system/lib/libhoudini.so` 與 `/system/lib64/arm64/nb/` 下的路徑，測試是否存在 x86-on-ARM 翻譯層。正在翻譯 ARM 代碼、而不是原生跑 AArch64 的宿主，因此與加載器所期望的環境不同。
+第一階段已經遍歷 `/proc/self/maps` 以找到自己的文件。第二階段保留 maps 上下文，並查看 `/proc/self/environ`。一種已觀察探測通過查找 `/system/lib/libhoudini.so` 與 `/system/lib64/arm64/nb/` 下的路徑，測試是否存在 x86-on-ARM 翻譯層。正在翻譯 ARM 代碼、而不是原生跑 AArch64 的宿主，因此與加載器所期望的環境不同。
 
 模塊 `0x8F` 讀 `/proc/self/cmdline`，查詢 uid/gid/tid，並檢查某路徑的屬主與模式。模塊 `0x60` 掃描系統庫目錄、進程環境與運行時路徑。模塊 `0x20` 校驗目標路徑、ELF 頭、`/proc/self/maps` 以及 libc 映射。
 
@@ -18,7 +18,7 @@ Windows 構建把用戶態探測與可選的內核支持疊在一起。Android �
 
 ## 內存可見性
 
-打開並讀取 `/proc/<pid>/mem` 已被觀察到會在數秒內殺死進程。讀 `maps`、`cmdline` 與 `status` 則不會。同一批構建上 `process_vm_readv` 沒有引起這種反應。恢復完成後，可執行頁保持可讀——沒有 Windows 那種對按需出錯代碼做 `PAGE_NOACCESS` 再加密。
+打開並讀取 `/proc/<pid>/mem` 已被觀察到會在數秒內殺死進程。讀 `maps`、`cmdline` 與 `status` 則不會。同一批構建上 `process_vm_readv` 沒有引起這種反應。恢復完成後，可執行頁保持可讀。沒有 Windows 那種對按需出錯代碼做 `PAGE_NOACCESS` 再加密。
 
 ## 包與時間
 

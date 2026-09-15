@@ -4,7 +4,7 @@ description: "The Windows container layout, encrypted info header, and the value
 
 # Container and encrypted header
 
-A protected file is a PE file whose original image has been replaced by an encrypted container. The container keeps the original PE headers (mostly readable) at the front, hides a small parameter block behind a key-derivation function at a fixed offset, and stores everything else — the program's sections and the loader's own code — as encrypted and usually compressed payload.
+A protected file is a PE file whose original image has been replaced by an encrypted container. The container keeps the original PE headers (mostly readable) at the front, hides a small parameter block behind a key-derivation function at a fixed offset, and stores everything else (the program's sections and the loader's own code) as encrypted and usually compressed payload.
 
 ## Container layout
 
@@ -24,10 +24,10 @@ Three regions matter:
 | Region | File offset | Contents |
 | --- | --- | --- |
 | Header region | `0x0000`–`0x0FFF` | The original PE headers. The DOS/PE signatures, COFF header, optional header, and section table survive in plaintext, but the entry point, several data directories, and the section raw-data pointers are blanked or repurposed. |
-| Info header | `0x1000` | 32 bytes: eight dwords encrypted with the key-derivation function below. This is the master parameter block for the whole container. |
+| Info header | `0x1000` | 32 bytes: eight dwords encrypted with the key-derivation function in [The info header and its key derivation](#the-info-header-and-its-key-derivation). This is the master parameter block for the whole container. |
 | Payload | After the info header | Encrypted (and usually Huffman-compressed) section data, loader tables, and staged loader code. The rolling XOR chain starts at `info[4] + 4096`, which may be later than `0x1020`. |
 
-The split at exactly 4096 bytes (`0x1000`) is constant across every observed build — including the [external-companion layout](companion-layout.md), which separates the stub from its payload at this exact boundary.
+The split at exactly 4096 bytes (`0x1000`) is constant across every observed build, including the [external-companion layout](companion-layout.md), which separates the stub from its payload at this exact boundary.
 
 ## The info header and its key derivation
 
@@ -45,12 +45,12 @@ def header_kdf(file_data, offset=4096):
     return info
 ```
 
-The same KDF is used for every build family, EXE and DLL, 32-bit and 64-bit — so one code path recognizes every protected file. The decrypted fields drive the entire unpack:
+The same KDF is used for every build family, EXE and DLL, 32-bit and 64-bit, so one code path recognizes every protected file. The decrypted fields drive the entire unpack:
 
 | Field | Meaning |
 | --- | --- |
 | `info[0]` | Seed key (stored in plaintext; also feeds the payload cipher) |
-| `info[1]` | **Format magic** — identifies the protection build (see below) |
+| `info[1]` | **Format magic**, identifies the protection build (see [Format magics](#format-magics)) |
 | `info[2]` | Reserved/variant |
 | `info[3]` | Base RVA in the reconstructed image where the payload is placed |
 | `info[4]` | Payload source offset: the payload begins at `info[4] + 4096` in the file |
@@ -67,4 +67,3 @@ The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 +
 | Magic (LE bytes) | Value |
 | --- | --- |
 | `KONN` | `0x4E4E4F4B` |
-

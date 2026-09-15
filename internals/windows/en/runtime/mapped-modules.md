@@ -4,7 +4,7 @@ description: "The helper-module roles embedded in the loader and mapped without 
 
 # Manually mapped helper modules
 
-Not everything CrackProof runs lives inside the protected module. Two support ecosystems exist: **manually mapped usermode DLLs** (loaded by the loader, invisible to the Windows loader) and a **kernel driver line** called Htsysm (three generations with sharply different designs). This page covers both.
+Not everything CrackProof runs lives inside the protected module. The loader maps helper DLLs itself, so they stay invisible to the Windows loader. Kernel support is a separate driver line, Htsysm, in three generations with sharply different designs; see [Htsysm kernel components](kernel-components.md).
 
 ## Manually mapped submodules
 
@@ -13,11 +13,10 @@ The loader maps auxiliary DLLs into the process itself through an internal modul
 | Code | Module | Status group | Role |
 | --- | --- | --- | --- |
 | `it` | `HtpecIt.dll` | `Axx` | Anti-tamper, anti-injection, anti-VM checks |
-| `dt` | `HtdpStub2.dll` | — | Additional loader code — including the demand-decrypt page-fault handler for [page-level encryption](page-protection.md#page-level-encryption) |
+| `dt` | `HtdpStub2.dll` | — | Additional loader code, including the demand-decrypt page-fault handler for [page-level encryption](page-protection.md#page-level-encryption) |
 | `cm` | (usermode init) | `Bxx` | Old Htsysm driver initialization |
 | `dm` | (usermode init) | `Cxx` | New Htsysm driver initialization |
 | `sk` | `HtsyskNT.dll` | `B21` | Old driver path: kernel manual-mapper, basic kernel I/O and memory functions |
 | `pm` | `HtpecmNT.dll` | `BB0` | Old driver path: process monitoring/termination (kills analysis tools) |
 
-The placement of the page-fault handler in `dt` explains a recurring observation: the protected module's own image contains no page-decryption code — the handler and its per-page key data live in a manually mapped module that naive module enumeration misses (it does not appear in the loader's module list; it shows up only as a private executable region).
-
+The placement of the page-fault handler in `dt` explains a recurring observation: the protected module's own image contains no page-decryption code. The handler and its per-page key data live in a manually mapped module that naive module enumeration misses (it doesn't appear in the loader's module list; it shows up only as a private executable region).

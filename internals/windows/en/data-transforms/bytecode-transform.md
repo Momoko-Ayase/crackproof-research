@@ -6,9 +6,9 @@ description: "The compact instruction stream that defines a build-specific byte 
 
 ## The per-build bytecode permutation
 
-The most distinctive layer: CrackProof does not hardcode a fixed per-byte transform for payload data. At pack time it **generates a unique x86 stub for each build** — a function that takes one byte in `AL`, applies a short random sequence of arithmetic/rotate instructions, and returns. The loader runs this stub over every payload byte between the block-cipher pass and decompression. Two protected files from different builds therefore share no payload permutation.
+The most distinctive layer: CrackProof doesn't hardcode a fixed per-byte transform for payload data. At pack time it **generates a unique x86 stub for each build**, a function that takes one byte in `AL`, applies a short random sequence of arithmetic/rotate instructions, and returns. The loader runs this stub over every payload byte between the block-cipher pass and decompression. Two protected files from different builds therefore share no payload permutation.
 
-The stub is stored wrapped in the LFSR keystream (above). Only a narrow instruction subset ever appears:
+The stub is stored wrapped in the [LFSR keystream](lfsr-strings-pages.md#the-lfsr-keystream). Only a narrow instruction subset ever appears:
 
 | Bytes | x86 instruction | Decoded op |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ The stub is stored wrapped in the LFSR keystream (above). Only a narrow instruct
 | `FE /1` | `DEC AL` | `("dec",)` |
 | `C3` | `RET` | end of program |
 
-For `C0`/`FE` the ModR/M byte must encode register-direct `AL` (`mod=3, rm=0`); the reg field selects the sub-operation. Anything else fails the parse — and that strictness is what makes trial-decoding candidate stub locations reliable: decrypted garbage essentially never parses as a valid program ending in `RET`.
+For `C0`/`FE` the ModR/M byte must encode register-direct `AL` (`mod=3, rm=0`); the reg field selects the sub-operation. Anything else fails the parse, and that strictness is what makes trial-decoding candidate stub locations reliable: decrypted garbage essentially never parses as a valid program ending in `RET`.
 
 ```python
 def generate(data, offset=0):
@@ -108,4 +108,3 @@ Two structural properties follow directly:
 - **Finding the stub is a search problem, not a fixed offset.** Because the keystream is data-independent, candidate positions are trial-XORed and parsed; the lowest position that decodes to a valid program (enough real operations, terminating in `RET`) is the real stub. Later valid parses are coincidental decodes of trailing filler.
 
 One build carries **two** such stubs: one used while decrypting the final loader stage, and a second, independent one applied to every section data block.
-

@@ -4,7 +4,7 @@ description: "Rolling, rotation, LFSR, string, page, on-demand page, CRC-32, che
 
 # primitives.py
 
-Every data transform except the block cipher, the decompressor, and the bytecode VM — the ciphers and checksums documented in [Data transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/data-transforms).
+The reference implementations of every data transform except the block cipher, the decompressor, and the bytecode VM. These are the ciphers and checksums documented in [Data transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/data-transforms).
 
 ```python
 """Reference implementations of the protection scheme's data transforms.

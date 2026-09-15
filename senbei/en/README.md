@@ -10,7 +10,7 @@ Senbei reads the protected bytes, replays the protection algorithm, validates th
 
 Supported inputs:
 
-* Protected Windows `.exe` and `.dll` files — 64-bit and 32-bit, native and managed — including external `.exe._` and `.dll._` companion payloads
+* Protected Windows `.exe` and `.dll` files (64-bit and 32-bit, native and managed), including external `.exe._` and `.dll._` companion payloads
 * `global-metadata.dat` files with supported method-token layouts
 * Protected Android `.so` files, standalone or inside `.apk`, `.apks`, and `.xapk` packages
 

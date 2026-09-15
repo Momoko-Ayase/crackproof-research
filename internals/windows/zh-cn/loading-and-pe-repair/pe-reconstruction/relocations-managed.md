@@ -8,7 +8,7 @@ description: 重定位策略、最终页变换，以及托管映像所需的特�
 
 各构建刻意在结果可否重定向上不同：
 
-* **较旧单文件 EXE 构建是 `/FIXED`。** 外壳丢弃基址重定位表并清空 `DllCharacteristics`；映像只能在首选基址加载。忠实的重建镜像这一点：`DataDirectory[5]` 清零、`DllCharacteristics` 清零。
+* **较旧单文件 EXE 构建是 `/FIXED`。** 外壳丢弃基址重定位表并清空 `DllCharacteristics`；映像只能在首选基址加载。忠实的重建同样如此：`DataDirectory[5]` 清零、`DllCharacteristics` 清零。
 * **DLL（任何布局）必须保持可重定位。** DLL 几乎总是被映射到非首选基址；剥离其重定位会使其无法加载。重建保留 `DataDirectory[5]` 并确保置位 `IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE`（`0x0040`）。
 * **无标记与伴生构建不是 `/FIXED`。** 它们携带真实的 ASLR 标志与有效重定位表，任何重定向都必须重定位一切——包括已还原 TLS 目录的指针，这正是 TLS 还原期间要追加重定位的原因。32 位家族以另一种方式满足同一要求：其 DLL 以中和的 `ABSOLUTE` 槽位保留四个 TLS 字段条目，重新启用为 `HIGHLOW`，而非追加（见[导入、TLS 与导出](imports-tls-exports.md#tls-被剥离并在运行时重装)）。
 

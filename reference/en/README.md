@@ -6,11 +6,11 @@ description: >-
 
 # Verification & reference
 
-This section publishes the reference material behind [CrackProof internals](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/PuKTEy2soDgSB3qfWACy/) in its complete, runnable form.
+This section publishes the reference material behind [CrackProof for Windows internals](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/) in its complete, runnable form.
 
 ## Verification suite
 
-Every Python snippet in the main document was verified before publication: each function's output was compared byte-for-byte against an independent reference port of the algorithms on identical inputs. The full suite — one page per file:
+Every Python snippet in the [CrackProof for Windows internals](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/) pages was verified before publication. Each function's output was compared byte-for-byte against an independent reference port of the algorithms on identical inputs. The full suite is one page per file:
 
 | File              | Role                                                                                                                                   |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -27,4 +27,4 @@ To re-run the full comparison, download the files and execute `python run_tests.
 
 ## Reference captures
 
-Sample debug logs — real CrackProof debug logs captured from a protected process, desensitized: a fully featured host EXE (page-encrypted), a native plugin DLL (bulk-decrypted only), and a managed DLL.
+The [sample debug logs](sample-debug-logs.md) page publishes real CrackProof debug logs captured from a protected process and then desensitized: a fully featured host EXE (page-encrypted), a native plugin DLL (bulk-decrypted only), and a managed DLL.

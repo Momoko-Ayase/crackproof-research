@@ -4,7 +4,7 @@ description: CrackProof 所保護 Windows PE 文件的內部結構與運行時�
 
 # CrackProof for Windows 內部機制
 
-CrackProof for Windows 保護 PE32 與 PE32+ 可執行文件和 DLL。受保護文件保留足以加載自舉映像的 PE 外層結構，而原始節、加載器階段、部分數據目錄、名稱和代碼頁則以變換後的形式保存。運行時會在控制權轉交給原程序前重建映像。
+CrackProof for Windows 保護 PE32 與 PE32+ 可執行文件和 DLL。受保護文件保留足以加載自舉映像的 PE 外層結構，而原始節、加載器階段、選定的數據目錄、名稱和代碼頁則以變換後的形式保存。運行時會在控制權轉交給原程序前重建映像。
 
 目前觀察到的佈局包括原生與託管映像、舊版基於標記的容器、必須按結構識別的新版佈局，以及將受保護載荷放在伴生文件中的 stub 可執行文件。
 
@@ -26,4 +26,4 @@ CrackProof for Windows 保護 PE32 與 PE32+ 可執行文件和 DLL。受保護�
 | 啟動檢查、頁保護與內核組件   | [運行時行為](runtime/runtime.md)                       |
 | 分析流程、侷限與常量      | [分析筆記](analysis/analysis.md)                      |
 
-Windows 數據變換頁面對應的測試代碼發佈在[驗證與參考](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/2p7kzW649ZlKfmpYdJ87/)中。Huffman/LZ 記號語言與緩衝區內 AES 日程也出現在 [Android 原生庫格式](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/HezwIJwx0lhm5CUG7g8R/)中。
+Windows 數據變換頁面對應的測試代碼發佈在[驗證與參考](https://app.gitbook.com/s/2p7kzW649ZlKfmpYdJ87/)中。Huffman/LZ 記號語言與緩衝區內 AES 調度表也出現在 [Android 原生庫格式](https://app.gitbook.com/s/HezwIJwx0lhm5CUG7g8R/)中。

@@ -4,17 +4,17 @@ description: "Desensitized debug logs from protected host, native DLL, and manag
 
 # Sample debug logs
 
-These are genuine CrackProof debug logs, captured by creating the per-executable 12-hex-character folder under `%temp%` and launching a protected title (see [Debug logging](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#debug-logging)). Paths and product names are replaced with generic placeholders; everything else — option flags, status codes, addresses, hook lists — is verbatim.
+These are genuine CrackProof debug logs, captured by creating the per-executable 12-hex-character folder under `%temp%` and launching a protected title (see [Debug logging](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#debug-logging)). Paths and product names are replaced with generic placeholders; everything else (option flags, status codes, addresses, hook lists) is verbatim.
 
 ## Reading a log
 
-* **Line 1** — the protected module's path.
-* **Line 2** — the protection option flags the build was packed with (each `-XX` token is one packer option).
-* **Line 3/4** — timestamp and the module's load base.
-* **Following lines** — 12-bit [status codes](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#the-boot-sequence-and-status-codes), one per stage; indented `000`– `00N` lines carry stage-specific detail (addresses, counts, hooked functions).
-* **Final lines** — completion timestamp and the 9-digit error code (`000-000-000` = success).
+* **Line 1:** the protected module's path.
+* **Line 2:** the protection option flags the build was packed with (each `-XX` token is one packer option).
+* **Line 3/4:** timestamp and the module's load base.
+* **Following lines:** 12-bit [status codes](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#the-boot-sequence-and-status-codes), one per stage; indented `000`–`00N` lines carry stage-specific detail (addresses, counts, hooked functions).
+* **Final lines:** completion timestamp and the 9-digit error code (`000-000-000` = success).
 
-## Host EXE — fully featured, page-encrypted
+## Host EXE, page-encrypted
 
 ```
 E:\Package\app.exe
@@ -96,13 +96,13 @@ A06
 
 Points of interest:
 
-* `C03` names the driver generation: `Htsysm7679` — the second-generation Htsysm (see [Htsysm kernel components](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/kernel-components)).
+* `C03` names the driver generation: `Htsysm7679`, the second-generation Htsysm (see [Htsysm kernel components](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/kernel-components)).
 * `C04` lists every API hooked for the Protected-Process toggle (`NtCreateSection`, `NtAlpcSendWaitReceivePort`, `NtDuplicateObject`, `NtConnectPort`, `NtOpenProcess`, `NtOpenThread`, …) plus loader-interception hooks (`CreateProcessInternal*`, `CreateRemoteThread*`, `LdrLoadDll`, `CreateActCtxW`).
-* `640 … 840` — this module is **page-encrypted**: bulk decrypt, then re-encrypt with the exception-handler hook installed. The `002` line after `840` carries three addresses (the re-encrypted range and handler data).
+* `640 … 840`: this module is **page-encrypted**. Bulk decrypt, then re-encrypt with the exception-handler hook installed. The `002` line after `840` carries three addresses (the re-encrypted range and handler data).
 * `570` and `A06` hook additional APIs late in the boot (`user32!SetFocus`, `CreateWindowExA/W`, `uxtheme!ThemeInitApiHook`).
-* `660` is a stage not in the public status table — present here between `840` and the final `280` (jump to OEP).
+* `660` is a stage that isn't in the public status table. It's present here between `840` and the final `280` (jump to OEP).
 
-## Native plugin DLL — bulk-decrypted only
+## Native plugin DLL, bulk-decrypted only
 
 ```
 E:\Package\app_Data\Plugins\native_plugin.dll
@@ -136,11 +136,11 @@ A15
 
 Points of interest:
 
-* `A11` — the DLL host-process check, present only for protected DLLs.
-* **No `640`/`840`** — this build is bulk-decrypted once (`610`) and never page-encrypted; compare the host EXE above. Page encryption is a per-module option.
-* `800` carries a single address — the freshly populated image region.
+* `A11`: the DLL host-process check, present only for protected DLLs.
+* **No `640`/`840`:** this build is bulk-decrypted once (`610`) and never page-encrypted; compare the host EXE above. Page encryption is a per-module option.
+* `800` carries a single address: the freshly populated image region.
 
-## Managed DLL — minimal sequence
+## Managed DLL, minimal sequence
 
 ```
 E:\Package\app_Data\Managed\Assembly-CSharp.dll
@@ -163,4 +163,4 @@ A11
 000-000-000
 ```
 
-The managed build runs the shortest pipeline: environment checks, section decryption (`610`), then straight to the OEP (`280`) — no driver init, no page encryption, no relocation stage.
+The managed build runs the shortest pipeline: environment checks, section decryption (`610`), then straight to the OEP (`280`), with no driver init, no page encryption, and no relocation stage.

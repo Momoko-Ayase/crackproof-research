@@ -4,7 +4,7 @@ description: "识别受支持的 IL2CPP 元数据版本，并还原各 image 的
 
 # 方法令牌
 
-已识别的 IL2CPP 元数据魔数是 `0xFAB11BAF`。受支持的布局为版本 29、31 与 39，三者共享下文介绍的带种子五轮 RID 置换。MethodDef 令牌高字节为表号 `0x06`，低 24 位是行标识。
+已识别的 IL2CPP 元数据魔数是 `0xFAB11BAF`。受支持的布局为版本 29、31 与 39，三者共享[五轮逆变换](#five-inverse-rounds)介绍的带种子五轮 RID 置换。MethodDef 令牌高字节为表号 `0x06`，低 24 位是行标识。
 
 这不是 Windows 的 `-GMD` 重映射。Windows 把每个令牌换成仅由表格顺序得到的连续值 `0x06000000 | (local_index + 1)`。Android 路径是对每个 image 方法块内部 RID 做带种子的五轮置换。Windows 规则见 [il2cpp 元数据混淆](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/analysis/il2cpp-metadata)。
 
@@ -32,13 +32,13 @@ repeat 5 times:
 rid' = value + low
 ```
 
-新令牌是 `0x06000000 | rid'`。对工具而言清理是幂等的：若各令牌已经是按 image 的规范顺序，则检测出来并保持不动，而不是再做一次逆变换。
+新令牌是 `0x06000000 | rid'`。该变换是幂等的：若各令牌已经是按 image 的规范顺序，则保持不动，而不是再做一次逆变换。
 
-表常量因版本而异。版本 29 与 31 的 type 和 image 布局与 Windows 版本 31 表相同（types `@0xA0` 步长 `0x58`，images `@0xA8` 步长 `0x28`；type `.methodStart +0x24` / `.method_count +0x40`，image `.typeStart +0x08` / `.typeCount +0x0C`），仅方法行不同：
+表常量因版本而异。版本 29 与 31 的 type 和 image 布局与 Windows 版本 31 表相同：types `@0xA0` 步长 `0x58`，images `@0xA8` 步长 `0x28`；type `.methodStart +0x24` / `.method_count +0x40`，image `.typeStart +0x08` / `.typeCount +0x0C`。二者只在方法行上不同：
 
 | 版本 | 方法表 | 方法步长 | `.token` 偏移 |
 | --- | --- | --- | --- |
 | 29 | `@0x30` | `0x20` | `+0x14` |
 | 31 | `@0x30` | `0x24` | `+0x18` |
 
-版本 39 用 12 字节 `(offset, size, count)` 节记录表取代固定头部，并使用变宽索引（1、2 或 4 字节，按各表的 count 选取）；其方法、类型与 image 步长由这些宽度推导。其他任何版本都必须拒绝，而不是用错误的布局解码。
+版本 39 用 12 字节 `(offset, size, count)` 节记录表取代固定头部，并使用变宽索引（1、2 或 4 字节，按各表的 count 选取）。其方法、类型与 image 步长由这些宽度推导。其他任何版本都必须拒绝，而不是用错误的布局解码。

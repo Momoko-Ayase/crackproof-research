@@ -1,10 +1,10 @@
 ---
-description: "GF(2^32) word mix, stream-header and record ciphers, and the 0x9D job-record head."
+description: "GF(2^32) word mix, stream-header and record ciphers, and the 0x9D protected descriptor."
 ---
 
 # Word, stream, and record ciphers
 
-Android streams do not reuse the Windows rolling-XOR family. Word mixing is multiplication in GF(2³²). Stream headers, record descriptors, and the `0x9D` job-record head each wrap that mix in a different feedback rule. Constants differ across families; treat the values below as observed material, not a single universal key.
+Android streams don't reuse the Windows rolling-XOR family. Word mixing is multiplication in GF(2³²). Stream headers, record descriptors, and the `0x9D` protected descriptor each wrap that mix in a different feedback rule. Constants differ across families; treat the values on this page as observed material, not a single universal key.
 
 ## GF(2³²) multiply
 
@@ -37,7 +37,7 @@ The 32-byte parameter header and the stage 2 image use unsigned 32-bit wraparoun
 plain[i] = (cipher[i] + (i + 3) * key) XOR (C * (i + 1))
 ```
 
-Observed `C` values are `0xbf20165d` and `0xbf189bdd` — one per family. The first word is the key and is written back after the 32-byte header is decrypted. Field checks live on [Stage 1 header](../file-format/stage1.md).
+Observed `C` values are `0xbf20165d` and `0xbf189bdd`, one per family. The first word is the key and is written back after the 32-byte header is decrypted. Field checks live on [Stage 1 header](../file-format/stage1.md).
 
 ## Stream-header cipher
 
@@ -45,7 +45,7 @@ Each interpreter stream starts with two little-endian dwords (`cipher0`, `cipher
 
 Two constant sets have been observed. They share the `sid * 0x9D323CD7` product and the `gf` mix of the header words; the added constants and the shift assembly differ.
 
-**Family A**
+**First observed constant set**
 
 ```
 K = sid * 0x9D323CD7
@@ -55,7 +55,7 @@ dw1 = gf(cipher0 + cipher1)    ^ (K + 0xF119421B)
 G   = (K + 0x5590AD79 + dw1) & 0xFFFFFFFF
 ```
 
-**Family B**
+**Second observed constant set**
 
 ```
 K    = sid * 0x9D323CD7
@@ -93,7 +93,7 @@ def rec_decrypt(G, idx, rec):
 
 `(off + 3) & 5` is a bitwise AND, not a constant 3: word 0 shifts by 1, word 1 by 5, and the pair alternates. Reading it as the constant 3 silently decrypts garbage. `G` is constant for the stream; `idx` changes `record_mask` per descriptor; `feedback` carries the previous *ciphertext* word.
 
-## The `0x9D` job-record head
+## The `0x9D` protected descriptor
 
 Module `0x9D` begins with another 0x5c-byte record, re-encrypted with the configuration module's header seed `S`:
 

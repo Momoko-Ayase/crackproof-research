@@ -85,4 +85,4 @@ ModR/M must be register-direct `AL` (`mod=3, rm=0`); anything else is invalid.
 
 ## Verification suite
 
-Every Python snippet in this document was verified before publication: each function's output was compared byte-for-byte against an independent reference port of the algorithms on identical inputs (32 test vectors, all matching). The complete, runnable snippet files and the comparison harness are published in the [Verification & reference](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/8S0xnfw9UP9A2yylicaA/) section of this site — `python run_tests.py` re-runs the full comparison.
+Each function's output matches an independent reference port of the algorithms on identical inputs (32 test vectors, all matching). The complete, runnable snippet files and the comparison harness are published in the [Verification & reference](https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/) section of this site. `python run_tests.py` re-runs the full comparison.

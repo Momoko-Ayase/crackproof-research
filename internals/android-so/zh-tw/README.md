@@ -4,7 +4,7 @@ description: CrackProof 所保護 Android 原生庫的內部結構與恢復規�
 
 # CrackProof for Android SO 內部機制
 
-本 Space 記錄 CrackProof Android 原生庫格式，範圍包括 ELF64 小端 AArch64 文件、私有保護節、分階段記錄流，以及重建可用 ELF 鏡像所需的結構。
+本節記錄 CrackProof Android 原生庫格式，範圍包括 ELF64 小端 AArch64 文件、私有保護節、分階段記錄流，以及重建可用 ELF 映像所需的結構。
 
 它與 Windows 版本屬於同一產品家族，但不是 PE 格式的變體。Android 的識別條件、節佈局、記錄流和元數據規則單獨說明。
 
@@ -19,4 +19,4 @@ description: CrackProof 所保護 Android 原生庫的內部結構與恢復規�
 | [元數據](metadata/metadata.md)                | IL2CPP 方法令牌和元數據存儲方式  |
 | [分析](analysis/analysis.md)                 | 校驗規則、失敗處理和已觀察常量      |
 
-Windows PE 格式請參閱 [Windows internals Space](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/sFi4W2Zr1UBoxZd5YI3A/)。Huffman/LZ 記號語言與緩衝區內 AES 日程與該家族共享；詞密碼、記錄洋蔥與輔助庫佈局則不是。
+Windows PE 格式請參閱 [Windows 內部機制](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/)。Huffman/LZ 記號語言與緩衝區內 AES 調度表與該家族共享；詞密碼、層層嵌套的記錄流與輔助庫佈局則不是。

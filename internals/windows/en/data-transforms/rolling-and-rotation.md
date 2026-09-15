@@ -47,7 +47,7 @@ def payload_xor_chain(file_data, out, info, decrypt_size):
         k = (i * i) ^ ((k + cell + i) & MASK32)
 ```
 
-Because the key rolls forward with each dword, the chain must be decrypted from the start — random access into the payload is impossible without replaying the chain.
+Because the key rolls forward with each dword, the chain must be decrypted from the start. Random access into the payload is impossible without replaying the chain.
 
 ## XOR + rotate-right dword cipher
 
@@ -98,7 +98,7 @@ def byte_rotate2(d, va, size):
         b2 = (b2 + 1) & 0xFF
 ```
 
-The position-keyed variant has a property the loader's table walks rely on heavily: **each output byte depends only on the input byte and the low 8 bits of its address** — there is no cross-byte state. Any four bytes can therefore be trial-decrypted without touching the rest of the buffer:
+The position-keyed variant has a property the loader's table walks rely on heavily: **each output byte depends only on the input byte and the low 8 bits of its address**. There's no cross-byte state. Any four bytes can therefore be trial-decrypted without touching the rest of the buffer:
 
 ```python
 def trial_byte_rotate2(d, va):
@@ -113,4 +113,3 @@ def trial_byte_rotate2(d, va):
 ```
 
 16-byte descriptors throughout the loader are encrypted with `byte_rotate2`, chained positionally: each descriptor's key comes from its own address, and the walk terminates on a zero length field.
-

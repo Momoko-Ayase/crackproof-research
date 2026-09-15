@@ -4,7 +4,7 @@ description: "基於內容識別並分類受保護文件（KONN、原生/託管 
 
 # detect.py
 
-[識別與構建家族](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/file-structure/recognition)中記載的識別與分類邏輯。
+這是識別與分類的參考實現，邏輯與 [識別與構建家族](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/file-structure/recognition) 中的記載一致。
 
 ```python
 """Content-based detection and classification of a protected PE file.

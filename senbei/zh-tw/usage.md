@@ -21,13 +21,13 @@ senbei app.exe --out C:\out
 
 ## Android 目標
 
-受保護的 `.so` 文件從其加密載荷節恢復，寫出為 `libil2cpp.unpack.so` 或對應的輸入名。APK、APKS、XAPK 文件按容器處理：Senbei 先讀取清單，必要時跟進嵌套 APK，只提取 `.so` 與精確匹配 `global-metadata.dat` 的條目。
+Senbei 從加密載荷節恢復受保護的 `.so` 文件，寫出為 `libil2cpp.unpack.so` 或對應的輸入名。APK、APKS、XAPK 文件按容器處理：Senbei 先讀取清單，必要時跟進嵌套 APK，只提取 `.so` 與精確匹配 `global-metadata.dat` 的條目。
 
-如果恢復後的庫包含內嵌元數據，解包後的 blob 會寫到它旁邊的 `global-metadata.unpack.dat`。內容相同的鬆散文件與包內條目只恢復一次，優先取鬆散文件。
+如果恢復後的庫包含內嵌元數據，Senbei 會把解包後的數據塊作為 `global-metadata.unpack.dat` 寫到它旁邊。內容相同的鬆散文件與包內條目只恢復一次，優先取鬆散文件。
 
 ## 文件夾模式
 
-文件夾模式遞歸遍歷，跳過名為 `unpack` 的目錄，並把識別到的輸出鏡像到 `<root>/unpack/` 或 `--out DIR` 下。Windows 候選名為 `.exe`、`.dll` 與 `global-metadata.dat`；Android 候選名為 `.so` 與 `global-metadata.dat`。匹配的 `.exe._`、`.dll._` 載荷由其 stub 消費，不計入跳過數。
+文件夾模式遞歸遍歷，跳過名為 `unpack` 的目錄，並把識別到的輸出按相對路徑寫到 `<root>/unpack/` 或 `--out DIR` 下。Windows 候選名為 `.exe`、`.dll` 與 `global-metadata.dat`；Android 候選名為 `.so` 與 `global-metadata.dat`。匹配的 `.exe._`、`.dll._` 載荷由其 stub 消費，不計入跳過數。
 
 託管 DLL 伴生文件在原始 DLL 中保留 CLR 元數據及相關運行時表。DLL 與其匹配的 `._` 文件必須同時可用；Senbei 從 DLL 恢復聲明的 CLR 區域，同時保留從伴生文件解密的方法體。被引用區域缺失或不可讀時報告為錯誤。
 
@@ -37,7 +37,7 @@ senbei app.exe --out C:\out
 
 PE 輸出會檢查有效頭部、節範圍、入口點映射、可讀導入名、重定位需求與託管元數據簽名。Android 輸出在 ELF 恢復過程中驗證，包括解碼後的容器大小、修復表邊界與重建的動態表。
 
-乾淨的報告不是正確性證明，但不乾淨的報告是輸出損壞的可靠信號。可疑 PE 文件仍會寫出並單獨計數。
+乾淨的報告不是正確性證明，但未通過的報告可以可靠地說明輸出已損壞。可疑 PE 文件仍會寫出並單獨計數。
 
 ## 標誌
 

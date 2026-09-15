@@ -11,12 +11,12 @@ A protected file is recognized by content, never by name or extension. The initi
 1. It is at least 4128 bytes long and has a valid `PE\0\0` signature at `e_lfanew` (`u32@0x3C`).
 2. The KDF over offset 4096 yields `info[1] == KONN`.
 
-These two checks identify a candidate. Before accepting its layout, every `info` range must also fit the file, stage and section records must have valid bounds, and at least one downstream checksum or decode must succeed. `KONN` alone is not enough to trust all derived offsets.
+These two checks identify a candidate. Before accepting its layout, every `info` range must also fit the file, stage and section records must have valid bounds, and at least one downstream checksum or decode must succeed. `KONN` alone isn't enough to trust all derived offsets.
 
 Classification then uses ordinary PE fields. Both fields apply to every candidate; EXE versus DLL and native versus managed are independent:
 
 - `IMAGE_FILE_HEADER.Characteristics & 0x2000` (`IMAGE_FILE_DLL`) distinguishes DLL from EXE.
-- The COM descriptor (CLR) data directory — entry 14, at optional-header `+96` on PE32 or `+112` on PE32+ — distinguishes managed (.NET) from native.
+- The COM descriptor (CLR) data directory (entry 14, at optional-header `+96` on PE32 or `+112` on PE32+) distinguishes managed (.NET) from native.
 
 The four combinations are:
 
@@ -27,7 +27,7 @@ The four combinations are:
 | set | 0 | native DLL |
 | set | nonzero | managed DLL |
 
-A managed EXE uses the same EXE-style container as a native EXE. The CLR directory is the only PE-header difference that classification needs. It is not a fifth layout family.
+A managed EXE uses the same EXE-style container as a native EXE. The CLR directory is the only PE-header difference that classification needs. It isn't a fifth layout family.
 
 ```python
 MAGIC_KONN = 0x4E4E4F4B  # the shell stamp
@@ -70,14 +70,14 @@ Protected files observed in the wild vary along four axes. The axes are independ
 
 **Bitness.** PE32+ (optional-header magic `0x20B`, 64-bit) and PE32 (`0x10B`, 32-bit) containers share the header/payload layer but use entirely different configuration layouts, stage structures, and final PE fixups.
 
-**Object kind.** Native EXE, managed EXE, native DLL, and managed DLL (see classification above). Some managed layouts preserve the COR20 header and BSJB metadata stream verbatim in the protected file. This does not make the managed method bodies plaintext; they still belong to sections handled by the normal recovery path.
+**Object kind.** Native EXE, managed EXE, native DLL, and managed DLL (see [Recognition and classification](#recognition-and-classification)). Some managed layouts preserve the COR20 header and BSJB metadata stream verbatim in the protected file. This doesn't make the managed method bodies plaintext; they still belong to sections handled by the normal recovery path.
 
 **Configuration layout.** Two generations of the 64-bit loader configuration:
 
-- The **marker layout** (older builds) embeds the byte markers `70 6D 00 00 63 6D 00 00` (`"pm\0\0cm\0\0"` — the loader's two-letter submodule codes) and `00 00 00 40 01 00 00 00` (a `0x40000000, 1` dword pair) in the final loader stage. Every important table is at a fixed offset from these markers.
+- The **marker layout** (older builds) embeds the byte markers `70 6D 00 00 63 6D 00 00` (`"pm\0\0cm\0\0"`, the loader's two-letter submodule codes) and `00 00 00 40 01 00 00 00` (a `0x40000000, 1` dword pair) in the final loader stage. Every important table is at a fixed offset from these markers.
 - The **marker-less layout** (newer builds, including EXE-style shells wrapped around DLLs) omits both markers. Tables are found from their record shape, embedded transform programs, pointer ranges, and a trial decode of a compressed record.
 
 **DLL packaging.** Two ways DLLs are protected:
 
 - The **dedicated DLL layout** (older): a DLL-specific container whose configuration block sits at a fixed offset (`keys[6] + 5592`) rather than a scanned anchor.
-- The **EXE-style shell** (newer): DLLs are wrapped in the same shell layout as EXEs. The external-companion split below is an instance of this family.
+- The **EXE-style shell** (newer): DLLs are wrapped in the same shell layout as EXEs. The [external-companion split](companion-layout.md) is an instance of this family.

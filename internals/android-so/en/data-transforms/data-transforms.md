@@ -9,6 +9,6 @@ The Android format combines a small arithmetic transform for the outer header wi
 - [Word, stream, and record ciphers](word-and-record.md) cover GF(2³²) mixing and the stream/record heads.
 - [Module configuration](module-config.md) is the `0x9B` seed and AES material.
 - [Container transforms](container.md) expand `0x9D` segments.
-- [Huffman and LZ compression](compression.md) is the writer format, shared with the Windows family.
+- [Huffman and LZ compression](compression.md) is the Huffman/LZ block format, shared with the Windows family.
 
-The pages here describe observable fields and equations. They avoid assigning new names to intermediate states that are not present in the format.
+The format names only the fields and equations that appear in the stream. Intermediate states that aren't present stay unnamed.

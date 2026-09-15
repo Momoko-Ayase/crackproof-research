@@ -4,11 +4,19 @@ description: "Workspace layout and the Windows and Android restoration pipelines
 
 # Design
 
-Senbei is a fully static unpacker. It reads protected bytes, replays the protection algorithm, validates the result, and writes a recovered image without launching or attaching to the protected program.
+This page covers the Senbei workspace layout and the Windows and Android restoration pipelines.
 
 ## Crate layout
 
-Seven crates make up the workspace; the browser binding `senbei-wasm` is a separate crate outside it. `senbei-cli` is the command-line entry point, `senbei-io` owns filesystem orchestration, `senbei-pe` and `senbei-elf` provide basic format parsing, `senbei-crypto` provides shared primitives, `senbei-metadata` restores metadata, and `senbei-engine` owns the protection-specific pipelines.
+Seven crates make up the workspace; the browser binding `senbei-wasm` is a separate crate outside it.
+
+* `senbei-cli` is the command-line entry point.
+* `senbei-io` owns filesystem orchestration.
+* `senbei-pe` provides basic format parsing.
+* `senbei-elf` provides basic format parsing.
+* `senbei-crypto` provides shared primitives.
+* `senbei-metadata` restores metadata.
+* `senbei-engine` owns the protection-specific pipelines.
 
 Single-platform source stays directly under `src/`. Multi-platform crates keep platform code below `src/windows/` and `src/android/`, with shared code directly below `src/`.
 

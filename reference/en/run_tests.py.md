@@ -4,7 +4,7 @@ description: "The comparison harness: replays every scenario in Python and compa
 
 # run\_tests.py
 
-The test harness. It regenerates every input with the same LCG sequence as the reference port, runs all Python implementations, and diffs the outputs against `vectors.txt`. Run it with `python run_tests.py` — expected output: `all vectors match`.
+The comparison harness that regenerates every input with the same LCG sequence as the reference port, runs all Python implementations, and diffs the outputs against `vectors.txt`. Run it with `python run_tests.py`. Expected output: `all vectors match`.
 
 ```python
 """Cross-check every Python snippet against the vectors printed by the

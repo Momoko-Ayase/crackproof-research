@@ -23,7 +23,7 @@ flowchart LR
     E8 --> M98["Module 0x98"]
 ```
 
-A direct record with flag `2` is not a compressed container. Its child stream identifier is `command_id - 0x10`, so `0xF3` feeds interpreter `0xE3`, and the same rule holds through `0xF8` / `0xE8`. That is the same relationship described in [Stage 2 streams](../file-format/stage2-streams.md).
+A direct record with flag `2` isn't a compressed container. Its child stream identifier is `command_id - 0x10`, so `0xF3` feeds interpreter `0xE3`, and the same rule holds through `0xF8` / `0xE8`. That's the same relationship described in [Stage 2 streams](../file-format/stage2-streams.md).
 
 ## Module table
 
@@ -39,8 +39,8 @@ Stage 2 maps `0x1800` bytes of anonymous writable memory. Each entry is 24 (`0x1
 
 The first two registrations are:
 
-- `0xE2` — the stage 2 image itself (`X2`, `X3` from stage 1)
-- `0xD0` — the file-tail mapping (`X6`, `X7` from stage 1)
+- `0xE2`: the stage 2 image itself (`X2`, `X3` from stage 1)
+- `0xD0`: the file-tail mapping (`X6`, `X7` from stage 1)
 
 Later records call the same registration helper with the command identifier from the decrypted descriptor.
 
@@ -58,7 +58,7 @@ Each record is `0x5C` bytes (23 little-endian dwords) after an 8-byte stream hea
 | `init_offset` | Init function relative to the materialized base |
 | `entry_offset` | Entry function relative to the materialized base |
 
-`flags & 0x2` borrows a subrange of the parent stream instead of decoding a container. `flags & 0x100` skips init and entry. Other flag bits have been seen; their meaning is not reduced.
+`flags & 0x2` borrows a subrange of the parent stream instead of decoding a container. `flags & 0x100` skips init and entry. Other flag bits have been seen; their meaning isn't known.
 
 The interpreter decrypts the stream header, then decrypts descriptors in index order. After each object is registered it calls init (if any) and then entry (if any), unless `0x100` is set. A zero record ends the table.
 

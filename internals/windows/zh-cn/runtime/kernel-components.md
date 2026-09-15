@@ -8,7 +8,7 @@ description: 已观察到的 Htsysm 代际、内核职责与版本标记。
 
 最旧驱动的招牌特性是一个**让任意进程执行内核态 shellcode 的无鉴权 IOCTL**。CrackProof 用它手动映射内核态 DLL（`HtsyskNT.dll`，然后是 `HtpecmNT.dll`），并调用它们的 `_FarEntry@0` 导出——其实现其余内核功能，包括按模块说明的监视并终止分析进程。
 
-其安全姿态名副其实地糟糕：系统上的任何进程都能要求该驱动在 ring 0 运行任意代码。
+安全设计名副其实地糟糕：系统上的任何进程都能要求该驱动在 ring 0 运行任意代码。
 
 ## Htsysm 第二代：EPROCESS 编辑（Htsysm7679）
 

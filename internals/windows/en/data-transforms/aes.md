@@ -6,10 +6,10 @@ description: "The AES-CBC layer and its in-buffer expanded key schedule."
 
 ## The block cipher: AES-CBC with an in-buffer key schedule
 
-Bulk content — stages and section blocks — is protected with AES decryption in CBC mode. Two design choices are worth noting:
+Bulk content (stages and section blocks) is protected with AES decryption in CBC mode. Two design choices stand out:
 
 - **The key schedule lives inside the data buffer itself.** A small header at `key_offset` holds the round count (little-endian u16 at `key_offset + 2`), followed by `(rounds + 1)` 16-byte round keys. No separate key material needs extracting; the schedule is unpacked along with everything else.
-- **The tables are the standard AES decryption T-tables** (InvSubBytes fused with InvMixColumns), generated below from GF(2⁸) arithmetic — public AES constants, not proprietary data. State words are loaded and stored big-endian.
+- **The tables are the standard AES decryption T-tables** (InvSubBytes fused with InvMixColumns), generated from GF(2⁸) arithmetic in the snippet that follows: public AES constants, not proprietary data. State words are loaded and stored big-endian.
 
 ```python
 def _gf_mul(a, b):
@@ -113,5 +113,4 @@ def aes_decrypt(d, pos, size, key_offset):
         prev = cur
 ```
 
-Each block is decrypted with `_aes_round` (initial key XOR, `rounds − 1` T-table rounds, and a final SubBytes/ShiftRows-only round — the canonical AES inverse structure) and then XORed with the previous ciphertext block (zero IV).
-
+Each block is decrypted with `_aes_round` (initial key XOR, `rounds − 1` T-table rounds, and a final SubBytes/ShiftRows-only round, the canonical AES inverse structure) and then XORed with the previous ciphertext block (zero IV).

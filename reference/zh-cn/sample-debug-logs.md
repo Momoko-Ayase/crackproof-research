@@ -4,17 +4,17 @@ description: "受保护宿主、原生 DLL 和托管 DLL 的脱敏调试日志�
 
 # 调试日志示例
 
-这些是真实的 CrackProof 调试日志，捕获方式是在 `%temp%` 下创建该可执行文件对应的 12 位十六进制字符文件夹并启动受保护程序（见[调试日志](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status)）。路径与产品名已替换为通用占位符；其余一切——选项标志、状态码、地址、hook 列表——均为原文。
+这些是真实的 CrackProof 调试日志，捕获方式是在 `%temp%` 下创建该可执行文件对应的 12 个十六进制字符文件夹并启动受保护程序（见 [调试日志](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status#调试日志)）。路径与产品名已替换为通用占位符；选项标志、状态码、地址、hook 列表等其余内容均为原文。
 
 ## 如何阅读日志
 
 * **第 1 行**——受保护模块的路径。
 * **第 2 行**——该构建打包时使用的保护选项标志（每个 `-XX` 记号对应一个打包器选项）。
 * **第 3/4 行**——时间戳与模块的加载基址。
-* **后续行**——12 位[状态码](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status)，每个 stage 一行；缩进的 `000`–`00N` 行携带 stage 特定的细节（地址、计数、被 hook 的函数）。
+* **后续行**——12 位 [状态码](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status#启动序列与状态码)，每个 stage 一行；缩进的 `000`–`00N` 行携带 stage 特定的细节（地址、计数、被 hook 的函数）。
 * **最后几行**——完成时间戳与 9 位错误码（`000-000-000` = 成功）。
 
-## 宿主 EXE——功能完整，页加密
+## 宿主 EXE，页加密
 
 ```
 E:\Package\app.exe
@@ -102,7 +102,7 @@ A06
 * `570` 与 `A06` 在启动后期 hook 更多 API（`user32!SetFocus`、`CreateWindowExA/W`、`uxtheme!ThemeInitApiHook`）。
 * `660` 是一个不在公开状态表中的 stage——在此处出现于 `840` 与最终的 `280`（跳转 OEP）之间。
 
-## 原生插件 DLL——仅整体解密
+## 原生插件 DLL，仅整体解密
 
 ```
 E:\Package\app_Data\Plugins\native_plugin.dll
@@ -140,7 +140,7 @@ A15
 * **没有 `640`/`840`**——该构建只整体解密一次（`610`），从不做页加密；对比上面的宿主 EXE。页加密是逐模块的选项。
 * `800` 携带单个地址——新填充的映像区域。
 
-## 托管 DLL——最简序列
+## 托管 DLL，最简序列
 
 ```
 E:\Package\app_Data\Managed\Assembly-CSharp.dll

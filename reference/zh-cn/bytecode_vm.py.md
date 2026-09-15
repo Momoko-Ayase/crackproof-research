@@ -4,7 +4,7 @@ description: "逐构建的自定义字节变换：x86 桩解码器、解释器�
 
 # bytecode\_vm.py
 
-解码每个构建独有 x86 桩的字节码 VM，见 [按构建定制的字节变换](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/data-transforms/bytecode-transform)。
+这是解码每个构建独有 x86 桩的字节码 VM，记载见 [按构建定制的字节变换](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/data-transforms/bytecode-transform)。
 
 ```python
 """The per-build custom byte transform ("bytecode VM").

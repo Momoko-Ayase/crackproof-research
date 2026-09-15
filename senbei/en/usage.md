@@ -21,9 +21,9 @@ For `global-metadata.dat`, Senbei writes `global-metadata.unpack.dat` only when 
 
 ## Android targets
 
-Protected `.so` files are restored from their encrypted payload sections and written as `libil2cpp.unpack.so` or the corresponding input name. APK, APKS, and XAPK files are treated as containers: Senbei reads their manifests first, follows nested APKs when necessary, and extracts only `.so` and exact `global-metadata.dat` entries.
+Senbei restores protected `.so` files from their encrypted payload sections and writes them as `libil2cpp.unpack.so` or the corresponding input name. It treats APK, APKS, and XAPK files as containers: it reads their manifests first, follows nested APKs when necessary, and extracts only `.so` and exact `global-metadata.dat` entries.
 
-If a restored library contains embedded metadata, the unwrapped blob is written beside it as `global-metadata.unpack.dat`. Identical loose and package entries are restored once, preferring the loose file.
+If a restored library contains embedded metadata, Senbei writes the unwrapped blob beside it as `global-metadata.unpack.dat`. It restores identical loose and package entries once, preferring the loose file.
 
 ## Folder mode
 
@@ -35,7 +35,7 @@ The summary has the form `12 unpacked · 3 skipped · 0 errors · 1 suspect · 2
 
 ## Integrity check
 
-PE outputs are checked for valid headers, section ranges, entry-point mapping, readable import names, relocation requirements, and managed metadata signatures. Android outputs are validated during ELF restoration, including decoded container sizes, fixup bounds, and rebuilt dynamic tables.
+Senbei checks PE outputs for valid headers, section ranges, entry-point mapping, readable import names, relocation requirements, and managed metadata signatures. It validates Android outputs during ELF restoration, including decoded container sizes, fixup bounds, and rebuilt dynamic tables.
 
 A clean report isn't a proof of correctness, but a non-clean report is a reliable broken-output signal. Suspect PE files are still written and counted separately.
 
@@ -47,7 +47,7 @@ A clean report isn't a proof of correctness, but a non-clean report is a reliabl
 | `-v`, `--verbose` | Print per-stage progress. |
 | `-q`, `--quiet` | Hide progress and per-file lines; repeat to suppress all standard output. |
 | `--no-log` | Don't write a run log. |
-| `--scan-all` | Probe every selected target-name candidate, including files below the size floor. |
+| `--scan-all` | Probe every selected target-name candidate, including files too small for the default scan to open. |
 | `--no-pause` | Disable the Explorer-friendly Windows exit prompt. |
 | `-V`, `--version` | Print the version and exit. |
 | `-h`, `--help` | Show usage. |

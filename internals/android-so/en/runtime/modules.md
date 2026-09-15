@@ -4,9 +4,9 @@ description: "Observed roles of runtime modules, listed by identifier."
 
 # Runtime modules
 
-Command identifiers below come from stage 2 records. Roles are taken from the functions those modules run after they are materialized. Identifiers required for ELF restoration stay on [Module streams](../restoration/module-streams.md). Environment and integrity behavior is collected on [Environment and integrity checks](environment-checks.md).
+Command identifiers on this page come from stage 2 records. Roles are taken from the functions those modules run after they're materialized. Identifiers required for ELF restoration stay on [Module streams](../restoration/module-streams.md). Environment and integrity behavior is collected on [Environment and integrity checks](environment-checks.md).
 
-An identifier listed as “not reduced” was present as a record; its behavior has not been turned into a stable description.
+An identifier listed as “observed only” was present as a record; its meaning isn't known.
 
 ## Interpreters and handoff
 
@@ -22,7 +22,7 @@ An identifier listed as “not reduced” was present as a record; its behavior 
 | ID | Role |
 | --- | --- |
 | `0x9B` | Restore workflow: page permissions, consume `0x9D` and `0x9E` |
-| `0x9D` | Protected container: descriptors, segments, writer streams |
+| `0x9D` | Protected container: descriptors, segments, compressed-block streams |
 | `0x9E` | Hidden dynamic-symbol patches (`dynsym` / `dynstr`) |
 | `0xB9` | Metadata-related data. A real payload on IL2CPP libraries; empty or data-less on some native libraries |
 | `0x0C` | IL2CPP only. Replaces `mmap` with a hook that restores method tokens when `global-metadata.dat` is mapped. See [Method tokens](../metadata/method-tokens.md) |
@@ -40,12 +40,12 @@ An identifier listed as “not reduced” was present as a record; its behavior 
 | `0x60` | Scan system library directories, `/proc` environment, and runtime paths |
 | `0x40` | Check `base.apk` and sibling split APKs. Signature order: v3.1, then v3, then v2, then JAR/v1 |
 | `0x20` | Validate a target path, ELF header, `/proc/self/maps`, and a libc mapping |
-| `0x33` | Build a dex2oat option list and delete artifacts that do not match it |
+| `0x33` | Build a dex2oat option list and delete artifacts that don't match it |
 | `0x72` | Unix-domain socket `bind` / `listen` / `accept` |
 | `0xB0` | Transform a sentinel table |
 
-## Present, not reduced
+## Observed only
 
 `0x8E`, `0x6A`, `0x68`, `0x54`, `0x71`, `0x53`, `0xA4`, `0x58`, `0x73`, `0xA0`, `0xB2`.
 
-These appear in the same interpreter layers as the rows above. They are registered and, unless `flags & 0x100`, receive init/entry calls. Their functions have not been reduced beyond that.
+These appear in the same interpreter layers as the tables earlier on this page. They're registered and, unless `flags & 0x100`, receive init/entry calls. Their meaning isn't known beyond that.

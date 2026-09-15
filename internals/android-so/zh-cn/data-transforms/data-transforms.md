@@ -9,6 +9,6 @@ Android 格式把外层首部的算术变换与容器记录的模块变换组合
 - [词、流与记录密码](word-and-record.md) 覆盖 GF(2³²) 混合以及流/记录头。
 - [模块配置](module-config.md) 是 `0x9B` 的种子与 AES 材料。
 - [容器变换](container.md) 展开 `0x9D` 段。
-- [Huffman 与 LZ 压缩](compression.md) 是 writer 格式，与 Windows 家族共享。
+- [Huffman 与 LZ 压缩](compression.md) 是 Huffman/LZ 块格式，与 Windows 家族共享。
 
-本组只描述可观察字段和公式，不为格式中没有出现的中间状态另造名称。
+格式只给流中出现的字段和公式命名。流里没有的中间状态保持无名。

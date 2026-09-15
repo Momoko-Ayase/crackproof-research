@@ -8,6 +8,6 @@ The Windows format keeps a valid PE-facing outer image but places the original i
 
 | Topic | What it establishes |
 |---|---|
-| [Container and encrypted header](container-layout.md) | The large offset ranges, the eight-dword `info` table, and its key derivation |
+| [Container and encrypted header](container-layout.md) | The large offset ranges, the eight-dword `info` header, and its key derivation |
 | [Recognition and build families](recognition.md) | Evidence used to classify PE32, PE32+, native/managed EXE, and native/managed DLL |
 | [Section data and companion files](companion-layout.md) | How section records map into the payload and how external `._` data is joined to a stub |

@@ -4,7 +4,7 @@ description: "嵌入加載器並繞過常規 Windows 加載器映射的輔助模
 
 # 手動映射輔助模塊
 
-CrackProof 運行的內容並不都住在受保護模塊內。存在兩個支持生態：**手動映射的用戶態 DLL**（由加載器加載，對 Windows 加載器不可見）和一條稱為 Htsysm 的**內核驅動線**（三代設計迥異）。本頁覆蓋二者。
+CrackProof 運行的內容並不都住在受保護模塊內。加載器自行映射輔助 DLL，因此它們對 Windows 加載器不可見。內核支持是另一條驅動線 Htsysm，三代設計迥異；見 [Htsysm 內核組件](kernel-components.md)。
 
 ## 手動映射子模塊
 
@@ -13,7 +13,7 @@ CrackProof 運行的內容並不都住在受保護模塊內。存在兩個支持
 | 代碼 | 模塊 | 狀態組 | 角色 |
 | --- | --- | --- | --- |
 | `it` | `HtpecIt.dll` | `Axx` | 防篡改、防注入、防 VM 檢查 |
-| `dt` | `HtdpStub2.dll` | — | 附加加載器代碼——包括[頁級加密](../runtime/page-protection.md#頁級加密)的按需解密頁錯誤處理器 |
+| `dt` | `HtdpStub2.dll` | — | 附加加載器代碼，包括[頁級加密](page-protection.md#頁級加密)的按需解密頁錯誤處理器 |
 | `cm` | （用戶態初始化） | `Bxx` | 舊 Htsysm 驅動初始化 |
 | `dm` | （用戶態初始化） | `Cxx` | 新 Htsysm 驅動初始化 |
 | `sk` | `HtsyskNT.dll` | `B21` | 舊驅動路徑：內核手動映射器、基礎內核 I/O 與內存函數 |

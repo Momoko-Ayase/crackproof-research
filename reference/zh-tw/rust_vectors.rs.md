@@ -4,7 +4,7 @@ description: "算法的獨立參考移植；編譯後可打印基準真值向量
 
 # rust\_vectors.rs
 
-用於產生基準真值向量的參考移植。每個原語都是對受保護二進制中所實現算法的直接轉寫。用 `rustc -O rust_vectors.rs` 構建並運行即可重新生成 `vectors.txt`。
+這是用於產生基準真值向量的參考移植。每個原語都是對受保護二進制中所實現算法的直接轉寫。用 `rustc -O rust_vectors.rs` 構建並運行即可重新生成 `vectors.txt`。
 
 ```rust
 // Vector generator for the CrackProof research documentation.

@@ -4,11 +4,19 @@ description: "工作区布局以及 Windows 与 Android 恢复流水线。"
 
 # 设计
 
-Senbei 是完全静态的解包器。它读取受保护字节，重放保护算法，验证结果，并写出恢复后的映像，全程不启动、不附加受保护程序。
+本页介绍 Senbei 的工作区布局，以及 Windows 与 Android 恢复流水线。
 
 ## crate 布局
 
-工作区由七个 crate 组成；浏览器绑定 `senbei-wasm` 是工作区之外的独立 crate。`senbei-cli` 是命令行入口，`senbei-io` 负责文件系统编排，`senbei-pe` 与 `senbei-elf` 提供基础格式解析，`senbei-crypto` 提供共享原语，`senbei-metadata` 恢复元数据，`senbei-engine` 负责保护方案专属的流水线。
+工作区由七个 crate 组成；浏览器绑定 `senbei-wasm` 是工作区之外的独立 crate。
+
+* `senbei-cli` 是命令行入口。
+* `senbei-io` 负责文件系统编排。
+* `senbei-pe` 提供基础格式解析。
+* `senbei-elf` 提供基础格式解析。
+* `senbei-crypto` 提供共享原语。
+* `senbei-metadata` 恢复元数据。
+* `senbei-engine` 负责保护方案专属的流水线。
 
 单一平台的源码直接放在 `src/` 下。多平台 crate 把平台代码放在 `src/windows/` 与 `src/android/` 下，共享代码直接放在 `src/` 下。
 
@@ -34,7 +42,7 @@ senbei-wasm/src/
 
 ## Windows 引擎
 
-`senbei-engine/src/windows/` 包含 PE 检测、布局发现、EXE 与 DLL 恢复、确定性块并行以及结构完整性检查。候选布局先经过试解密与验证，然后才会被接受为输出。
+`senbei-engine/src/windows/` 包含 PE 检测、布局发现、EXE 与 DLL 恢复、确定性块并行以及结构完整性检查。候选布局先经过试解再验证，然后才会被接受为输出。
 
 外置伴生输入重建为 `stub[..4096]` 后接匹配的 `._` 载荷。stub 的导出、TLS 与声明的 CLR 区域在解包后覆盖回去，因为这些区域不存在于加密的伴生文件中。托管恢复沿 COR20 目录以及被引用的元数据、资源、vtable 修复表，按各文件的 RVA 映射进行，保留解密出的方法体。
 
@@ -54,10 +62,10 @@ APK、APKS、XAPK 文件是容器。Senbei 先读取它们的 ZIP 清单，必�
 
 ## 验证
 
-每个启发式布局都使用试跑加验证。未通过结构检查、校验和或表边界的候选会被拒绝，然后尝试下一个候选。恢复失败会报告为错误，而不是发出静默损坏的二进制文件。
+每个启发式布局都使用试解再验证。未通过结构检查、校验和或表边界的候选会被拒绝，然后尝试下一个候选。恢复失败会报告为错误，而不是发出静默损坏的二进制文件。
 
 PE 完整性检查验证头部、节范围、入口点映射、导入名、重定位需求与托管元数据签名。Android 恢复验证 ELF 范围、解码后的容器大小、修复表边界与重建的动态表。
 
 ## WebAssembly
 
-浏览器绑定通过 I/O 字节 API 依赖 `senbei-engine`。原生文件系统与 Android 包编排不在浏览器工作流内。每次浏览器解包都在一次性 worker 中运行，因为 WebAssembly 无法像原生代码那样从捕获的 panic 中恢复。
+浏览器绑定通过 I/O 字节 API 依赖 `senbei-engine`。原生文件系统与 Android 包编排不在浏览器版工作流内。每次浏览器版解包都在一次性 worker 中运行，因为 WebAssembly 无法像原生代码那样从捕获的 panic 中恢复。

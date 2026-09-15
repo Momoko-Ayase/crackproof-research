@@ -4,7 +4,7 @@ description: "Observed Android format constants and the scope in which each is v
 
 # Constants
 
-These values are observations from the current Android SO samples. They help identify a build family but do not replace structural checks.
+These values are observations from the current Android SO samples. They help identify a build family but don't replace structural checks.
 
 | Value | Scope |
 | --- | --- |
@@ -28,4 +28,4 @@ These values are observations from the current Android SO samples. They help ide
 | `0xFAB11BAF`, version `24` | Unwrapped embedded slim metadata blob |
 | `lib__XXXX__.so`, `assets/<id>/data1.dat` | Companion protector library and side configuration |
 
-When a sample differs, record the new value with its source and re-run all range and relationship checks. Do not widen a parser merely to make an isolated constant fit.
+When a sample differs, record the new value with its source and re-run all range and relationship checks. An isolated new constant isn't a reason to drop the range and relationship checks.

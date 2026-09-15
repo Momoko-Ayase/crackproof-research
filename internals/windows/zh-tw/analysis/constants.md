@@ -83,4 +83,4 @@ ModR/M 必須是寄存器直接尋址的 `AL`（`mod=3, rm=0`）；其餘一律�
 
 ## 驗證套件
 
-本文檔中的每個 Python 片段在發佈前都經過驗證：每個函數的輸出在相同輸入上與算法的獨立參考移植逐字節比對（32 個測試向量，全部一致）。完整可運行的片段文件與比對工具發佈在本站的[驗證與參考](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/2p7kzW649ZlKfmpYdJ87/)欄目中——運行 `python run_tests.py` 可重跑全部比對。
+每個函數的輸出在相同輸入上與算法的獨立參考移植一致（32 個測試向量，全部匹配）。完整可運行的片段文件與比對工具發佈在本站的[驗證與參考](https://app.gitbook.com/s/2p7kzW649ZlKfmpYdJ87/)欄目中。運行 `python run_tests.py` 可重跑全部比對。

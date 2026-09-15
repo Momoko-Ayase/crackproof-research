@@ -4,7 +4,7 @@ description: "The Huffman/LZ hybrid decompressor: 3-byte table entries, literal/
 
 # huffman.py
 
-The decompressor used for stages and section blocks, as documented in [Huffman and LZ compression](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/compression).
+The decompressor used for stages and section blocks. It matches the algorithm documented in [Huffman and LZ compression](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/compression).
 
 ```python
 """The Huffman/LZ hybrid decompressor.

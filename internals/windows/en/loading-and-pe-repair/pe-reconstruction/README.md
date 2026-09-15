@@ -10,4 +10,4 @@ Section recovery produces an RVA-oriented memory image. A usable PE file also ne
 - [Imports, TLS, and exports](imports-tls-exports.md)
 - [Relocations, page transforms, and CLR data](relocations-managed.md)
 
-These steps are layout-sensitive. In particular, old fixed-base executables, rebased DLLs, external-companion images, and CLR images cannot share one blanket directory policy.
+These steps are layout-sensitive. In particular, old fixed-base executables, rebased DLLs, external-companion images, and CLR images can't share one blanket directory policy.
