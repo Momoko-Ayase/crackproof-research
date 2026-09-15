@@ -55,7 +55,7 @@ SPACE_ID_MAP: dict[str, str] = {
     "fEb9nKPvKsjkPAHMUbOt": "sFi4W2Zr1UBoxZd5YI3A",  # Windows
     "Aoyn9wKiHAVzBKGSUifa": "HezwIJwx0lhm5CUG7g8R",  # Android SO
     "L9bXLua8yrIPEUZOHO21": "2p7kzW649ZlKfmpYdJ87",  # Reference
-    # Senbei: add the zh-cn -> zh-tw space IDs after GitBook provisions the spaces.
+    "tMIkyJzuS8q10cZToDDD": "v6LkixcUwwnaXW5PFCVE",  # Senbei
 }
 
 CONVERT_SUFFIXES = {".md"}
