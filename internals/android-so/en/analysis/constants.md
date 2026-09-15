@@ -24,7 +24,8 @@ These values are observations from the current Android SO samples. They help ide
 | `0x0C` | IL2CPP-only `mmap` hook for method tokens |
 | `0xa6fae968` | Observed default method-token seed from module `0x0C` |
 | `0x98` | Handoff that invokes the restored `.init_array` |
-| `0xFAB11BAF`, version `31` | Recognized IL2CPP metadata |
+| `0xFAB11BAF`, versions `29` / `31` / `39` | Recognized IL2CPP metadata |
+| `0xFAB11BAF`, version `24` | Unwrapped embedded slim metadata blob |
 | `lib__XXXX__.so`, `assets/<id>/data1.dat` | Companion protector library and side configuration |
 
 When a sample differs, record the new value with its source and re-run all range and relationship checks. Do not widen a parser merely to make an isolated constant fit.

@@ -1,10 +1,10 @@
 ---
-description: "Identify IL2CPP metadata version 31 and restore per-image method RID permutations."
+description: "Identify supported IL2CPP metadata versions and restore per-image method RID permutations."
 ---
 
 # Method tokens
 
-The recognized IL2CPP metadata magic is `0xFAB11BAF`; the documented version is `31`. A MethodDef token has table byte `0x06` in the high byte and a row identifier in the low 24 bits.
+The recognized IL2CPP metadata magic is `0xFAB11BAF`. Versions 29, 31, and 39 are supported layouts, and all three share the seeded five-round RID permutation described below. A MethodDef token has table byte `0x06` in the high byte and a row identifier in the low 24 bits.
 
 This is not the Windows `-GMD` remap. Windows replaces each token with the contiguous `0x06000000 | (local_index + 1)` value derived from table order alone. The Android path is a seeded five-round permutation of the RID inside each image's method block. See [il2cpp metadata obfuscation](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/analysis/il2cpp-metadata) for the Windows rule.
 
@@ -34,4 +34,11 @@ rid' = value + low
 
 The new token is `0x06000000 | rid'`. Cleaning is idempotent for tooling: an image whose tokens are already the canonical per-image order is detected and left untouched instead of applying the inverse a second time.
 
-Key format constants match the Windows version-31 table (methods `@0x30` stride `0x24`, types `@0xA0` stride `0x58`, images `@0xA8` stride `0x28`; method `.token +0x18`, type `.methodStart +0x24` / `.method_count +0x40`, image `.typeStart +0x08` / `.typeCount +0x0C`). Other metadata versions use different strides and must be rejected rather than decoded with this layout.
+Table constants differ by version. Versions 29 and 31 share the type and image layouts with the Windows version-31 table (types `@0xA0` stride `0x58`, images `@0xA8` stride `0x28`; type `.methodStart +0x24` / `.method_count +0x40`, image `.typeStart +0x08` / `.typeCount +0x0C`) and differ only in the method row:
+
+| Version | Method table | Method stride | `.token` offset |
+| --- | --- | --- | --- |
+| 29 | `@0x30` | `0x20` | `+0x14` |
+| 31 | `@0x30` | `0x24` | `+0x18` |
+
+Version 39 replaces the fixed header with a table of 12-byte `(offset, size, count)` section records and variable-width indexes (1, 2, or 4 bytes, chosen from each table's count); its method, type, and image strides are derived from those widths. Any other version is rejected rather than decoded with the wrong layout.

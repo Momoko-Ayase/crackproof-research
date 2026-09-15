@@ -18,6 +18,8 @@ Recognition accepts ELF64, little-endian files for AArch64. The file must contai
 
 The private section is the distinguishing feature. More than one private section, a section whose file range is outside the file, or an ELF class/endianness mismatch is rejected before any decryption is attempted.
 
+Section names are read from the ELF string table (`.shstrtab`), which must be a well-formed `SHT_STRTAB`; a malformed string table is a format error, and names are never guessed. Restoration additionally requires `.dynamic`, `.rela.dyn`, and `.rela.plt`, each exactly once. The private section is the last section header and begins at the 16-byte-aligned end of the file-backed `PT_LOAD` range.
+
 `.init_array[0]` points at the stage 1 stub in the intact `.text` head. Later entries point into ranges that are hollow on disk and only become valid after restoration.
 
 ## What remains visible

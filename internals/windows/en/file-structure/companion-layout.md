@@ -16,7 +16,7 @@ A descriptor's `src` field therefore maps to file offset `src + section_data_fil
 
 ## The external-companion layout (`._` files)
 
-Some builds — observed so far on il2cpp titles — split a protected module into two files:
+Some builds split a protected module into two files:
 
 - **`Foo.dll`** — a thin on-disk **loader stub**. Its code sections are stripped down to a single page (the CrackProof loader itself), but its headers and `.rdata` are intact plaintext.
 - **`Foo.dll._`** — the encrypted **companion**, holding the real payload. It contains no plaintext PE structures at all (entropy ≈ 8 bits/byte).
@@ -30,6 +30,8 @@ What the stub retains in plaintext matters for later reconstruction:
 - The **export directory** (the companion decrypts to ciphertext here; the loader rebuilds exports at runtime from the stub's copy).
 - The **TLS directory** — the `IMAGE_TLS_DIRECTORY` struct, its raw-data template, and the data-directory entry, all of which the packer strips from the encrypted payload (see [PE reconstruction](../loading-and-pe-repair/pe-reconstruction/README.md)).
 - A real `DllCharacteristics` field and base-relocation table — companion modules are **not** `/FIXED`, unlike the older single-file builds.
+
+Managed DLL companions retain one more category in the stub: the CLR metadata and its related runtime tables. The `._` payload then carries only the encrypted IL method bodies, and reconstruction overlays the stub's COR20 header and every non-empty range it references (see [Relocations, page transforms, and CLR data](../loading-and-pe-repair/pe-reconstruction/relocations-managed.md)).
 
 For the boot-time view of how this pair is loaded, see [Runtime behavior](../runtime/runtime.md); for how the missing pieces are restored into a reconstructed image, see [PE reconstruction](../loading-and-pe-repair/pe-reconstruction/README.md).
 

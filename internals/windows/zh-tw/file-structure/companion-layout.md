@@ -16,7 +16,7 @@ section_data_file_base = (~u32@0x1080) + 0x1000      (32-bit wrapping)
 
 ## 外置伴生體佈局（`._` 文件）
 
-某些構建——目前僅在 il2cpp 作品上觀察到——把受保護模塊拆成一對文件：
+某些構建把受保護模塊拆成一對文件：
 
 * **`Foo.dll`**——磁盤上的瘦**加載器 stub**。其代碼節被裁剪到只剩一頁（即 CrackProof 加載器本體），但其頭部與 `.rdata` 是完整明文。
 * **`Foo.dll._`**——全加密的**伴生體**，持有真正的 payload。它不含任何明文 PE 結構（熵 ≈ 8 比特/字節）。
@@ -30,5 +30,7 @@ stub 以明文保留的內容對後續重建很重要：
 * **導出目錄**（伴生體在此處解密為密文；加載器運行時從 stub 的副本重建導出）。
 * **TLS 目錄**——`IMAGE_TLS_DIRECTORY` 結構體、其原始數據模板與數據目錄項，這些都被保護層從加密 payload 中剝離（見 [PE 重建](../loading-and-pe-repair/pe-reconstruction/)）。
 * 真實的 `DllCharacteristics` 字段與基址重定位表——伴生模塊**不是** `/FIXED`，與較舊的單文件構建不同。
+
+託管 DLL 伴生還在 stub 中保留再一類內容：CLR 元數據及其相關運行時表。此時 `._` 載荷只攜帶加密的 IL 方法體，重建時覆蓋 stub 的 COR20 頭及它引用的每個非空範圍（見[重定位、頁變換與 CLR 數據](../loading-and-pe-repair/pe-reconstruction/relocations-managed.md)）。
 
 關於此文件對在啟動時如何加載，見[運行時行為](../runtime/runtime.md)；關於缺失部分如何被還原進重建映像，見 [PE 重建](../loading-and-pe-repair/pe-reconstruction/)。
