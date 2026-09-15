@@ -26,4 +26,4 @@ CrackProof for Windows 保护 PE32 与 PE32+ 可执行文件和 DLL。受保护�
 | 启动检查、页保护与内核组件   | [运行时行为](runtime/runtime.md)                       |
 | 分析流程、局限与常量      | [分析笔记](analysis/analysis.md)                      |
 
-Windows 数据变换页面对应的测试代码发布在[验证与参考](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/)中。Huffman/LZ 记号语言与缓冲区内 AES 日程也出现在 [Android 原生库格式](https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/)中。
+Windows 数据变换页面对应的测试代码发布在[验证与参考](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/L9bXLua8yrIPEUZOHO21/)中。Huffman/LZ 记号语言与缓冲区内 AES 日程也出现在 [Android 原生库格式](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/Aoyn9wKiHAVzBKGSUifa/)中。
