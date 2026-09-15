@@ -1,5 +1,5 @@
 ---
-description: "CrackProof 所保护 Android 原生库的内部结构与恢复规则。"
+description: CrackProof 所保护 Android 原生库的内部结构与恢复规则。
 ---
 
 # CrackProof for Android SO 内部机制
@@ -10,13 +10,13 @@ description: "CrackProof 所保护 Android 原生库的内部结构与恢复规�
 
 ## 内容导航
 
-| 分区 | 内容 |
-| --- | --- |
-| [文件格式](file-format/README.md) | ELF 识别、私有节和两阶段记录流 |
-| [数据变换](data-transforms/README.md) | 外层首部、模块配置、容器变换和压缩 |
-| [恢复](restoration/README.md) | 记录分发、动态链接和 ELF 输出 |
-| [运行时](runtime/README.md) | 第一阶段引导、第二阶段解释器与运行时模块 |
-| [元数据](metadata/README.md) | IL2CPP 方法令牌和元数据存储方式 |
-| [分析](analysis/README.md) | 校验规则、失败处理和已观察常量 |
+| 分区                                         | 内容                   |
+| ------------------------------------------ | -------------------- |
+| [文件格式](file-format/file-format.md)         | ELF 识别、私有节和两阶段记录流    |
+| [数据变换](data-transforms/data-transforms.md) | 外层首部、模块配置、容器变换和压缩    |
+| [恢复](restoration/restoration.md)           | 记录分发、动态链接和 ELF 输出    |
+| [运行时](runtime/runtime.md)                  | 第一阶段引导、第二阶段解释器与运行时模块 |
+| [元数据](metadata/metadata.md)                | IL2CPP 方法令牌和元数据存储方式  |
+| [分析](analysis/analysis.md)                 | 校验规则、失败处理和已观察常量      |
 
-Windows PE 格式请参阅 [Windows internals Space](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt)。Huffman/LZ 记号语言与缓冲区内 AES 日程与该家族共享；词密码、记录洋葱与辅助库布局则不是。
+Windows PE 格式请参阅 [Windows internals Space](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/fEb9nKPvKsjkPAHMUbOt/)。Huffman/LZ 记号语言与缓冲区内 AES 日程与该家族共享；词密码、记录洋葱与辅助库布局则不是。
