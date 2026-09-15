@@ -1,5 +1,7 @@
 ---
-description: "Internal structures and runtime behavior of CrackProof-protected Windows PE files."
+description: >-
+  Internal structures and runtime behavior of CrackProof-protected Windows PE
+  files.
 ---
 
 # CrackProof for Windows internals
@@ -10,20 +12,20 @@ The observed layouts include native and managed images, older marker-based conta
 
 ## Conventions
 
-- All offsets are hexadecimal byte offsets from the start of the file unless noted otherwise. `u32@X` means the little-endian 32-bit value at offset X.
-- **RVA** (relative virtual address) is used in the usual PE sense. The loader works on a memory image laid out by RVA; on disk the same offsets are used as file offsets into the unpacked image buffer.
-- Integer arithmetic is fixed-width (32-bit or 8-bit) with wraparound, matching the x86 environment the algorithms come from. The Python reference code applies explicit masks for this.
-- Names like `info[3]` refer to entries of the 8-dword table derived from the encrypted file header (see [Protected file structure](file-structure/file-format.md)).
+* All offsets are hexadecimal byte offsets from the start of the file unless noted otherwise. `u32@X` means the little-endian 32-bit value at offset X.
+* **RVA** (relative virtual address) is used in the usual PE sense. The loader works on a memory image laid out by RVA; on disk the same offsets are used as file offsets into the unpacked image buffer.
+* Integer arithmetic is fixed-width (32-bit or 8-bit) with wraparound, matching the x86 environment the algorithms come from. The Python reference code applies explicit masks for this.
+* Names like `info[3]` refer to entries of the 8-dword table derived from the encrypted file header (see [Protected file structure](file-structure/file-format.md)).
 
 ## Contents
 
-| Area | Start here |
-|---|---|
-| On-disk layout and build recognition | [Protected file structure](file-structure/file-format.md) |
-| Ciphers, compression, and checksums | [Data transforms](data-transforms/data-transforms.md) |
-| Loader stages and section recovery | [Loading and section recovery](loading-and-pe-repair/loading/README.md) |
-| Headers, directories, imports, and CLR data | [PE reconstruction](loading-and-pe-repair/pe-reconstruction/README.md) |
-| Startup checks, page protection, and kernel components | [Runtime behavior](runtime/runtime.md) |
-| Analysis workflow, limitations, and constants | [Analysis notes](analysis/analysis.md) |
+| Area                                                   | Start here                                                     |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| On-disk layout and build recognition                   | [Protected file structure](file-structure/file-format.md)      |
+| Ciphers, compression, and checksums                    | [Data transforms](data-transforms/data-transforms.md)          |
+| Loader stages and section recovery                     | [Loading and section recovery](loading-and-pe-repair/loading/) |
+| Headers, directories, imports, and CLR data            | [PE reconstruction](loading-and-pe-repair/pe-reconstruction/)  |
+| Startup checks, page protection, and kernel components | [Runtime behavior](runtime/runtime.md)                         |
+| Analysis workflow, limitations, and constants          | [Analysis notes](analysis/analysis.md)                         |
 
-Tested code corresponding to the Windows transform pages is published in [Verification and reference](https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/readme). The Huffman/LZ token language and the in-buffer AES schedule also appear in the [Android native-library format](https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/).
+Tested code corresponding to the Windows transform pages is published in [Verification and reference](https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/). The Huffman/LZ token language and the in-buffer AES schedule also appear in the [Android native-library format](https://app.gitbook.com/o/-Lx9XUuXVg8x3nx7ouIX/s/fcBZibCo72OSh5jVcKoo/).

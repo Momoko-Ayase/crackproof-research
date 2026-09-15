@@ -2,14 +2,14 @@
 
 * [CrackProof for Windows internals](README.md)
 
-## File structure <a href="#file-structure" id="file-structure"></a>
+## File structure
 
 * [Overview](file-structure/file-format.md)
 * [Container and encrypted header](file-structure/container-layout.md)
 * [Recognition and build families](file-structure/recognition.md)
 * [Section data and companion files](file-structure/companion-layout.md)
 
-## Data transforms <a href="#data-transforms" id="data-transforms"></a>
+## Data transforms
 
 * [Overview](data-transforms/data-transforms.md)
 * [Rolling-key and rotation ciphers](data-transforms/rolling-and-rotation.md)
@@ -19,7 +19,7 @@
 * [Huffman and LZ compression](data-transforms/compression.md)
 * [Per-build byte transform](data-transforms/bytecode-transform.md)
 
-## Loading and PE repair <a href="#loading-and-pe-repair" id="loading-and-pe-repair"></a>
+## Loading and PE repair
 
 * [Loading and section recovery](loading-and-pe-repair/loading/README.md)
   * [Stage chain and marker layout](loading-and-pe-repair/loading/stage-chain.md)
@@ -30,7 +30,7 @@
   * [Imports, TLS, and exports](loading-and-pe-repair/pe-reconstruction/imports-tls-exports.md)
   * [Relocations, page transforms, and CLR data](loading-and-pe-repair/pe-reconstruction/relocations-managed.md)
 
-## Runtime <a href="#runtime" id="runtime"></a>
+## Runtime
 
 * [Overview](runtime/runtime.md)
 * [Startup sequence and status reporting](runtime/startup-status.md)
@@ -39,7 +39,7 @@
 * [Manually mapped helper modules](runtime/mapped-modules.md)
 * [Htsysm kernel components](runtime/kernel-components.md)
 
-## Analysis <a href="#analysis" id="analysis"></a>
+## Analysis
 
 * [Overview](analysis/analysis.md)
 * [Analysis workflow](analysis/workflow.md)
