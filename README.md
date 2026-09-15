@@ -11,6 +11,8 @@ Windows PE files and Android native libraries.
 - `reference/en/`, `reference/zh-cn/`, `reference/zh-tw/` — Verification & reference section: the
   runnable snippet suite, one file per page, plus desensitized reference
   captures
+- `senbei/en/`, `senbei/zh-cn/`, `senbei/zh-tw/` — Senbei product documentation:
+  usage, design, and development of the project's own static unpacker
 - `scripts/s2tw.py` — regenerate Traditional Chinese from Simplified after any
   `zh-cn` edit (`pip install opencc-python-reimplemented && python scripts/s2tw.py`)
 - `verification/` — the runnable Python snippet suite and test vectors behind

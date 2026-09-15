@@ -46,6 +46,7 @@ PAIRS: tuple[tuple[str, str], ...] = (
     ("internals/windows/zh-cn", "internals/windows/zh-tw"),
     ("internals/android-so/zh-cn", "internals/android-so/zh-tw"),
     ("reference/zh-cn", "reference/zh-tw"),
+    ("senbei/zh-cn", "senbei/zh-tw"),
 )
 
 # zh-cn space ID -> zh-tw space ID. Keep in sync with AGENTS.md.
@@ -54,6 +55,7 @@ SPACE_ID_MAP: dict[str, str] = {
     "fEb9nKPvKsjkPAHMUbOt": "sFi4W2Zr1UBoxZd5YI3A",  # Windows
     "Aoyn9wKiHAVzBKGSUifa": "HezwIJwx0lhm5CUG7g8R",  # Android SO
     "L9bXLua8yrIPEUZOHO21": "2p7kzW649ZlKfmpYdJ87",  # Reference
+    # Senbei: add the zh-cn -> zh-tw space IDs after GitBook provisions the spaces.
 }
 
 CONVERT_SUFFIXES = {".md"}

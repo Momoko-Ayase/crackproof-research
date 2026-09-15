@@ -116,3 +116,32 @@ site:
           content:
             directory: ./reference/zh-tw
             language: zh-tw
+    - type: section
+      key: section-5
+      title: Senbei
+      path: senbei
+      description: ""
+      icon: screwdriver-wrench
+      children:
+        - type: space
+          key: space-13
+          title: English
+          path: en
+          default: true
+          content:
+            directory: ./senbei/en
+            language: en
+        - type: space
+          key: space-14
+          title: 简体中文
+          path: zh-cn
+          content:
+            directory: ./senbei/zh-cn
+            language: zh
+        - type: space
+          key: space-15
+          title: 繁體中文
+          path: zh-tw
+          content:
+            directory: ./senbei/zh-tw
+            language: zh-tw
