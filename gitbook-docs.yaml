@@ -1,0 +1,118 @@
+$schema: https://api.gitbook.com/gitbook-docs.yaml
+site:
+  title: CrackProof Research
+  structure:
+    - type: section
+      key: section-4
+      title: Home
+      path: home
+      icon: house
+      default: true
+      children:
+        - type: space
+          key: space-6
+          title: English
+          path: en
+          default: true
+          content:
+            directory: ./home/en
+            language: en
+        - type: space
+          key: space-7
+          title: 简体中文
+          path: zh-cn
+          content:
+            directory: ./home/zh-cn
+            language: zh
+        - type: space
+          key: space-9
+          title: 繁體中文
+          path: zh-tw
+          content:
+            directory: ./home/zh-tw
+            language: zh-tw
+    - type: section
+      key: section-1
+      title: Windows
+      path: windows
+      description: ""
+      icon: desktop
+      children:
+        - type: space
+          key: space-1
+          title: English
+          path: en
+          default: true
+          content:
+            directory: ./internals/windows/en
+            language: en
+        - type: space
+          key: space-2
+          title: 简体中文
+          path: zh-cn
+          content:
+            directory: ./internals/windows/zh-cn
+            language: zh
+        - type: space
+          key: space-10
+          title: 繁體中文
+          path: zh-tw
+          content:
+            directory: ./internals/windows/zh-tw
+            language: zh-tw
+    - type: section
+      key: section-3
+      title: Android SO
+      path: android-so
+      icon: mobile-screen-button
+      children:
+        - type: space
+          key: space-5
+          title: English
+          path: en
+          default: true
+          content:
+            directory: ./internals/android-so/en
+            language: en
+        - type: space
+          key: space-8
+          title: 简体中文
+          path: zh-cn
+          content:
+            directory: ./internals/android-so/zh-cn
+            language: zh
+        - type: space
+          key: space-11
+          title: 繁體中文
+          path: zh-tw
+          content:
+            directory: ./internals/android-so/zh-tw
+            language: zh-tw
+    - type: section
+      key: section-2
+      title: Reference
+      path: reference
+      icon: code
+      children:
+        - type: space
+          key: space-3
+          title: English
+          path: en
+          default: true
+          content:
+            directory: ./reference/en
+            language: en
+        - type: space
+          key: space-4
+          title: 简体中文
+          path: zh-cn
+          content:
+            directory: ./reference/zh-cn
+            language: zh
+        - type: space
+          key: space-12
+          title: 繁體中文
+          path: zh-tw
+          content:
+            directory: ./reference/zh-tw
+            language: zh-tw
