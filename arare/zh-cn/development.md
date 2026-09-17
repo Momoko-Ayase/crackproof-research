@@ -63,4 +63,4 @@ dotnet run --project gui/Arare.Gui.SmokeTests -c Release --no-build
 - 当前实现不包括 Android 与 IL2CPP 元数据混淆。
 - 不要在提交中加入署名尾注。
 
-现行约定在 `docs/design/`。操作页面在 `docs/usage.md`、`docs/support.md`、`docs/format.md` 与 `docs/verification.md`。注明日期的评审与实现计划在 `docs/notes/`。
+现行约定在 `docs/design/`。注明日期的评审与实现计划在 `docs/notes/`。面向操作者的文档就是本 GitBook 栏目。

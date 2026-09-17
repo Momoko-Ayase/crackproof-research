@@ -63,4 +63,4 @@ A successful private decoder round trip is insufficient. Format integration must
 - Keep Android and IL2CPP metadata obfuscation out of the current implementation.
 - Do not add attribution trailers to commits.
 
-Living contracts live under `docs/design/`. Operator pages live at `docs/usage.md`, `docs/support.md`, `docs/format.md`, and `docs/verification.md`. Dated reviews and implementation plans live under `docs/notes/`.
+Living contracts live under `docs/design/`. Dated reviews and implementation plans live under `docs/notes/`. Operator documentation is this GitBook section.
