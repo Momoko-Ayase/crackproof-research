@@ -26,13 +26,13 @@ CrackProof® 是 HyperTech 开发的一系列商用二进制保护系统。本�
 
 当前研究范围包括 Windows PE 文件和 Android 原生库。两个平台使用不同的容器格式与恢复路径，因此分别编写内部机制文档。
 
-<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Windows 内部机制</strong></td><td>受保护 PE 布局、数据变换、分阶段加载、PE 重建与运行时行为。</td><td><a href="https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/">CrackProof for Windows 内部机制</a></td></tr><tr><td><strong>Android SO 内部机制</strong></td><td>受保护 AArch64 ELF 布局、模块流、容器解码、ELF 恢复与 IL2CPP 元数据。</td><td><a href="https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/">CrackProof for Android SO 内部机制</a></td></tr><tr><td><strong>验证与参考</strong></td><td>文中 Windows 数据变换的可执行测试向量与小型参考实现。</td><td><a href="https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/">验证与参考</a></td></tr><tr><td><strong>Senbei</strong></td><td>本项目面向受保护 Windows PE 文件与 Android 共享库的静态解包器：用法、设计与开发。</td><td><a href="https://app.gitbook.com/s/tMIkyJzuS8q10cZToDDD/">Senbei</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Windows 内部机制</strong></td><td>受保护 PE 布局、数据变换、分阶段加载、PE 重建与运行时行为。</td><td><a href="https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/">CrackProof for Windows 内部机制</a></td></tr><tr><td><strong>Android SO 内部机制</strong></td><td>受保护 AArch64 ELF 布局、模块流、容器解码、ELF 恢复与 IL2CPP 元数据。</td><td><a href="https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/">CrackProof for Android SO 内部机制</a></td></tr><tr><td><strong>验证与参考</strong></td><td>文中 Windows 数据变换的可执行测试向量与小型参考实现。</td><td><a href="https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/">验证与参考</a></td></tr><tr><td><strong>Senbei</strong></td><td>本项目面向受保护 Windows PE 文件与 Android 共享库的静态解包器：用法、设计与开发。</td><td><a href="https://app.gitbook.com/s/tMIkyJzuS8q10cZToDDD/">Senbei</a></td></tr><tr><td><strong>Arare</strong></td><td>本项目面向 Windows PE 的源码生成保护器：用法、图形界面、支持范围、设计与开发。</td><td><a href="https://app.gitbook.com/s/WU1t9Kr3H23IyrF4AqbS/">Arare</a></td></tr></tbody></table>
 
 ## 研究边界
 
 文档只描述可观察的结构与行为。名称来自二进制、日志、已有平台术语，或对字段作用的直白说明。只有经过多个样本验证，或能通过内部一致性约束证明的结论，才会写成格式行为。
 
-文档不记录受保护产品名称、部署专用驱动名和可识别样本的信息。研究页面不点名用于验证结论的实现项目；Senbei 栏目单独记录本项目自己的静态解包器。
+文档不记录受保护产品名称、部署专用驱动名和可识别样本的信息。研究页面不点名用于验证结论的实现项目；Senbei 与 Arare 栏目单独记录本项目自己的工具。
 
 ## 法律声明
 

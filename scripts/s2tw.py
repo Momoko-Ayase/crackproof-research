@@ -57,6 +57,7 @@ SPACE_ID_MAP: dict[str, str] = {
     "Aoyn9wKiHAVzBKGSUifa": "HezwIJwx0lhm5CUG7g8R",  # Android SO
     "L9bXLua8yrIPEUZOHO21": "2p7kzW649ZlKfmpYdJ87",  # Reference
     "tMIkyJzuS8q10cZToDDD": "v6LkixcUwwnaXW5PFCVE",  # Senbei
+    "WU1t9Kr3H23IyrF4AqbS": "7HowntiXDyzWEvoMUZzH",  # Arare
 }
 
 CONVERT_SUFFIXES = {".md"}
