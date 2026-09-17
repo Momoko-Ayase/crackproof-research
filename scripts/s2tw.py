@@ -47,6 +47,7 @@ PAIRS: tuple[tuple[str, str], ...] = (
     ("internals/android-so/zh-cn", "internals/android-so/zh-tw"),
     ("reference/zh-cn", "reference/zh-tw"),
     ("senbei/zh-cn", "senbei/zh-tw"),
+    ("arare/zh-cn", "arare/zh-tw"),
 )
 
 # zh-cn space ID -> zh-tw space ID. Keep in sync with AGENTS.md.

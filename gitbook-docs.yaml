@@ -145,3 +145,32 @@ site:
           content:
             directory: ./senbei/zh-tw
             language: zh-tw
+    - type: section
+      key: section-6
+      title: Arare
+      path: arare
+      description: ""
+      icon: shield-halved
+      children:
+        - type: space
+          key: space-16
+          title: English
+          path: en
+          default: true
+          content:
+            directory: ./arare/en
+            language: en
+        - type: space
+          key: space-17
+          title: 简体中文
+          path: zh-cn
+          content:
+            directory: ./arare/zh-cn
+            language: zh
+        - type: space
+          key: space-18
+          title: 繁體中文
+          path: zh-tw
+          content:
+            directory: ./arare/zh-tw
+            language: zh-tw
