@@ -137,6 +137,7 @@ A15
 Points of interest:
 
 * `A11`: the DLL host-process check, present only for protected DLLs.
+* `A15` follows the host-process check. It is a pure marker with no check body of its own: the host verification passed and the boot moved on to the decrypt prelude.
 * **No `640`/`840`:** this build is bulk-decrypted once (`610`) and never page-encrypted; compare the host EXE above. Page encryption is a per-module option.
 * `800` carries a single address: the freshly populated image region.
 

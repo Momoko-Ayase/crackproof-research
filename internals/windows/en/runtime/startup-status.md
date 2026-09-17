@@ -34,6 +34,7 @@ The loader reports progress as 12-bit **status codes**, roughly one per stage. T
 | `A01` | Abort if injected threads are found |
 | `A03` | Parent-process check (`cmd.exe` / `explorer.exe`) |
 | `A11` | For DLLs: check the host process (a `peC` section, or imports from `KeRnEl32.dLl`) |
+| `A15` | For DLLs: host-trust marker logged after `5D0`; carries no check of its own and only appears once the earlier check chain has passed |
 | `B00` | OS compatible-version check |
 | `B21` | Load `HtsyskNT.dll` (old driver path) |
 | `BD0` | Ensure `C:\Windows\msc.log.log` doesn't exist |
@@ -54,6 +55,8 @@ The loader reports progress as 12-bit **status codes**, roughly one per stage. T
 | `280` | Jump to the OEP |
 
 Observed sequences confirm features are per-module: in one title, the host EXE logs `640 … 840` (bulk decrypt, then page re-encryption), while a native plugin DLL in the same process goes from `610` (section decryption) straight to `655`, bulk-decrypted once, never page-encrypted.
+
+The `A`-series checks are not hard-wired into the stage walker. A single sequencer function drives them, and the walker calls it several times with different modes; each call runs only the subset of checks that the build's option flags select. A protected DLL is driven in its own mode. That is why a DLL log shows `A09` and `A11` before `5D0` and `A15` after it, while the host log for the same title shows `A09` `A0F` `A08` `A07` before `5D0` and `552` `570` after it.
 
 The `C00` line logs two dwords. Each is `0x01A0` plus a Windows build number: the first is the host build, the second is the minimum accepted build. Observed minima correspond to Windows 10.
 
