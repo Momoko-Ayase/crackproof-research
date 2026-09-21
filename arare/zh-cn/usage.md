@@ -4,7 +4,7 @@ description: "命令行保护、检查与验证：配置文件、检查项、页
 
 # 用法
 
-普通构建产出 `target/release/arare.exe`，不需要 Senbei 检出。托管打包需要另行构建的托管工具。生成相同命令行的 WPF 前端见 [图形界面](gui.md)。
+普通构建产出 `target/release/arare.exe`，不需要 Senbei 检出。托管打包需要另行构建的托管工具与 .NET 10 运行时。把三个托管工具文件放入 `arare.exe` 旁的 `managed/` 目录，或把 `ARARE_MANAGED_TOOLS` 设为这些文件所在的绝对目录；详见[开发](development.md)。生成相同命令行的 WPF 前端见[图形界面](gui.md)。
 
 ```text
 arare protect INPUT --output OUTPUT --profile PROFILE
@@ -33,9 +33,18 @@ arare verify INPUT --profile PROFILE [--companion PATH] [--json]
 
 ## 环境检查
 
-受保护模块在解密前运行 CrackProof 风格的环境检查。每一项记录其观察到的阶段码，失败时静默结束进程。
+受保护模块在启动期间运行可配置的环境检查。大多数检查在载荷重建前运行；可选的 E55/E91 设备检查在页密封后运行。检查失败时静默结束进程。启用日志时，调试日志会记录检查的阶段码。大多数阶段码遵循已观察到的 CrackProof 行为；`541` 是 Arare 自己的 Hyper-V 来宾策略。
 
-原生 EXE 使用较完整的已观察检查集。原生 DLL 启用 `crc-loader`、`vm-backdoor`、`vm-registry` 与 `host-process`。托管模块启用 `crc-loader` 与 `vm-registry`；托管 DLL 另外启用 `host-process`。因此两类 DLL 默认都需要兼容的受保护 EXE。
+默认启用的检查如下：
+
+| 模块 | 检查 |
+| --- | --- |
+| 原生 EXE | `antidebug`、`crc-loader`、`debug-port`、`os-version`、`boot-options`、`vm-registry`、`injected-dll`、`injected-thread`、`clean-code` |
+| 原生 DLL | `crc-loader`、`vm-registry`、`host-process` |
+| 托管 EXE | `crc-loader`、`vm-registry` |
+| 托管 DLL | `crc-loader`、`vm-registry`、`host-process` |
+
+其余检查默认关闭。因此两类 DLL 默认都需要兼容的受保护 EXE。`vm-backdoor`、`parent-process` 与 `hyperv-guest` 对所有模块类型都需要显式启用。
 
 `--check NAME=on|off` 切换单项检查。重复该标志以组合覆盖。
 
@@ -46,6 +55,7 @@ arare verify INPUT --profile PROFILE [--companion PATH] [--json]
 | `debug-port` | 520 |
 | `kernel-debugger` | 52F |
 | `vm-backdoor` | 540 |
+| `hyperv-guest` | 541（Arare 专用） |
 | `parent-process` | A03 |
 | `os-version` | C00 |
 | `boot-options` | C01 |
@@ -62,9 +72,17 @@ arare verify INPUT --profile PROFILE [--companion PATH] [--json]
 | `openark-device` | E55 |
 | `cheat-engine-device` | E91 |
 
-默认值按设计会产生误报。`parent-process` 拒绝除 `cmd.exe`/`explorer.exe` 以外的启动器。`vm-backdoor` 拒绝存在虚拟机监控程序的机器，包括 VBS/Hyper-V 主机。这类环境应关闭它们。
+`vm-backdoor` 仍需显式启用。`--check vm-backdoor=on` 探测 VMware 后门协议，并在收到匹配响应时拒绝运行。它允许 Hyper-V/VBS 环境；通用的 CPUID 虚拟机监控程序标志位不会触发拒绝。显式指定 `--check parent-process=on` 仍会拒绝除 `cmd.exe` 或 `explorer.exe` 以外的启动器。
 
-`host-process` 接受兼容的原生与托管 Arare EXE，包括不同打包种子。用 `--check host-process=off` 可在普通主机中加载受保护 DLL。可选戳记是协作式运行时兼容性检查，不是密码学认证。
+**强烈不建议启用：** `hyperv-guest` 是独立检查，对所有模块类型默认关闭。`--check hyperv-guest=on` 根据经校验的 `Hv#1` CPUID 分区权限拒绝报告为 Hyper-V 兼容来宾的环境。它允许主机/根分区（包括 VBS），也允许无法判断或信息不完整的环境。来宾检测依赖启发式判断，嵌套环境、信息屏蔽或伪造都可能绕过分类。这是兼容性限制，不能提供可靠保护。
+
+`vm-registry` 默认仍然启用。当 `Hv#1` 接口表明环境兼容 Hyper-V 时，该检查允许 `Virtual`、`VRTUAL` 与 `Microsoft Hyper-V` 这些通用注册表标记。其他虚拟机厂商的明确标记仍会触发拒绝。是否拒绝 Hyper-V 兼容来宾，由独立且需显式启用的 `hyperv-guest` 决定。
+
+已有受保护文件保留生成时使用的检查实现。要应用修订后的检查与默认值，使用更新后的构建重新保护原始输入。GUI 或命令脚本中保存的显式 `on` 覆盖仍然有效；对于不需要的可选限制，清除覆盖或将其设为 `off`。
+
+`host-process` 接受兼容的原生与托管 Arare EXE，包括不同打包种子。用 `--check host-process=off` 可在普通主机中加载受保护 DLL。`host-stamp` 只为已启用 `host-process` 的 DLL 增加校验。可选戳记是协作式运行时兼容性检查，不是密码学认证。
+
+启用 `disk-integrity` 会取代 `clean-code`，即使同时指定两者。两者都会把加载器调用路由到原始系统代码副本；`disk-integrity` 还会对照可信系统映像校验磁盘映像。
 
 `os-version`（C00）使用 Arare 的下限：Windows 10 内部版本 10240。一份已观察的商用样本使用 14251。
 
@@ -72,19 +90,19 @@ arare verify INPUT --profile PROFILE [--companion PATH] [--json]
 
 ## 页加密
 
-`--page-encrypt=on` 时，加载器在重建后把每个可执行应用程序页就地重新加密，并设为 `PAGE_NOACCESS`。stub 模块的处理程序在首次触及时解密该页。文件只携带描述符表，不携带密文。默认与已观察构建一致：主机 EXE 开启，DLL 关闭。
+`--page-encrypt=on` 时，加载器在重建后把可执行应用程序页就地重新加密，并设为 `PAGE_NOACCESS`。stub 模块的处理程序在首次触及时解密该页。页密文在运行时创建；文件载荷仍使用所选格式的编码。默认情况下主机 EXE 开启、DLL 关闭，与已观察到的配置一致。
 
 `--scribble=on` 在故障之间对驻留已解密页的选定字节做 XOR。它要求页加密，默认关闭。
 
-`--errlog=on` 在日志关闭时把结束码 `AAA-BBB-CCC` 报告到 `\\.\mailslot\ErrLog-Pec`。默认关闭。
+`--errlog=on` 尝试向 `\\.\mailslot\ErrLog-Pec<suffix>` 发送诊断报告，其中 `<suffix>` 是根据日志身份派生的四位十六进制数。报告包含时间戳、结束码 `AAA-BBB-CCC` 与模块路径；失败报告还可能包含已加载模块或 OS 详情。该通道独立于调试日志文件夹，默认关闭；只有匹配的邮件槽存在监听方时才能送达。
 
 含可写可执行节的输入需要 `--page-encrypt=off`。有效的默认开启与显式开启会在发布或替换任一输出之前拒绝它们。
 
 ## 调试日志
 
-在 `%TEMP%` 下创建该构建的 12 位十六进制文件夹以启用日志。其创建时间须在 48 小时内。运行时不会创建缺失的门控目录。
+`protect --json` 返回 `log_folder`，即模块自身的 12 位大写十六进制日志身份。在 `%TEMP%` 下创建该文件夹即可启用其日志。创建时间须在 48 小时内。运行时不会创建缺失的门控目录。
 
-DLL 跨打包种子继承其受保护 EXE 的门控与文件夹。主机门控缺失、过期或无效时，即使 DLL 自己的门控是新的，也会抑制 DLL 日志。没有受保护主机上下文时，DLL 使用自己的门控。
+DLL 跨打包种子继承其受保护 EXE 的门控与文件夹。主机门控缺失、过期或无效时，即使 DLL 自己的门控是新的，也会抑制 DLL 日志。没有受保护主机上下文时，DLL 使用自己的门控。使用受保护主机时，应采用 EXE 报告的 `log_folder`；DLL 报告的值标识其后备文件夹。
 
 主机校验与日志相互独立：`host-process=off` 不会关闭继承。EXE 使用 `HHMMSSmmmE-...` 文件名，DLL 使用 `HHMMSSmmmD-...`。
 

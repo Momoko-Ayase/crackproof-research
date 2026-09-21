@@ -21,7 +21,7 @@ The optional kernel provider has a separate build and validation boundary. It is
 
 Native IL2CPP PEs use the native rows. Standalone `global-metadata.dat` obfuscation is outside this implementation.
 
-Managed execution covers Framework 4.8 x86/x64, CoreCLR 10.0.12 x64, and Mono 6.13 x86 on applicable hosts. Assemblies that are pure IL with only the COR20 `ILONLY` bit clear — the Unity Mono-era shape — are accepted. Genuine C++/CLI mixed mode, ReadyToRun/AOT, strong names, and multi-module content are refused.
+Managed execution covers Framework 4.8 x86/x64, CoreCLR 10.0.12 x64, and Mono 6.13 x86 on applicable hosts. Pure-IL assemblies with only the COR20 `ILONLY` bit clear are accepted when they satisfy the restrictions below.
 
 ## Explicit refusals
 
@@ -30,5 +30,17 @@ Managed execution covers Framework 4.8 x86/x64, CoreCLR 10.0.12 x64, and Mono 6.
 - Exported data deliberately placed in an executable section.
 - Modern managed zero-import layouts whose unused RVA page `[0x1000,0x2000)` is occupied.
 - Writable executable sections when page encryption is effectively on.
+
+Managed packing also refuses:
+
+- Genuine C++/CLI mixed mode, native CLR entry points or fixups, ReadyToRun/AOT, and non-IL method implementations.
+- Strong-named or delay-signed assemblies, multi-module assemblies, and linked or exported module content.
+- Native exports, native exception/startup tables, TLS, load configuration tables, or delay imports.
+- Sections whose `VirtualSize` exceeds `SizeOfRawData`, pre-existing pointer or Edit-and-Continue metadata tables, and implemented CLI vararg methods.
+- Input types in the reserved `Arare.Managed` namespace.
+
+These are input constraints, not differences between the listed CLR hosts. Disabling an environment check doesn't enable an unsupported assembly layout.
+
+Managed preparation also limits metadata expansion to 524,288 added generic-padding TypeDefs. Signature parsing permits 128 type levels and 65,536 type elements per parsed return type. Inputs that exceed these work limits are rejected; the limits don't define a hard process-memory budget.
 
 Profiles describe observed structural families, not commercial cloud versions. Remaining commercial-fidelity gaps include host-directory admission, unidentified E-series objects, loaded-module integrity cadence, a verified commercial default matrix, and Windows 10 execution.

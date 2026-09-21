@@ -17,13 +17,20 @@ cargo build --release -p arare-cli
 
 ```powershell
 & tools/managed/build.ps1
+$env:ARARE_MANAGED_TOOLS = (Resolve-Path target/managed-tools).Path
 ```
+
+開發運行時，`ARARE_MANAGED_TOOLS` 必須是包含 `Arare.ManagedHost.dll`、`Arare.ManagedHost.runtimeconfig.json` 與 `Arare.Bootstrap.dll` 的絕對目錄。分發包也可把這三個文件放入 `arare.exe` 旁的 `managed/` 目錄。工具發現使用這些顯式位置。
 
 託管寫入器沒有 NuGet 依賴。構建後可創建本地二進制包：
 
 ```powershell
-& tools/package.ps1 -Architecture x64
+& tools/package.ps1 -Architecture x64 -IncludeGui
 ```
+
+CI 會上傳同樣的 `arare-windows-x64` 與 `arare-windows-x86` 包。
+
+運行打包後的圖形界面需要對應架構的 .NET 10 Desktop Runtime。託管打包需要 .NET 10 運行時；僅使用原生命令行不需要。
 
 ## 測試
 
@@ -36,14 +43,27 @@ cargo fmt --all -- --check
 cargo test --workspace --target i686-pc-windows-msvc
 ```
 
-把未改動的 `senbei/` 作為 `arare/` 的同級目錄，供 oracle crate 使用：
+把 `SENBEI_SOURCE` 設為未改動的 Senbei 源碼檢出所在的絕對路徑，然後使用 oracle 運行腳本：
+
+完整 oracle 執行還需要選定的 32 位 Mono 運行時。在啟動運行腳本前，把 `ARARE_MONO_X86` 設為已存在的運行時可執行文件的絕對路徑。運行 Mono 案例時才檢查此前提；未選擇或選擇無效會使該案例失敗，不會靜默跳過。
 
 ```powershell
-cargo test --manifest-path verification/senbei-oracle/Cargo.toml --release
-cargo test --manifest-path verification/senbei-oracle/Cargo.toml --release --target i686-pc-windows-msvc
+python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release
+python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release --target i686-pc-windows-msvc
 ```
 
-兩個 oracle 目標必須依次運行。它們的測試工具共享生成的產物位置。更改運行時 C 或 C# 之後重建託管工具。
+運行腳本解析選定源碼；如果尚未設置 `ARARE_MANAGED_TOOLS`，則在調用 Cargo 前補充該變量。兩個 oracle 目標必須依次運行，因為測試工具共享生成的產物位置。更改運行時 C 或 C# 之後重建託管工具。
+
+託管解析器與工具發現的專項檢查：
+
+```powershell
+python verification/managed/parser_tests.py
+cargo test -p arare-engine --lib managed::tool_discovery_tests
+```
+
+解析器檢查需要 .NET 10 SDK/參考包，並把生成的產物寫到 `target/managed-parser-tests/`。在從源碼目錄啟動託管執行或其 Cargo 測試前，應提供 `ARARE_MANAGED_TOOLS`。僅構建或保護原生文件不需要這些文件。
+
+託管夾具編譯會在配置的 `ARARE_DOTNET` 安裝中選擇最新且完整的正式版 .NET 10 SDK，按版本數字排序，並檢查 Roslyn 是否存在。如果該安裝中沒有合適的編譯器，會報告前提條件錯誤。
 
 圖形界面冒煙測試：
 

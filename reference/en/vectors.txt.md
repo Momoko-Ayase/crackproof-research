@@ -1,10 +1,10 @@
 ---
-description: "The 32 ground-truth vectors printed by the reference port, which run_tests.py compares against."
+description: "The 25 named reference records used by the Python comparison checks."
 ---
 
 # vectors.txt
 
-The expected outputs the harness compares against. Each line is `name hex-value`; the first two lines are the standard CRC-32 known answer (`crc32(b"123456789") == 0xCBF43926`) and its chained form, a cheap cross-check independent of the rest.
+The 25 named records used by the comparison checks. Each line contains a name and one or more values; not every record is a single hexadecimal number. The first two records are the standard CRC-32 known answer (`crc32(b"123456789") == 0xCBF43926`) and its chained form, which provide a check independent of the other transforms.
 
 ```
 crc32_123456789 cbf43926

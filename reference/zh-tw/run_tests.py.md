@@ -1,16 +1,17 @@
 ---
-description: "比對工具：用 Python 重放每個場景，並與參考向量逐字節比對。"
+description: "對照固定向量與已知答案，比對 Windows Python 參考實現。"
 ---
 
 # run\_tests.py
 
-這是比對工具：它用與參考移植相同的 LCG 序列重新生成每個輸入，運行全部 Python 實現，並將輸出與 `vectors.txt` 對照。以 `python run_tests.py` 運行。預期輸出：`all vectors match`。
+比對工具使用參考移植的 LCG 序列重新生成輸入，對照 `vectors.txt` 與已知答案運行 31 項比對。把參考 Python 文件與向量放在一起，然後運行 `python run_tests.py`；在文檔倉庫根目錄使用 `python verification/run_tests.py`。腳本從自身所在目錄定位向量文件。預期結束輸出：`all vectors match`。
 
 ```python
-"""Cross-check every Python snippet against the vectors printed by the
-verbatim Rust port (rust_vectors.rs -> vectors.txt). Exit 0 = all match."""
+"""Compare the Windows Python reference implementations with the checked-in
+vectors from rust_vectors.rs. Exit 0 means all configured comparisons match."""
 
 import sys
+from pathlib import Path
 
 import primitives as P
 import aes_impl
@@ -31,7 +32,7 @@ def lcg_factory(seed=0x12345678):
 
 def load_vectors(path):
     out = {}
-    for line in open(path):
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
         parts = line.split()
         if parts:
             out[parts[0]] = parts[1:]
@@ -54,7 +55,7 @@ def check(name, got, want):
 
 
 def main():
-    v = load_vectors("vectors.txt")
+    v = load_vectors(Path(__file__).resolve().with_name("vectors.txt"))
     lcg = lcg_factory()
 
     # --- crc32 (also cross-check against the zlib standard CRC) ---

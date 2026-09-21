@@ -1,7 +1,8 @@
-"""Cross-check every Python snippet against the vectors printed by the
-verbatim Rust port (rust_vectors.rs -> vectors.txt). Exit 0 = all match."""
+"""Compare the Windows Python reference implementations with the checked-in
+vectors from rust_vectors.rs. Exit 0 means all configured comparisons match."""
 
 import sys
+from pathlib import Path
 
 import primitives as P
 import aes_impl
@@ -22,7 +23,7 @@ def lcg_factory(seed=0x12345678):
 
 def load_vectors(path):
     out = {}
-    for line in open(path):
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
         parts = line.split()
         if parts:
             out[parts[0]] = parts[1:]
@@ -45,7 +46,7 @@ def check(name, got, want):
 
 
 def main():
-    v = load_vectors("vectors.txt")
+    v = load_vectors(Path(__file__).resolve().with_name("vectors.txt"))
     lcg = lcg_factory()
 
     # --- crc32 (also cross-check against the zlib standard CRC) ---

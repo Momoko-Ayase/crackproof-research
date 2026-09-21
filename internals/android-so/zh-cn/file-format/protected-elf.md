@@ -32,4 +32,4 @@ description: "用于识别受保护 Android 库的 ELF 属性和私有节条件�
 
 同一 APK 里常常还有第二个原生库，文件名形如 `lib__XXXX__.so`（XXXX 是短构建戳），以及约 180 KiB、高熵的 `assets/<id>/data1.dat`。
 
-这些文件属于保护方案，不属于恢复后的 ELF。具名库是第一/二阶段桩的第二份拷贝，`data1.dat` 保存一张小记录表（库名与按库配置）。二者都不能替代[必需的 ELF 形状](#required-elf-shape)中的 `SHT_LOUSER` 检查。
+这些文件属于保护方案，不属于恢复后的 ELF。具名库是第一/二阶段桩的第二份拷贝，`data1.dat` 保存一张小记录表（库名与按库配置）。二者都不能替代[必需的 ELF 形状](#必需的-elf-形状)中的 `SHT_LOUSER` 检查。

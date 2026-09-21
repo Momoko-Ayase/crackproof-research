@@ -17,13 +17,20 @@ Both native loader architectures are compiled from source during the build. Mana
 
 ```powershell
 & tools/managed/build.ps1
+$env:ARARE_MANAGED_TOOLS = (Resolve-Path target/managed-tools).Path
 ```
+
+For development runs, `ARARE_MANAGED_TOOLS` must be an absolute directory containing `Arare.ManagedHost.dll`, `Arare.ManagedHost.runtimeconfig.json`, and `Arare.Bootstrap.dll`. A distribution can instead place those three files in `managed/` beside `arare.exe`. Tool discovery uses these explicit locations.
 
 The managed writer has no NuGet dependencies. Create a local binary package after building:
 
 ```powershell
-& tools/package.ps1 -Architecture x64
+& tools/package.ps1 -Architecture x64 -IncludeGui
 ```
+
+CI uploads the same `arare-windows-x64` and `arare-windows-x86` packages.
+
+Running the packaged GUI needs the matching .NET 10 Desktop Runtime. Managed packing needs the .NET 10 runtime; native-only CLI use doesn't.
 
 ## Testing
 
@@ -36,14 +43,27 @@ cargo fmt --all -- --check
 cargo test --workspace --target i686-pc-windows-msvc
 ```
 
-Keep unchanged `senbei/` as a sibling of `arare/` for the oracle crate:
+Set `SENBEI_SOURCE` to the absolute path of an unchanged Senbei source checkout, then use the oracle runner:
+
+Full oracle execution also needs a selected 32-bit Mono runtime. Set `ARARE_MONO_X86` to its existing absolute executable path before starting the runner. This prerequisite is checked when a Mono case runs; missing or invalid selection fails that case rather than skipping it.
 
 ```powershell
-cargo test --manifest-path verification/senbei-oracle/Cargo.toml --release
-cargo test --manifest-path verification/senbei-oracle/Cargo.toml --release --target i686-pc-windows-msvc
+python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release
+python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release --target i686-pc-windows-msvc
 ```
 
-Run the two oracle targets sequentially. Their harnesses share generated artifact locations. Rebuild managed tools after runtime C or C# changes.
+The runner resolves the selected source and supplies `ARARE_MANAGED_TOOLS` when the variable is absent before invoking Cargo. Run the two oracle targets sequentially because their harnesses share generated artifact locations. Rebuild managed tools after runtime C or C# changes.
+
+Focused managed parser and tool-discovery checks:
+
+```powershell
+python verification/managed/parser_tests.py
+cargo test -p arare-engine --lib managed::tool_discovery_tests
+```
+
+The parser checks need the .NET 10 SDK/reference pack and write generated artifacts under `target/managed-parser-tests/`. Supply `ARARE_MANAGED_TOOLS` before launching source-tree managed execution or its Cargo tests. Native-only builds and protection don't need these files.
+
+Managed fixture compilation selects the newest complete release .NET 10 SDK in the configured `ARARE_DOTNET` installation, using numeric version ordering and checking that Roslyn is present. It reports a prerequisite error when that installation has no suitable compiler.
 
 GUI smoke tests:
 

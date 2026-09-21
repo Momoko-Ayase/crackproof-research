@@ -6,12 +6,12 @@ description: "Decode and validate the fixed-size outer header before reading the
 
 The private `SHT_LOUSER` section isn't a single blob. Observed layout:
 
-```
-[0x23C-byte outer wrapper]
-[0x1000-byte encrypted parameter area; only the first 32 bytes are the word header]
-[encrypted stage 2 image]
-[remaining record streams]
-```
+| Order | Content |
+| --- | --- |
+| 1 | Outer wrapper (`0x23C` bytes) |
+| 2 | Encrypted parameter area (`0x1000` bytes); only the first 32 bytes form the word header |
+| 3 | Encrypted stage 2 image |
+| 4 | Remaining record streams |
 
 The observed default wrapper size is `0x23c` bytes (572 decimal). Two word-transform constants have been observed: `0xbf20165d` and `0xbf189bdd`. Each family uses one of them. Read the size and the constant from the private section when a build supplies a different value; the defaults are recognition clues, not universal assumptions.
 

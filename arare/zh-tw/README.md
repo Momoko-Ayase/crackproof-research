@@ -8,7 +8,7 @@ Arare 是源碼生成的 Windows PE 保護器。它自行生成加載器、密�
 
 原生保護覆蓋 x86 EXE/DLL 與 x64 EXE/DLL，對應 PE32、經典 PE32+、現代 PE32+ 與遺留 DLL 族。託管保護使用可讀的 IL 入口包裝與獨立的原生解碼器。兼容性對照未改動的 Senbei 檢查，並通過執行生成的原始、受保護與恢復後的程序驗證。不以商用字節一致為目標。
 
-目標平臺是 Windows 10 與 Windows 11。當前執行證據來自 Windows 11 內部版本 26100。運行時行為跟隨已觀察的 CrackProof 流水線：按構建門控的調試日誌（使用原始狀態碼）、可配置的環境與反分析檢查（由手動映射的支持模塊運行）、按需解密的頁加密、由種子決定的加載器代碼變化，以及用盡後的運行時元數據擦除。檢查失敗時以 `AAA-BBB-CCC` 失敗碼靜默結束。
+目標平臺是 Windows 10 與 Windows 11。當前執行證據來自 Windows 11 內部版本 26100。運行時行為跟隨已觀察的 CrackProof 流水線：按構建門控的調試日誌、由手動映射的支持模塊運行的可配置環境與反分析檢查、按需解密的頁加密、由種子決定的加載器代碼變化，以及用盡後的運行時元數據擦除。日誌使用已觀察到的狀態碼與明確的 Arare 擴展，包括可選的 `541` Hyper-V 來賓策略。檢查失敗時以 `AAA-BBB-CCC` 失敗碼靜默結束。這些共同機制不能證明商用檢查或頁密碼完全相同；詳見[設計](design.md)。
 
 這些輸出所對應的保護格式與運行時行為記錄在 [CrackProof Windows 內部機制](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/)。本項目的靜態解包器 Senbei 記錄在 [Senbei](https://app.gitbook.com/s/v6LkixcUwwnaXW5PFCVE/)。
 

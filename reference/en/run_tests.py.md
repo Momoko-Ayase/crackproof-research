@@ -1,16 +1,17 @@
 ---
-description: "The comparison harness: replays every scenario in Python and compares byte-for-byte with the reference vectors."
+description: "Compares the Windows Python reference implementations with fixed vectors and known answers."
 ---
 
 # run\_tests.py
 
-The comparison harness that regenerates every input with the same LCG sequence as the reference port, runs all Python implementations, and diffs the outputs against `vectors.txt`. Run it with `python run_tests.py`. Expected output: `all vectors match`.
+The harness regenerates inputs with the reference port's LCG sequence and runs 31 comparisons against `vectors.txt` and known answers. Save the reference Python files and vectors together, then run `python run_tests.py`. From the documentation repository root, use `python verification/run_tests.py`. The vector path is resolved beside the script. Expected final output: `all vectors match`.
 
 ```python
-"""Cross-check every Python snippet against the vectors printed by the
-verbatim Rust port (rust_vectors.rs -> vectors.txt). Exit 0 = all match."""
+"""Compare the Windows Python reference implementations with the checked-in
+vectors from rust_vectors.rs. Exit 0 means all configured comparisons match."""
 
 import sys
+from pathlib import Path
 
 import primitives as P
 import aes_impl
@@ -31,7 +32,7 @@ def lcg_factory(seed=0x12345678):
 
 def load_vectors(path):
     out = {}
-    for line in open(path):
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
         parts = line.split()
         if parts:
             out[parts[0]] = parts[1:]
@@ -54,7 +55,7 @@ def check(name, got, want):
 
 
 def main():
-    v = load_vectors("vectors.txt")
+    v = load_vectors(Path(__file__).resolve().with_name("vectors.txt"))
     lcg = lcg_factory()
 
     # --- crc32 (also cross-check against the zlib standard CRC) ---

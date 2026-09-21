@@ -4,7 +4,7 @@ description: "識別受支持的 IL2CPP 元數據版本，並還原各 image 的
 
 # 方法令牌
 
-已識別的 IL2CPP 元數據魔數是 `0xFAB11BAF`。受支持的佈局為版本 29、31 與 39，三者共享[五輪逆變換](#five-inverse-rounds)介紹的帶種子五輪 RID 置換。MethodDef 令牌高字節為表號 `0x06`，低 24 位是行標識。
+已識別的 IL2CPP 元數據魔數是 `0xFAB11BAF`。受支持的佈局為版本 29、31 與 39，三者共享[五輪逆變換](#五輪逆變換)介紹的帶種子五輪 RID 置換。MethodDef 令牌高字節為表號 `0x06`，低 24 位是行標識。
 
 這不是 Windows 的 `-GMD` 重映射。Windows 把每個令牌換成僅由表格順序得到的連續值 `0x06000000 | (local_index + 1)`。Android 路徑是對每個 image 方法塊內部 RID 做帶種子的五輪置換。Windows 規則見 [il2cpp 元數據混淆](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/analysis/il2cpp-metadata)。
 
