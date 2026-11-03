@@ -31,6 +31,10 @@ Folder mode walks recursively, skips directories named `unpack`, and mirrors rec
 
 Managed DLL companions retain CLR metadata and related runtime tables in the original DLL. Both the DLL and its matching `._` file must be available; Senbei restores the declared CLR regions from the DLL while retaining method bodies decrypted from the companion. Missing or unreadable referenced regions are reported as errors.
 
+`Companion missing?` means Senbei recognized a PE32+ loader entry record that explicitly declares the `._` suffix, but no companion was supplied. Put `<input>._` beside the input, keeping the complete filename (for example, `module.dll._`), or add both files in the browser. This check validates the PE structure, protection signature, and entry record; it doesn't prove that every part of the stub is intact. File size, hollow sections, and unpack failures alone don't trigger this hint. Damaged or unrecognized entry records keep the original unpack error.
+
+If a supplied companion is too short to contain the 32-byte pairing header or its header differs from the recognized loader's, Senbei reports `Companion doesn't match`. Use both files from the same build; either file may be damaged. A companion that can't be read produces a file-read error. A matching header followed by a decryption failure keeps the original unpack error.
+
 The summary has the form `12 unpacked · 3 skipped · 0 errors · 1 suspect · 2 metadata`; the package count is appended when packages were opened. Each file is isolated, so one failed target doesn't stop the folder run.
 
 ## Integrity check
