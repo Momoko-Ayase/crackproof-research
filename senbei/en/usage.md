@@ -5,7 +5,7 @@ description: "Command-line usage: file, package, and folder targets, flags, and 
 # Usage
 
 ```text
-senbei <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]... [--scan-all] [--strict-integrity] [--no-log] [--no-pause] [-V|--version] [-h|--help]
+senbei <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]... [--scan-all] [--strict-integrity] [--max-entry-mib N] [--max-total-mib N] [--max-entries N] [--max-depth N] [--no-log] [--no-pause] [-V|--version] [-h|--help]
 ```
 
 ## Single file
@@ -53,6 +53,10 @@ A clean report isn't a proof of correctness, but a non-clean report is a reliabl
 | `--no-log` | Don't write a run log. |
 | `--scan-all` | Probe every selected target-name candidate, including files too small for the default scan to open. |
 | `--strict-integrity` | Not in a released build yet. Exit non-zero when any output fails the static integrity check (a suspect) or a file errors. Off by default: a suspect is still written and the process exits `0` unless a file errors. Repeat `-q` is unchanged. |
+| `--max-entry-mib N` | Not in a released build yet. Android only. Positive MiB ceiling for one ZIP entry during decompression, one decoded buffer, one artifact read, and one output file. Default `2048` (1 MiB = 1,048,576 bytes). |
+| `--max-total-mib N` | Not in a released build yet. Android only. Positive MiB ceiling for cumulative archive bytes across a folder, plus separately accounted extraction and restoration work inside one engine task. Default `8192`. This is not a peak-memory cap. |
+| `--max-entries N` | Not in a released build yet. Android only. Positive ceiling for archive entries and stage-2 records, counted across nested archives. Default `100000`. |
+| `--max-depth N` | Not in a released build yet. Android only. Nesting ceiling for nested APKs and stage-2 streams. The root is depth `0`, and `0` is allowed. Default `32`. |
 | `--no-pause` | Disable the Explorer-friendly Windows exit prompt. |
 | `-V`, `--version` | Print the version and exit. |
 | `-h`, `--help` | Show usage. |
@@ -62,5 +66,5 @@ A clean report isn't a proof of correctness, but a non-clean report is a reliabl
 | Code | Meaning |
 | --- | --- |
 | `0` | The requested restore completed without errors. A suspect output still exits `0` unless `--strict-integrity` is set. |
-| `1` | A target failed, a scan probe was unreadable, or a single-file restore errored. With `--strict-integrity` (not released yet), any suspect output also exits `1`. Outputs are still written. |
-| `2` | The command line was rejected. |
+| `1` | A target failed, a scan probe was unreadable, or a single-file restore errored. With `--strict-integrity` (not released yet), any suspect output also exits `1`. Outputs are still written. An Android resource limit that is exceeded also exits `1`; Senbei doesn't silently truncate that work. |
+| `2` | The command line was rejected. A resource-limit value that isn't an unsigned decimal integer is a command-line error, as is `0` for every limit except `--max-depth`. |
