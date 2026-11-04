@@ -5,7 +5,7 @@ description: "Command-line usage: file, package, and folder targets, flags, and 
 # Usage
 
 ```text
-senbei <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]... [--scan-all] [--no-log] [--no-pause] [-V|--version] [-h|--help]
+senbei <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]... [--scan-all] [--strict-integrity] [--no-log] [--no-pause] [-V|--version] [-h|--help]
 ```
 
 ## Single file
@@ -41,7 +41,7 @@ The summary has the form `12 unpacked · 3 skipped · 0 errors · 1 suspect · 2
 
 Senbei checks PE outputs for valid headers, section ranges, entry-point mapping, readable import names, relocation requirements, and managed metadata signatures. It validates Android outputs during ELF restoration, including decoded container sizes, fixup bounds, and rebuilt dynamic tables.
 
-A clean report isn't a proof of correctness, but a non-clean report is a reliable broken-output signal. Suspect PE files are still written and counted separately.
+A clean report isn't a proof of correctness, but a non-clean report is a reliable broken-output signal. Suspect PE files are still written and counted separately. `--strict-integrity` doesn't change that write; it only changes the process exit code.
 
 ## Flags
 
@@ -52,6 +52,7 @@ A clean report isn't a proof of correctness, but a non-clean report is a reliabl
 | `-q`, `--quiet` | Hide progress and per-file lines; repeat to suppress all standard output. |
 | `--no-log` | Don't write a run log. |
 | `--scan-all` | Probe every selected target-name candidate, including files too small for the default scan to open. |
+| `--strict-integrity` | Not in a released build yet. Exit non-zero when any output fails the static integrity check (a suspect) or a file errors. Off by default: a suspect is still written and the process exits `0` unless a file errors. Repeat `-q` is unchanged. |
 | `--no-pause` | Disable the Explorer-friendly Windows exit prompt. |
 | `-V`, `--version` | Print the version and exit. |
 | `-h`, `--help` | Show usage. |
@@ -60,6 +61,6 @@ A clean report isn't a proof of correctness, but a non-clean report is a reliabl
 
 | Code | Meaning |
 | --- | --- |
-| `0` | The requested restore completed without errors. |
-| `1` | A target failed, a scan probe was unreadable, or a single-file restore errored. |
+| `0` | The requested restore completed without errors. A suspect output still exits `0` unless `--strict-integrity` is set. |
+| `1` | A target failed, a scan probe was unreadable, or a single-file restore errored. With `--strict-integrity` (not released yet), any suspect output also exits `1`. Outputs are still written. |
 | `2` | The command line was rejected. |
