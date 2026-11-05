@@ -25,14 +25,20 @@ For `global-metadata.dat`, Senbei writes `global-metadata.unpack.dat` only when 
 The following commands are development features and aren't in a released build yet. The original `senbei PATH` form still restores files; `senbei unpack PATH` is an alias.
 
 ```cmd
+senbei inspect module.dll
 senbei inspect module.dll --json
+senbei inspect module.dll --strict-integrity --json
 senbei unpack module.dll --dry-run --json
 senbei unpack module.dll --json --strict-integrity --no-pause
 ```
 
-`inspect` reports observed format and protection evidence without restoring images or writing output files or logs. Recognition doesn't establish that an input can be recovered. A metadata signature identifies IL2CPP data, not protection; a known header version doesn't validate its table layout.
+`inspect` is the research-oriented command. It reports source hashes, parsed format structures, decoded protection headers, candidate reasoning, discovered stage parameters, and structural checks. It runs the static recovery pipeline where needed to obtain that evidence, then discards recovered images instead of writing normal outputs or logs. It never executes the target. Ordinary file scanning still uses lightweight detection; inspection deliberately prioritizes detail over minimum processing time.
 
-`--dry-run` exercises the normal restoration and validation paths in a temporary workspace without retaining outputs or logs. Senbei removes the workspace when the run ends. `--dry-run` can't be combined with `--out`. Inspection also rejects `--out`, `--dry-run`, and `--strict-integrity` because it doesn't recover or validate an output.
+For Windows inputs, the report distinguishes the physical source, a companion-spliced analysis view when used, and the recovered image. It shows section ranges and permissions, data-directory mappings, unsectioned file regions, payload declarations, and actual discovery events with file-offset or working-image-RVA provenance. Header flags are declarations, not runtime guarantees. Probe limits and unavailable prerequisites are reported explicitly; a rejected candidate remains visible even when a later route succeeds.
+
+Recognition doesn't establish that recovery succeeds. A metadata signature identifies IL2CPP data, not protection; a known header version doesn't validate its table layout. The research report preserves recovery failures as findings rather than replacing them with an unexplained unrecognized verdict. A successful inspection exit means the input was examined, not that recovery succeeded. Unreadable inputs and infrastructure failures still fail the command; `--strict-integrity` additionally checks any actual recovered-image verdict.
+
+`--dry-run` checks the normal restoration and validation paths without retaining outputs or logs; it doesn't request the richer research trace. Senbei removes any temporary workspace when the run ends. `--dry-run` can't be combined with `--out`. Inspection also rejects `--out` and `--dry-run`, because discarding outputs is already part of inspection. `inspect --strict-integrity` can fail the command when an image actually recovered for inspection has a suspect integrity result.
 
 `--json` writes a versioned machine-readable report to standard output instead of the banner, progress, and human-readable summary. An explicit JSON request still emits the report with `-q`; it disables run logs and the exit prompt. It records available profiles, actual stage outcomes, candidate attempts, diagnostics, and pairing provenance. Unattempted stages aren't marked successful. Static checks don't establish runtime loadability or complete analysis-tool coverage. Reports can contain local paths and content hashes; review them before sharing.
 
