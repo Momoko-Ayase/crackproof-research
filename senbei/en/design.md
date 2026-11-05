@@ -40,6 +40,14 @@ senbei-wasm/src/
 
 `senbei-pe` and `senbei-elf` own validated format models, address mapping, and ELF dynamic hash helpers. They don't depend on the unpacking engines, filesystem code, or platform protection logic.
 
+## Protection profiles
+
+The development tree's shared `senbei-engine/src/profile.rs` model records observed format, protection evidence, candidate attempts, the selected route, recovery status, and final static-validation status. Its `format_version` describes the report schema, not a protector build. Detection doesn't replace trial-and-validate or assign a CrackProof version from an unverified fingerprint.
+
+Inspection leaves recovery and validation unattempted. A recovery report retains rejected candidates and their errors even if a later route succeeds. Companion preparation can block recovery before a candidate runs; post-overlay validation describes the returned image rather than the earlier candidate. Static validation doesn't claim that Windows or the Android linker has loaded the image successfully.
+
+Metadata layout definitions live in `senbei-metadata/src/layout.rs`, separate from restoration algorithms. Header identification reports a raw version and implemented capabilities. `known` means that a layout definition exists, not that the input's tables passed validation. Version 24 still needs its owning app's module `0x0C` and layout validation; the raw version alone doesn't identify v24.1. Seeded method-token restoration supports the existing v29, v31, and compact v39 paths, while structural restoration remains v31-only. Unknown versions retain their numeric tag without claiming recovery support.
+
 ## Windows engine
 
 `senbei-engine/src/windows/` contains PE detection, layout discovery, EXE and DLL restoration, deterministic block parallelism, and structural integrity checks. Candidate layouts are trial-decrypted and validated before an output is accepted.

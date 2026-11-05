@@ -5,7 +5,8 @@ description: "命令行用法：文件、包與文件夾目標，標誌與退出
 # 用法
 
 ```text
-senbei <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]... [--scan-all] [--strict-integrity] [--max-entry-mib N] [--max-total-mib N] [--max-entries N] [--max-depth N] [--no-log] [--no-pause] [-V|--version] [-h|--help]
+senbei [unpack] <file|folder> [options]
+senbei inspect <file|folder> [--json] [options]
 ```
 
 ## 單個文件
@@ -17,7 +18,23 @@ senbei app.exe
 senbei app.exe --out C:\out
 ```
 
-對於 `global-metadata.dat`，只有方法令牌發生變化時 Senbei 才寫出 `global-metadata.unpack.dat`。不支持的元數據版本保持原樣，並報告為跳過。
+對於 `global-metadata.dat`，只有方法字段發生變化時 Senbei 才寫出 `global-metadata.unpack.dat`。不支持的版本保持原樣。文件夾運行報告為跳過；直接恢復單個文件時報告為錯誤。
+
+## 檢查與 JSON 報告
+
+以下命令屬於開發中功能，尚未進入已發佈構建。原有的 `senbei PATH` 形式仍用於恢復文件；`senbei unpack PATH` 是它的別名。
+
+```cmd
+senbei inspect module.dll --json
+senbei unpack module.dll --dry-run --json
+senbei unpack module.dll --json --strict-integrity --no-pause
+```
+
+`inspect` 報告觀察到的格式與保護證據，不恢復映像，也不寫出輸出文件或日誌。識別成功不代表能夠恢復該輸入。元數據簽名只能說明數據屬於 IL2CPP，不能說明存在保護；已知頭部版本也不代表表佈局已通過驗證。
+
+`--dry-run` 在臨時工作區執行正常的恢復與驗證流程，但不保留輸出或日誌。Senbei 會在運行結束時移除該工作區。`--dry-run` 不能與 `--out` 一起使用。檢查模式也拒絕 `--out`、`--dry-run` 與 `--strict-integrity`，因為它不會恢復或驗證輸出。
+
+`--json` 向標準輸出寫入帶格式版本的機器可讀報告，替代橫幅、進度與人類可讀彙總。明確請求 JSON 時，即使帶有 `-q` 也仍會輸出報告，並關閉運行日誌與退出提示。報告記錄可用的 profile、實際階段狀態、候選嘗試、診斷與配對來源。未嘗試的階段不會標為成功。靜態檢查不能證明運行時可加載，也不能證明分析工具能完整識別內容。報告可能包含本地路徑與內容哈希；分享前請檢查。
 
 ## Android 目標
 
@@ -41,13 +58,24 @@ Senbei 從加密載荷節恢復受保護的 `.so` 文件，寫出為 `libil2cpp.
 
 PE 輸出會檢查有效頭部、節範圍、入口點映射、可讀導入名、重定位需求與託管元數據簽名。Android 輸出在 ELF 恢復過程中驗證，包括解碼後的容器大小、修復表邊界與重建的動態表。
 
-乾淨的報告不是正確性證明，但未通過的報告可以可靠地說明輸出已損壞。可疑 PE 文件仍會寫出並單獨計數。`--strict-integrity` 不改變這一寫出行為，只改變進程退出碼。
+乾淨的報告不是正確性證明。報告區分錯誤與警告：警告需要檢查，但不一定表示加載器會拒絕文件。新增的結構診斷不會改變現有 DLL 佈局選擇的接受條件。可疑 PE 文件仍會寫出並單獨計數。`--strict-integrity` 不改變這一寫出行為，只改變進程退出碼。
+
+## 瀏覽器報告與輸入上限
+
+開發版瀏覽器前端在恢復前顯示僅來自頭部的 profile 信息，在恢復後顯示實際恢復與完整性結果。**Export JSON** 在本地下載報告，包含失敗與因上限而未嘗試的輸入。元數據變換也在一次性 worker 中運行；其報告不會聲稱執行了獨立的 PE/ELF 完整性檢查。
+
+**Input limit per module (MiB)** 默認為 `256`，允許的範圍是 `8` 至 `4096`。瀏覽器在讀取完整內容前，把主模塊與匹配的 `._` 伴生文件一起計入預算；暫存階段只讀取一小段頭部。這不是內存峰值上限。輸入、輸出映像與臨時緩衝區可能同時駐留，已完成的輸出也會保留以供下載。多個大文件請分開處理，並清除已完成的條目。提高輸入上限不保證文件能放入瀏覽器內存。
+
+Android ELF 與包恢復仍需要原生 CLI。瀏覽器不會上傳輸入或報告。
 
 ## 標誌
 
 | 標誌 | 行為 |
 | --- | --- |
-| `--out DIR` | 把輸出與日誌寫到 `DIR` 下。 |
+| `--out DIR` | 正常恢復時把輸出與日誌寫到 `DIR` 下。 |
+| `--dry-run` | 開發中功能。執行恢復，但不保留輸出或日誌。 |
+| `--json` | 開發中功能。寫出結構化報告，替代人類可讀標準輸出。 |
+| `--threads N` | 開發中功能。為本次運行設置正整數工作線程上限，優先於 `SENBEI_THREADS`。`1` 選擇串行處理。 |
 | `-v`, `--verbose` | 打印各階段進度。 |
 | `-q`, `--quiet` | 隱藏進度與逐文件行；重複使用可抑制全部標準輸出。 |
 | `--no-log` | 不寫運行日誌。 |

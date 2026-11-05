@@ -5,7 +5,8 @@ description: "Command-line usage: file, package, and folder targets, flags, and 
 # Usage
 
 ```text
-senbei <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]... [--scan-all] [--strict-integrity] [--max-entry-mib N] [--max-total-mib N] [--max-entries N] [--max-depth N] [--no-log] [--no-pause] [-V|--version] [-h|--help]
+senbei [unpack] <file|folder> [options]
+senbei inspect <file|folder> [--json] [options]
 ```
 
 ## Single file
@@ -17,7 +18,23 @@ senbei app.exe
 senbei app.exe --out C:\out
 ```
 
-For `global-metadata.dat`, Senbei writes `global-metadata.unpack.dat` only when method tokens change. Unsupported metadata versions stay untouched and are reported as skipped.
+For `global-metadata.dat`, Senbei writes `global-metadata.unpack.dat` only when method fields change. Unsupported versions stay untouched. Folder runs report them as skipped; a direct-file restore reports an error.
+
+## Inspection and JSON reports
+
+The following commands are development features and aren't in a released build yet. The original `senbei PATH` form still restores files; `senbei unpack PATH` is an alias.
+
+```cmd
+senbei inspect module.dll --json
+senbei unpack module.dll --dry-run --json
+senbei unpack module.dll --json --strict-integrity --no-pause
+```
+
+`inspect` reports observed format and protection evidence without restoring images or writing output files or logs. Recognition doesn't establish that an input can be recovered. A metadata signature identifies IL2CPP data, not protection; a known header version doesn't validate its table layout.
+
+`--dry-run` exercises the normal restoration and validation paths in a temporary workspace without retaining outputs or logs. Senbei removes the workspace when the run ends. `--dry-run` can't be combined with `--out`. Inspection also rejects `--out`, `--dry-run`, and `--strict-integrity` because it doesn't recover or validate an output.
+
+`--json` writes a versioned machine-readable report to standard output instead of the banner, progress, and human-readable summary. An explicit JSON request still emits the report with `-q`; it disables run logs and the exit prompt. It records available profiles, actual stage outcomes, candidate attempts, diagnostics, and pairing provenance. Unattempted stages aren't marked successful. Static checks don't establish runtime loadability or complete analysis-tool coverage. Reports can contain local paths and content hashes; review them before sharing.
 
 ## Android targets
 
@@ -41,13 +58,24 @@ The summary has the form `12 unpacked · 3 skipped · 0 errors · 1 suspect · 2
 
 Senbei checks PE outputs for valid headers, section ranges, entry-point mapping, readable import names, relocation requirements, and managed metadata signatures. It validates Android outputs during ELF restoration, including decoded container sizes, fixup bounds, and rebuilt dynamic tables.
 
-A clean report isn't a proof of correctness, but a non-clean report is a reliable broken-output signal. Suspect PE files are still written and counted separately. `--strict-integrity` doesn't change that write; it only changes the process exit code.
+A clean report isn't a proof of correctness. Reports distinguish errors from warnings: a warning needs investigation, but doesn't necessarily mean that the loader rejects the file. New structural diagnostics don't change the existing DLL layout-selection gates. Suspect PE files are still written and counted separately. `--strict-integrity` doesn't change that write; it only changes the process exit code.
+
+## Browser reports and input limits
+
+The development browser build shows header-only profile information before recovery and the actual recovery and integrity results afterward. **Export JSON** downloads the report locally, including failures and blocked inputs. Metadata transformation runs in a disposable worker too; its report doesn't claim an independent PE/ELF integrity check.
+
+**Input limit per module (MiB)** defaults to `256` and accepts values from `8` to `4096`. The browser budgets a base module and its matching `._` companion together before reading their full contents; staging reads only a small header slice. This isn't a peak-memory limit. Inputs, output images, and scratch buffers can coexist, and completed outputs remain available for download. For several large files, process them separately and clear completed rows. Raising the input limit doesn't guarantee that a file fits the browser's memory.
+
+Android ELF and package recovery still require the native CLI. Browser inputs and reports aren't uploaded.
 
 ## Flags
 
 | Flag | Behavior |
 | --- | --- |
-| `--out DIR` | Write outputs and logs below `DIR`. |
+| `--out DIR` | Write outputs and logs below `DIR` during a normal restore. |
+| `--dry-run` | Development feature. Run restoration without retaining outputs or logs. |
+| `--json` | Development feature. Write the structured report instead of human-readable standard output. |
+| `--threads N` | Development feature. Set a positive worker cap for this run, overriding `SENBEI_THREADS`. `1` selects sequential processing. |
 | `-v`, `--verbose` | Print per-stage progress. |
 | `-q`, `--quiet` | Hide progress and per-file lines; repeat to suppress all standard output. |
 | `--no-log` | Don't write a run log. |
