@@ -60,6 +60,12 @@ If a supplied companion is too short to contain the 32-byte pairing header or it
 
 The summary has the form `12 unpacked · 3 skipped · 0 errors · 1 suspect · 2 metadata`; the package count is appended when packages were opened. Each file is isolated, so one failed target doesn't stop the folder run.
 
+## Terminal colors
+
+Unpack and inspection output use colors to distinguish headings, values, successful outcomes, warnings, and errors. Color supplements the text; it doesn't replace status labels or imply that a structural candidate was recovered successfully.
+
+The default `--color auto` enables color separately for standard output and standard error when each stream is a terminal. Redirected output stays plain. A nonempty `NO_COLOR` environment variable or `TERM=dumb` disables automatic color. Use `--color always` to force color in human-readable output, including redirected output, or `--color never` to disable it. Explicit `always` and `never` override these environment variables. JSON reports and saved run logs never contain presentation colors, even with `--color always`.
+
 ## Integrity check
 
 Senbei checks PE outputs for valid headers, section ranges, entry-point mapping, readable import names, relocation requirements, and managed metadata signatures. It validates Android outputs during ELF restoration, including decoded container sizes, fixup bounds, and rebuilt dynamic tables.
@@ -82,6 +88,7 @@ Android ELF and package recovery still require the native CLI. Browser inputs an
 | `--dry-run` | Development feature. Run restoration without retaining outputs or logs. |
 | `--json` | Development feature. Write the structured report instead of human-readable standard output. |
 | `--threads N` | Development feature. Set a positive worker cap for this run, overriding `SENBEI_THREADS`. `1` selects sequential processing. |
+| `--color auto\|always\|never` | Development feature. Control human-readable terminal colors. Default `auto`; JSON reports and saved logs stay plain. |
 | `-v`, `--verbose` | Print per-stage progress. |
 | `-q`, `--quiet` | Hide progress and per-file lines; repeat to suppress all standard output. |
 | `--no-log` | Don't write a run log. |
