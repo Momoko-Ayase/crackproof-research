@@ -88,6 +88,7 @@ Use these measurements before changing buffer ownership, copying, or pipeline pa
 * `SEL_DIAG` prints PE layout-selector diagnostics.
 * `SENBEI_THREADS` caps deterministic block fan-out; `1` forces the sequential reference path.
 * `SENBEI_SCAN_ALL` enables probing selected target names below the size floor; it never enables arbitrary filenames.
+* `SENBEI_LANG` selects the console language (`en`, `zh-CN`, `zh-TW`, `ja`, or `ko`); see [Usage](usage.md). Not in a released build yet.
 * `SENBEI_ANDROID_SAMPLES` overrides the Android sample corpus location.
 
 ## Conventions

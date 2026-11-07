@@ -88,6 +88,7 @@ node --test scripts/benchmark.test.mjs
 * `SEL_DIAG` 打印 PE 佈局選擇器診斷。
 * `SENBEI_THREADS` 限制確定性塊並行的扇出；`1` 強制順序參考路徑。
 * `SENBEI_SCAN_ALL` 允許探測低於大小下限的選定目標名；它不會啟用任意文件名。
+* `SENBEI_LANG` 選擇控制檯語言（`en`、`zh-CN`、`zh-TW`、`ja` 或 `ko`）；參見[用法](usage.md)。尚未進入已發佈構建。
 * `SENBEI_ANDROID_SAMPLES` 覆蓋 Android 樣本語料位置。
 
 ## 約定

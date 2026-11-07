@@ -66,6 +66,21 @@ Unpack and inspection output use colors to distinguish headings, values, success
 
 The default `--color auto` enables color separately for standard output and standard error when each stream is a terminal. Redirected output stays plain. A nonempty `NO_COLOR` environment variable or `TERM=dumb` disables automatic color. Use `--color always` to force color in human-readable output, including redirected output, or `--color never` to disable it. Explicit `always` and `never` override these environment variables. JSON reports and saved run logs never contain presentation colors, even with `--color always`.
 
+## Display language
+
+Console language selection isn't in a released build yet. Senbei shows console messages in English, Simplified Chinese, Traditional Chinese, Japanese, or Korean. To choose a language, set the `SENBEI_LANG` environment variable to `en`, `zh-CN`, `zh-TW`, `ja`, or `ko`.
+
+```cmd
+set SENBEI_LANG=ja
+senbei inspect module.dll
+```
+
+Values are case-insensitive, and an underscore works in place of the hyphen. `zh-Hant`, `zh-HK`, and `zh-MO` also select Traditional Chinese; any other `zh` tag selects Simplified Chinese. A value that names no supported language selects English.
+
+When `SENBEI_LANG` is unset or empty, Senbei uses the first supported language in the Windows display-language list. On other systems, it follows the message locale (`LC_ALL`, `LC_MESSAGES`, or `LANG`) and the GNU `LANGUAGE` priority list, as gettext does. If no supported language is found, Senbei uses English.
+
+The language applies to help, command-line errors, per-file lines with their warnings and errors, the summary, verbose stage titles, the summary lines of `inspect`, and the exit prompt. Inspection evidence, verbose detail lines, JSON reports, and saved run logs stay English, so their content doesn't depend on the machine. Messages that have no translation, such as some low-level errors, also stay English. When a translated error leaves out part of the underlying cause, Senbei shows the full English message on the next line.
+
 ## Integrity check
 
 Senbei checks PE outputs for valid headers, section ranges, entry-point mapping, readable import names, relocation requirements, and managed metadata signatures. It validates Android outputs during ELF restoration, including decoded container sizes, fixup bounds, and rebuilt dynamic tables.
