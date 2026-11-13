@@ -5,7 +5,7 @@ icon: code
 
 # primitives.py
 
-AES-CBC, Huffman/LZ 압축 해제, 바이트코드 VM을 제외한 모든 Windows 데이터 변환의 레퍼런스 구현입니다([데이터 변환](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/data-transforms/data-transforms) 참조).
+AES-CBC, Huffman/LZ 압축 해제, 바이트코드 VM을 제외한 모든 Windows 데이터 변환의 레퍼런스 구현입니다([데이터 변환](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/data-transforms/data-transforms) 참조).
 
 ```python
 """Reference implementations of the protection scheme's data transforms.

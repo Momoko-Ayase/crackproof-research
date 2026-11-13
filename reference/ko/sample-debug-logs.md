@@ -5,14 +5,14 @@ icon: file-lines
 
 # 샘플 디버그 로그
 
-실행 전 `%temp%` 아래에 각 바이너리의 12자리 16진수 폴더를 생성하여 수집한 실제 CrackProof 런타임 로그입니다([디버그 로깅](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/runtime/startup-status#debug-logging) 참고). 파일 경로와 제품명은 일반 자리표시자로 치환했으며, 옵션 플래그, 상태 코드, 주소 및 후킹된 API 목록은 원문 그대로 유지했습니다.
+실행 전 `%temp%` 아래에 각 바이너리의 12자리 16진수 폴더를 생성하여 수집한 실제 CrackProof 런타임 로그입니다([디버그 로깅](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/runtime/startup-status#debug-logging) 참고). 파일 경로와 제품명은 일반 자리표시자로 치환했으며, 옵션 플래그, 상태 코드, 주소 및 후킹된 API 목록은 원문 그대로 유지했습니다.
 
 ## 로그 구조
 
 * **1행:** 보호된 EXE 또는 DLL의 전체 경로입니다.
 * **2행:** 모듈 빌드 시 기록된 패커 옵션 토큰(`-CF`, `-CP`, `-PP` 등)입니다.
 * **3행 및 4행:** 시작 타임스탬프와 16진수 모듈 로드 베이스 주소입니다.
-* **본문 행:** 12비트 [상태 코드](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/runtime/startup-status#the-boot-sequence-and-status-codes)와 들여쓰기된 `000`..`00D` 상세 행으로 구성되며, 단계 파라미터, 드라이버 이름, 후킹된 함수 주소를 기록합니다.
+* **본문 행:** 12비트 [상태 코드](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/runtime/startup-status#the-boot-sequence-and-status-codes)와 들여쓰기된 `000`..`00D` 상세 행으로 구성되며, 단계 파라미터, 드라이버 이름, 후킹된 함수 주소를 기록합니다.
 * **마지막 행:** 종료 타임스탬프와 `AAA-BBB-CCC` 결과 코드입니다(정상 시작 시 `000-000-000`).
 
 ## 수집된 로그 전문
@@ -22,7 +22,7 @@ icon: file-lines
 이 트레이스의 주요 관찰 사항은 다음과 같습니다.
 
 * **`C00` (`01A065F4 01A037AB`):** 각 dword 값은 `0x01A00000 + build` 형식이며, 호스트 Windows 빌드 번호인 `26100` (`0x65F4`) 및 최소 허용 빌드 번호인 `14251` (`0x37AB`) 값을 기록합니다.
-* **`C03` 및 `C04`:** 2세대 드라이버 `Htsysm7679`를 초기화하고([Htsysm 커널 구성 요소](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/runtime/kernel-components) 참고), 호환되지 않는 시스템 호출 전후에 보호된 프로세스(Protected Process) 상태를 전환하기 위해 `kernel32` / `kernelbase` / `ntdll` API 15개를 후킹합니다.
+* **`C03` 및 `C04`:** 2세대 드라이버 `Htsysm7679`를 초기화하고([Htsysm 커널 구성 요소](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/runtime/kernel-components) 참고), 호환되지 않는 시스템 호출 전후에 보호된 프로세스(Protected Process) 상태를 전환하기 위해 `kernel32` / `kernelbase` / `ntdll` API 15개를 후킹합니다.
 * **`610 -> 640 -> 655 -> 6E1 -> 800..840 -> 660 -> 280`:** 실행 섹션을 일괄 복호화(`640`)하고 재배치를 적용(`655`)한 뒤, `KiUserExceptionDispatcher`를 후킹하고 실행 페이지를 `PAGE_NOACCESS`로 전환합니다(`840`). 이어서 페이지 보호 설정 후 인계 단계(`660`)를 실행하고 OEP로 점프합니다(`280`).
 
 ```text

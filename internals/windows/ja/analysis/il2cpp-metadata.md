@@ -34,4 +34,4 @@ new_token   = 0x06000000 | ((local_index + 1) & 0x00FFFFFF)
 | レコードストライド | `method = 0x24`、`type = 0x58`、`image = 0x28` |
 | 主要フィールド | `method.token`（`+0x18` の `u32`）、`type.methodStart`（`+0x24` の `u32`）、`type.method_count`（`+0x40` の `u16`）、`image.typeStart`（`+0x08` の `u32`）、`image.typeCount`（`+0x0C` の `u32`） |
 
-復元後のバイト列を書き出す前には、`0xFAB11BAF`、`version == 31`、各テーブルがファイルサイズ内に収まること、サイズが各レコードストライドで割り切れること、および各メソッド範囲が単一イメージに連続して属していることを検証します。なお、Android 版の IL2CPP ビルドではシード付きの 5 ラウンド RID／`methodIndex` 置換が使われており、実行時にモジュール `0x0C` が復元します（バージョン 31 ではフォールバックとして `-GMD` も併用されます）。詳細は Android 編の[メソッドトークン](https://app.gitbook.com/s/XSPACE_ANDROID_JA/metadata/method-tokens)を参照してください。
+復元後のバイト列を書き出す前には、`0xFAB11BAF`、`version == 31`、各テーブルがファイルサイズ内に収まること、サイズが各レコードストライドで割り切れること、および各メソッド範囲が単一イメージに連続して属していることを検証します。なお、Android 版の IL2CPP ビルドではシード付きの 5 ラウンド RID／`methodIndex` 置換が使われており、実行時にモジュール `0x0C` が復元します（バージョン 31 ではフォールバックとして `-GMD` も併用されます）。詳細は Android 編の[メソッドトークン](https://app.gitbook.com/s/Uiv7ZqRm9GbUFbENk158/metadata/method-tokens)を参照してください。

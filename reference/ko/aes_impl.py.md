@@ -5,7 +5,7 @@ icon: key
 
 # aes\_impl.py
 
-데이터 버퍼 내부의 확장 키 스케줄을 사용하는 제로 IV AES-CBC 복호화 구현입니다([AES-CBC 계층](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/data-transforms/aes) 참조).
+데이터 버퍼 내부의 확장 키 스케줄을 사용하는 제로 IV AES-CBC 복호화 구현입니다([AES-CBC 계층](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/data-transforms/aes) 참조).
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.

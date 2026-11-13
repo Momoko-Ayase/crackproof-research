@@ -27,4 +27,4 @@ Windows 版とは異なり、Android 版の CrackProof はカーネルドライ�
 
 ## リンカーのモジュールリストからの秘匿
 
-Stage 2 のインタープリターと各ワーカーモジュールは匿名 `mmap` 領域（セットアップ中は多くの場合 `RWX`）に配置され、コールバック完了後に自身のメモリをゼロ埋めまたは上書き消去できます。Windows 版における[手動マップされたヘルパー DLL](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/runtime/mapped-modules) と同様、これらのモジュールは Bionic の `dl_iterate_phdr` や `soinfo` リストには一切現れません。
+Stage 2 のインタープリターと各ワーカーモジュールは匿名 `mmap` 領域（セットアップ中は多くの場合 `RWX`）に配置され、コールバック完了後に自身のメモリをゼロ埋めまたは上書き消去できます。Windows 版における[手動マップされたヘルパー DLL](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/runtime/mapped-modules) と同様、これらのモジュールは Bionic の `dl_iterate_phdr` や `soinfo` リストには一切現れません。

@@ -22,4 +22,4 @@ flowchart LR
 
 ## Windows 포맷과의 관계
 
-Android 공유 라이브러리는 3바이트 Huffman/LZ 토큰 인코딩과 바이트 역순 AES-256 복호화 키 스케줄을 [CrackProof for Windows 내부 구조](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/)와 공유합니다. 반면 GF(2³²) 워드 암호, 중첩 `0xE2`..`0xE8` 레코드 스트림, 보조 ELF 컨테이너 기반 재배치 구조, 유저모드 전용 환경 검사는 Android 고유 요소입니다.
+Android 공유 라이브러리는 3바이트 Huffman/LZ 토큰 인코딩과 바이트 역순 AES-256 복호화 키 스케줄을 [CrackProof for Windows 내부 구조](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/)와 공유합니다. 반면 GF(2³²) 워드 암호, 중첩 `0xE2`..`0xE8` 레코드 스트림, 보조 ELF 컨테이너 기반 재배치 구조, 유저모드 전용 환경 검사는 Android 고유 요소입니다.

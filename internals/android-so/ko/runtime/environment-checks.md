@@ -27,4 +27,4 @@ Windows 제품군과 달리 Android용 CrackProof는 커널 드라이버 없이 
 
 ## 링커 모듈 목록 미노출
 
-Stage 2 인터프리터와 작업 모듈은 익명 `mmap` 영역(초기화 중에는 주로 `RWX` 권한)에 상주하며, 콜백 실행을 마친 뒤 자신의 메모리 영역을 0으로 지우거나 덮어쓸 수 있습니다. Windows의 [수동 매핑 보조 DLL](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/runtime/mapped-modules)과 마찬가지로, 이 모듈들은 Bionic 링커의 `dl_iterate_phdr`이나 `soinfo` 목록에 나타나지 않습니다.
+Stage 2 인터프리터와 작업 모듈은 익명 `mmap` 영역(초기화 중에는 주로 `RWX` 권한)에 상주하며, 콜백 실행을 마친 뒤 자신의 메모리 영역을 0으로 지우거나 덮어쓸 수 있습니다. Windows의 [수동 매핑 보조 DLL](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/runtime/mapped-modules)과 마찬가지로, 이 모듈들은 Bionic 링커의 `dl_iterate_phdr`이나 `soinfo` 목록에 나타나지 않습니다.

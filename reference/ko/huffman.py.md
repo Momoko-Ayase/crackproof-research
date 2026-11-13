@@ -5,7 +5,7 @@ icon: file-zipper
 
 # huffman.py
 
-스테이지와 섹션 데이터 블록에 사용되는 하이브리드 Huffman/LZ 압축 해제기입니다([Huffman 및 LZ 압축](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/data-transforms/compression) 참조).
+스테이지와 섹션 데이터 블록에 사용되는 하이브리드 Huffman/LZ 압축 해제기입니다([Huffman 및 LZ 압축](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/data-transforms/compression) 참조).
 
 ```python
 """The Huffman/LZ hybrid decompressor.

@@ -5,7 +5,7 @@ icon: diagram-project
 
 # 설계
 
-Arare는 표준 Windows PE 입력을 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/)에 문서화된 4가지 구조 레이아웃 계열(`pe32`, `pe64-classic`, `pe64-modern`, `legacy-dll`)로 인코딩하며, 자체 구현한 MIT 라이선스 네이티브 및 관리형 런타임 로더를 내장합니다.
+Arare는 표준 Windows PE 입력을 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/)에 문서화된 4가지 구조 레이아웃 계열(`pe32`, `pe64-classic`, `pe64-modern`, `legacy-dll`)로 인코딩하며, 자체 구현한 MIT 라이선스 네이티브 및 관리형 런타임 로더를 내장합니다.
 
 ## 워크스페이스 아키텍처
 

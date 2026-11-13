@@ -5,7 +5,7 @@ icon: microchip
 
 # bytecode\_vm.py
 
-ビルドごとに生成される `AL` バイトコードスタブのパーサー、インタープリター、256バイト変換テーブル生成、および逆変換の実装です（[ビルド固有のバイト変換](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/data-transforms/bytecode-transform)を参照）。
+ビルドごとに生成される `AL` バイトコードスタブのパーサー、インタープリター、256バイト変換テーブル生成、および逆変換の実装です（[ビルド固有のバイト変換](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/data-transforms/bytecode-transform)を参照）。
 
 ```python
 """The per-build custom byte transform ("bytecode VM").

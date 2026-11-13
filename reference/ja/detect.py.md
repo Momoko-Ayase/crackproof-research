@@ -5,7 +5,7 @@ icon: fingerprint
 
 # detect.py
 
-`KONN` ヘッダー KDF による検出と PE32/PE32+ ネイティブ/マネージド分類のリファレンス実装です（[識別とビルドファミリー](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/file-structure/recognition)を参照）。
+`KONN` ヘッダー KDF による検出と PE32/PE32+ ネイティブ/マネージド分類のリファレンス実装です（[識別とビルドファミリー](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/file-structure/recognition)を参照）。
 
 ```python
 """Content-based detection and classification of a protected PE file.

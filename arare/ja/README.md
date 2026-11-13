@@ -11,7 +11,7 @@ Arare はソースコードからビルドされる Windows PE プロテクタ�
 
 組み込みランタイムは、ビルド固有の `%TEMP%` フォルダーによるデバッグログ制御、手動マップされるヘルパー DLL 内での構成可能な環境チェック、`KiUserExceptionDispatcher` を用いたオンデマンドページ復号（ページ暗号化）、シードに基づくローダーコード変形、起動完了後のメタデータ消去を実装しています。チェック失敗時には、ログ出力が有効な場合に `AAA-BBB-CCC` の終了コードを記録します。ネイティブ EXE では既定（`--antidebug-av=on`）で終了前に `EXCEPTION_ACCESS_VIOLATION` を発生させてアタッチ中のデバッガーをブレークさせ、DLL、`--antidebug-av=off` 指定のネイティブ EXE、およびマネージドモジュールでは直接 `TerminateProcess` を呼び出します。
 
-ベースとなるフォーマット仕様については [CrackProof for Windows の内部構造](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/)を参照してください。静的アンパックについては [Senbei](https://app.gitbook.com/s/XSPACE_SENBEI_JA/) で解説しています。
+ベースとなるフォーマット仕様については [CrackProof for Windows の内部構造](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/)を参照してください。静的アンパックについては [Senbei](https://app.gitbook.com/s/ztt8mmT5fZLnHqBjw6QU/) で解説しています。
 
 ## このセクションの内容
 

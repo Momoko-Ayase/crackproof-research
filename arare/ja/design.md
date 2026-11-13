@@ -5,7 +5,7 @@ icon: diagram-project
 
 # 設計
 
-Arare は標準的な Windows PE 入力を [CrackProof for Windows の内部構造](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/)で解説されている4種類の構造レイアウト系統（`pe32`、`pe64-classic`、`pe64-modern`、`legacy-dll`）へ符号化し、MIT ライセンスの独自ネイティブ／マネージドランタイムローダーを組み込みます。
+Arare は標準的な Windows PE 入力を [CrackProof for Windows の内部構造](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/)で解説されている4種類の構造レイアウト系統（`pe32`、`pe64-classic`、`pe64-modern`、`legacy-dll`）へ符号化し、MIT ライセンスの独自ネイティブ／マネージドランタイムローダーを組み込みます。
 
 ## ワークスペース構成
 

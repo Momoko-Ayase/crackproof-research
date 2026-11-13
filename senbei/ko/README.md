@@ -15,7 +15,7 @@ Windows 및 Linux용 네이티브 릴리스에는 명령줄 도구인 `senbei`�
 * **Android 네이티브 라이브러리 (`ELF64` AArch64):** 보호된 단독 `.so` 파일과 `.apk`, `.apks`, `.xapk` 앱 패키지를 지원합니다.
 * **Unity IL2CPP 메타데이터:** Windows `-GMD` (`v31`) 레이아웃과 Android 시드 기반(`v24.1`, `v29`, `v31`, `v39`) 또는 내장 XOR(`v24`) 레이아웃의 `global-metadata.dat` 파일을 지원합니다.
 
-기반 컨테이너 포맷과 변환 구조는 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/) 및 [CrackProof Android SO 내부 구조](https://app.gitbook.com/s/XSPACE_ANDROID_KO/)에 문서화되어 있습니다.
+기반 컨테이너 포맷과 변환 구조는 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/) 및 [CrackProof Android SO 내부 구조](https://app.gitbook.com/s/lHw4BUMHINzsXego7Ota/)에 문서화되어 있습니다.
 
 ## 섹션 구성
 

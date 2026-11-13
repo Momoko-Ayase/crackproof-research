@@ -5,7 +5,7 @@ icon: code
 
 # primitives.py
 
-AES-CBC、Huffman/LZ 展開、バイトコード VM を除くすべての Windows データ変換のリファレンス実装です。詳細は[データ変換](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/data-transforms/data-transforms)を参照してください。
+AES-CBC、Huffman/LZ 展開、バイトコード VM を除くすべての Windows データ変換のリファレンス実装です。詳細は[データ変換](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/data-transforms/data-transforms)を参照してください。
 
 ```python
 """Reference implementations of the protection scheme's data transforms.

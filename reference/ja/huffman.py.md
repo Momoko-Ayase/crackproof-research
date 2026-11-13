@@ -5,7 +5,7 @@ icon: file-zipper
 
 # huffman.py
 
-ローダーステージおよびセクションブロック用のハイブリッド Huffman/LZ 展開実装です（[Huffman / LZ 圧縮](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/data-transforms/compression)に対応）。
+ローダーステージおよびセクションブロック用のハイブリッド Huffman/LZ 展開実装です（[Huffman / LZ 圧縮](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/data-transforms/compression)に対応）。
 
 ```python
 """The Huffman/LZ hybrid decompressor.

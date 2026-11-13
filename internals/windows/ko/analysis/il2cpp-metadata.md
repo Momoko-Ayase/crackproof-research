@@ -34,4 +34,4 @@ new_token   = 0x06000000 | ((local_index + 1) & 0x00FFFFFF)
 | 레코드 스트라이드 | `method = 0x24`, `type = 0x58`, `image = 0x28` |
 | 핵심 필드 | `method.token` (`+0x18`의 `u32`); `type.methodStart` (`+0x24`의 `u32`), `type.method_count` (`+0x40`의 `u16`); `image.typeStart` (`+0x08`의 `u32`), `image.typeCount` (`+0x0C`의 `u32`) |
 
-복원된 바이트를 기록하기 전에는 항상 `0xFAB11BAF` 매직, `version == 31`, 파일 내 테이블 경계, 테이블 크기가 레코드 스트라이드로 나누어떨어지는지 여부, 각 이미지에 속한 메서드 인덱스 범위의 연속성을 검증해야 합니다. Android IL2CPP 빌드는 시드 기반 5라운드 RID 또는 `methodIndex` 순열을 사용하며 모듈 `0x0C`에서 복원됩니다(버전 31에서는 `-GMD` 방식도 폴백으로 지원하며, 자세한 내용은 [메서드 토큰](https://app.gitbook.com/s/XSPACE_ANDROID_KO/metadata/method-tokens) 참고).
+복원된 바이트를 기록하기 전에는 항상 `0xFAB11BAF` 매직, `version == 31`, 파일 내 테이블 경계, 테이블 크기가 레코드 스트라이드로 나누어떨어지는지 여부, 각 이미지에 속한 메서드 인덱스 범위의 연속성을 검증해야 합니다. Android IL2CPP 빌드는 시드 기반 5라운드 RID 또는 `methodIndex` 순열을 사용하며 모듈 `0x0C`에서 복원됩니다(버전 31에서는 `-GMD` 방식도 폴백으로 지원하며, 자세한 내용은 [메서드 토큰](https://app.gitbook.com/s/lHw4BUMHINzsXego7Ota/metadata/method-tokens) 참고).

@@ -5,7 +5,7 @@ icon: microchip
 
 # bytecode\_vm.py
 
-빌드마다 생성되는 `AL` 바이트코드 스텁의 디코더, 인터프리터, 256바이트 조회 테이블 및 역변환 구현입니다([빌드별 바이트 변환](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/data-transforms/bytecode-transform) 참조).
+빌드마다 생성되는 `AL` 바이트코드 스텁의 디코더, 인터프리터, 256바이트 조회 테이블 및 역변환 구현입니다([빌드별 바이트 변환](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/data-transforms/bytecode-transform) 참조).
 
 ```python
 """The per-build custom byte transform ("bytecode VM").

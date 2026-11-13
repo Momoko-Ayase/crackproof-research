@@ -129,4 +129,4 @@ def decompress(d, src, dest, key_offset, s_size, d_size):
     return written == d_size
 ```
 
-`decompress`는 트리 깊이, 역참조 범위, `pending` 누적 폭, 정확한 출력 길이(`written == d_size`)를 모두 검증하므로, [로딩 및 섹션 복구](../loading-and-pe-repair/loading/README.md) 전반에서 시험 압축 해제를 통해 잘못된 스테이지 키나 시프트 추정값, 오탐된 바이트코드 스텁 후보를 걸러낼 수 있습니다. 동일한 3바이트 테이블 엔트리 구조와 4가지 토큰 모드는 [CrackProof for Android SO 내부 구조](https://app.gitbook.com/s/XSPACE_ANDROID_KO/data-transforms/compression)에서도 그대로 사용됩니다.
+`decompress`는 트리 깊이, 역참조 범위, `pending` 누적 폭, 정확한 출력 길이(`written == d_size`)를 모두 검증하므로, [로딩 및 섹션 복구](../loading-and-pe-repair/loading/README.md) 전반에서 시험 압축 해제를 통해 잘못된 스테이지 키나 시프트 추정값, 오탐된 바이트코드 스텁 후보를 걸러낼 수 있습니다. 동일한 3바이트 테이블 엔트리 구조와 4가지 토큰 모드는 [CrackProof for Android SO 내부 구조](https://app.gitbook.com/s/lHw4BUMHINzsXego7Ota/data-transforms/compression)에서도 그대로 사용됩니다.

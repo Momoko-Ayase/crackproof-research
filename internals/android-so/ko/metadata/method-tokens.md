@@ -7,7 +7,7 @@ icon: hashtag
 
 표준 IL2CPP 메타데이터 파일은 매직 넘버 `0xFAB11BAF`와 32비트 버전 번호로 시작합니다. Android에서 CrackProof는 버전 `29`, `31`, `39`의 `Il2CppImage`별 `MethodDef` RID(`0x06000000 | rid`)와 버전 `24`(`v24.1`)의 전역 `methodIndex` 엔트리(256엔트리 예외 테이블과 함께 구성)에 시드 기반 5라운드 산술 반전·감산(mirror-and-subtract) 순열을 적용합니다. 일부 버전 `31` 빌드는 키 없이 동작하는 `-GMD` 토큰 레이아웃을 대신 사용합니다.
 
-테이블 순서만으로 띄엄띄엄 배치된 토큰을 `0x06000000 | (local_index + 1)`로 재매핑하는 키 없는 Windows `-GMD` 방식과의 비교는 [IL2CPP 메타데이터 난독화](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/analysis/il2cpp-metadata)를 참고하십시오.
+테이블 순서만으로 띄엄띄엄 배치된 토큰을 `0x06000000 | (local_index + 1)`로 재매핑하는 키 없는 Windows `-GMD` 방식과의 비교는 [IL2CPP 메타데이터 난독화](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/analysis/il2cpp-metadata)를 참고하십시오.
 
 ## 5라운드 역순열
 

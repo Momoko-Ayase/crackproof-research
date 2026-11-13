@@ -5,14 +5,14 @@ icon: file-lines
 
 # サンプルデバッグログ
 
-起動前に `%temp%` 配下へ各バイナリ固有の12桁16進数フォルダーを作成して採取した、実際の CrackProof 実行時ログです（[デバッグログ出力](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/runtime/startup-status#debug-logging)を参照）。ファイルパスと製品名は汎用的なプレースホルダーに置き換えていますが、オプションフラグ、ステータスコード、アドレス、hook 対象 API の一覧は実出力そのままです。
+起動前に `%temp%` 配下へ各バイナリ固有の12桁16進数フォルダーを作成して採取した、実際の CrackProof 実行時ログです（[デバッグログ出力](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/runtime/startup-status#debug-logging)を参照）。ファイルパスと製品名は汎用的なプレースホルダーに置き換えていますが、オプションフラグ、ステータスコード、アドレス、hook 対象 API の一覧は実出力そのままです。
 
 ## ログの構造
 
 * **1行目:** 保護された EXE または DLL のフルパス。
 * **2行目:** ビルド時にモジュールへ埋め込まれたパッカーのオプショントークン（`-CF`、`-CP`、`-PP` など）。
 * **3〜4行目:** 開始タイムスタンプと16進表記のモジュールロードベースアドレス。
-* **本文行:** 12ビットの[ステータスコード](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/runtime/startup-status#the-boot-sequence-and-status-codes)。インデントされた `000`..`00D` の詳細行には、ステージパラメーター、ドライバー名、hook された関数のアドレスが記録されます。
+* **本文行:** 12ビットの[ステータスコード](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/runtime/startup-status#the-boot-sequence-and-status-codes)。インデントされた `000`..`00D` の詳細行には、ステージパラメーター、ドライバー名、hook された関数のアドレスが記録されます。
 * **末尾行:** 終了タイムスタンプと `AAA-BBB-CCC` 形式の結果コード（正常起動時は `000-000-000`）。
 
 ## 採取ログ一覧
@@ -22,7 +22,7 @@ icon: file-lines
 このトレースから確認できる主な挙動は次のとおりです。
 
 * **`C00`（`01A065F4 01A037AB`）:** 各 DWORD は `0x01A00000 + build` 形式であり、ホストの Windows ビルド `26100`（`0x65F4`）と許容最小ビルド `14251`（`0x37AB`）を記録しています。
-* **`C03` と `C04`:** 第2世代ドライバー `Htsysm7679` を初期化し（[Htsysm カーネルコンポーネント](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/runtime/kernel-components)を参照）、非互換なシステムコールの前後で Protected Process 状態を切り替えるために `kernel32` / `kernelbase` / `ntdll` の 15 個の API を hook しています。
+* **`C03` と `C04`:** 第2世代ドライバー `Htsysm7679` を初期化し（[Htsysm カーネルコンポーネント](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/runtime/kernel-components)を参照）、非互換なシステムコールの前後で Protected Process 状態を切り替えるために `kernel32` / `kernelbase` / `ntdll` の 15 個の API を hook しています。
 * **`610 -> 640 -> 655 -> 6E1 -> 800..840 -> 660 -> 280`:** 実行可能セクションを一括復号し（`640`）、再配置を適用したあと（`655`）、`KiUserExceptionDispatcher` を hook して各ページを `PAGE_NOACCESS` に変更し（`840`）、ページ保護設定後の引き渡し処理 `660` を経て OEP へジャンプしています（`280`）。
 
 ```text

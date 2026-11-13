@@ -5,7 +5,7 @@ icon: key
 
 # aes\_impl.py
 
-データバッファ内の展開済み鍵スケジュールを使用するゼロ IV AES-CBC 復号実装です（[AES-CBC レイヤー](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/data-transforms/aes)に対応）。
+データバッファ内の展開済み鍵スケジュールを使用するゼロ IV AES-CBC 復号実装です（[AES-CBC レイヤー](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/data-transforms/aes)に対応）。
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.

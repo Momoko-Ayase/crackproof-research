@@ -7,7 +7,7 @@ icon: hashtag
 
 標準の IL2CPP メタデータファイルは、マジック値 `0xFAB11BAF` とそれに続く 32 ビットのバージョン番号で始まります。Android 版の CrackProof は、バージョン `29`・`31`・`39` ではイメージ（`Il2CppImage`）単位の `MethodDef` RID（`0x06000000 | rid`）に対して、バージョン `24`（`v24.1`）では 256 エントリの例外テーブルと組み合わせたグローバルな `methodIndex` エントリに対して、シード付きの 5 ラウンド反転・減算置換を適用します。なお、バージョン `31` の一部ビルドでは鍵を使わない `-GMD` メソッドトークン配置が使用されます。
 
-鍵を使わずテーブルの並び順だけで疎なトークンを `0x06000000 | (local_index + 1)` に振り直す Windows 版 `-GMD` 方式との比較については、[IL2CPP メタデータの難読化](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/analysis/il2cpp-metadata)を参照してください。
+鍵を使わずテーブルの並び順だけで疎なトークンを `0x06000000 | (local_index + 1)` に振り直す Windows 版 `-GMD` 方式との比較については、[IL2CPP メタデータの難読化](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/analysis/il2cpp-metadata)を参照してください。
 
 ## 5 ラウンドの逆置換
 

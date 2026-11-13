@@ -15,7 +15,7 @@ Windows および Linux 向けのネイティブリリースには、コマン�
 * **Android ネイティブライブラリ（`ELF64` AArch64）:** 単体の保護された `.so` ファイル、および `.apk`・`.apks`・`.xapk` アプリパッケージ。
 * **Unity IL2CPP メタデータ:** Windows の `-GMD`（`v31`）、および Android のシード派生型（`v24.1`、`v29`、`v31`、`v39`）または埋め込み XOR 型（`v24`）レイアウトの `global-metadata.dat` ファイル。
 
-対象となるコンテナーフォーマットとデータ変換の詳細は、[CrackProof for Windows の内部構造](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/)および[CrackProof for Android SO の内部構造](https://app.gitbook.com/s/XSPACE_ANDROID_JA/)を参照してください。
+対象となるコンテナーフォーマットとデータ変換の詳細は、[CrackProof for Windows の内部構造](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/)および[CrackProof for Android SO の内部構造](https://app.gitbook.com/s/Uiv7ZqRm9GbUFbENk158/)を参照してください。
 
 ## このセクションの内容
 

@@ -5,7 +5,7 @@ icon: file-zipper
 
 # Huffman / LZ 圧縮
 
-圧縮されたコンテナーブロックは、[Windows 版の Huffman/LZ 形式](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/data-transforms/compression)と同じ 3 バイト単位の Huffman 木エントリおよび 4 モードのトークン符号化を使用します。テーブル内の各ノードは 3 バイト（`u16 value`、`u8 bit_len`）で構成されます。8 ビットのルックアップで開始ルートノードを選択し、短い符号は 16 ビットのプレフィックステーブルで高速に解決します。それより長い符号は、葉ノード（`value & 0x8000 != 0`）に到達するまで入力ビットを 1 ビットずつ読みながら兄弟ペア（`value` と `value + 1`）を辿ります。
+圧縮されたコンテナーブロックは、[Windows 版の Huffman/LZ 形式](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/data-transforms/compression)と同じ 3 バイト単位の Huffman 木エントリおよび 4 モードのトークン符号化を使用します。テーブル内の各ノードは 3 バイト（`u16 value`、`u8 bit_len`）で構成されます。8 ビットのルックアップで開始ルートノードを選択し、短い符号は 16 ビットのプレフィックステーブルで高速に解決します。それより長い符号は、葉ノード（`value & 0x8000 != 0`）に到達するまで入力ビットを 1 ビットずつ読みながら兄弟ペア（`value` と `value + 1`）を辿ります。
 
 ## トークンモード
 

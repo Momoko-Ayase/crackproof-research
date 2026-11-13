@@ -62,7 +62,7 @@ def demand_page_decrypt(buf, key):
         prev = enc
 ```
 
-`get_u32`、`put_u32`、`rol32`、`MASK32` の定義は[ローリング鍵とビット回転暗号](../data-transforms/rolling-and-rotation.md)にあり、実行可能なテストベクタは [primitives.py](https://app.gitbook.com/s/XSPACE_REFERENCE_JA/primitives.py) に収録されています。`flags & 0x00100000` が非ゼロの場合は、`VirtualProtect` でページ属性を `PAGE_EXECUTE_READ` に切り替える前にビルド固有の第 2 パスが実行されます。
+`get_u32`、`put_u32`、`rol32`、`MASK32` の定義は[ローリング鍵とビット回転暗号](../data-transforms/rolling-and-rotation.md)にあり、実行可能なテストベクタは [primitives.py](https://app.gitbook.com/s/UWQkIK86mO8QHm25y3lh/primitives.py) に収録されています。`flags & 0x00100000` が非ゼロの場合は、`VirtualProtect` でページ属性を `PAGE_EXECUTE_READ` に切り替える前にビルド固有の第 2 パスが実行されます。
 
 ## ローダーのポリモーフィック変形・デコイ・ディスクからの自ファイルマッピング
 

@@ -72,4 +72,4 @@ icon: sliders
 
 ## 検証スイート
 
-上記の各変換は、[検証・リファレンス](https://app.gitbook.com/s/XSPACE_REFERENCE_JA/)に収録されている 25 件の名前付きリファレンスレコードに対する 31 項目の比較を通じて、独立した Rust 実装と照合・検証されています。リポジトリルートで `python verification/run_tests.py` および `python verification/verify_docs.py` を実行すると、すべてのリファレンス実装とドキュメント内コードブロックを再検証できます。
+上記の各変換は、[検証・リファレンス](https://app.gitbook.com/s/UWQkIK86mO8QHm25y3lh/)に収録されている 25 件の名前付きリファレンスレコードに対する 31 項目の比較を通じて、独立した Rust 実装と照合・検証されています。リポジトリルートで `python verification/run_tests.py` および `python verification/verify_docs.py` を実行すると、すべてのリファレンス実装とドキュメント内コードブロックを再検証できます。

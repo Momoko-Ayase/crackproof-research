@@ -62,7 +62,7 @@ def demand_page_decrypt(buf, key):
         prev = enc
 ```
 
-`get_u32`, `put_u32`, `rol32`, `MASK32`의 정의는 [롤링 키 및 비트 회전 암호](../data-transforms/rolling-and-rotation.md)에 수록되어 있으며, 실행 가능한 테스트 벡터는 [primitives.py](https://app.gitbook.com/s/XSPACE_REFERENCE_KO/primitives.py)에 있습니다. `flags & 0x00100000`이 0이 아니면 `VirtualProtect`가 페이지 권한을 `PAGE_EXECUTE_READ`로 전환하기 전에 빌드별 2차 패스가 추가로 실행됩니다.
+`get_u32`, `put_u32`, `rol32`, `MASK32`의 정의는 [롤링 키 및 비트 회전 암호](../data-transforms/rolling-and-rotation.md)에 수록되어 있으며, 실행 가능한 테스트 벡터는 [primitives.py](https://app.gitbook.com/s/B5aYhrgw97Xp8Yd3YI4L/primitives.py)에 있습니다. `flags & 0x00100000`이 0이 아니면 `VirtualProtect`가 페이지 권한을 `PAGE_EXECUTE_READ`로 전환하기 전에 빌드별 2차 패스가 추가로 실행됩니다.
 
 ## 로더 다형성, 디코이 및 디스크 자체 매핑
 

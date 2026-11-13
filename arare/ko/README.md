@@ -11,7 +11,7 @@ Arare는 소스 코드부터 직접 빌드하는 Windows PE 프로텍터입니�
 
 내장 런타임은 빌드별 `%TEMP%` 폴더 게이트 방식의 디버그 로깅, 수동 매핑(manual mapping) 헬퍼 DLL 내부의 설정 가능한 환경 검사, 페이지 암호화 및 온디맨드 페이지 복호화(`KiUserExceptionDispatcher`), 시드 기반 로더 코드 변형, 시작 완료 후 메타데이터 소거를 구현합니다. 검사에 실패하면 활성 로그에 `AAA-BBB-CCC` 종료 코드를 기록하며, 네이티브 EXE는 기본적으로 종료 전에 `EXCEPTION_ACCESS_VIOLATION`을 발생시켜(`--antidebug-av=on`) 연결된 디버거가 즉시 중단되도록 합니다. 반면 DLL, `--antidebug-av=off`가 지정된 네이티브 EXE, 관리형 모듈은 곧바로 `TerminateProcess`를 호출합니다.
 
-기반 포맷은 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/)를 참고하십시오. 정적 언패킹은 [Senbei](https://app.gitbook.com/s/XSPACE_SENBEI_KO/)에 문서화되어 있습니다.
+기반 포맷은 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/)를 참고하십시오. 정적 언패킹은 [Senbei](https://app.gitbook.com/s/mrjeUWp0ICb0dlYX4QBv/)에 문서화되어 있습니다.
 
 ## 섹션 구성
 

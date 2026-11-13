@@ -5,7 +5,7 @@ icon: flask
 
 # 検証とリファレンス
 
-このセクションでは、[CrackProof for Windows の内部構造](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/)の裏付けとなる実行可能なリファレンス実装とテストベクター一式、および匿名化した実行時デバッグログを収録しています。
+このセクションでは、[CrackProof for Windows の内部構造](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/)の裏付けとなる実行可能なリファレンス実装とテストベクター一式、および匿名化した実行時デバッグログを収録しています。
 
 ## 検証スイート
 

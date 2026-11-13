@@ -5,7 +5,7 @@ icon: file-zipper
 
 # Huffman 및 LZ 압축
 
-압축된 컨테이너 블록은 [Windows Huffman/LZ 포맷](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/data-transforms/compression)과 동일한 3바이트 Huffman 트리 엔트리 및 4모드 토큰 인코딩을 사용합니다. 테이블의 각 노드는 3바이트(`u16 value`, `u8 bit_len`)로 구성됩니다. 8비트 조회 테이블로 초기 루트 노드를 선택하고 16비트 프리픽스 테이블로 짧은 코드를 빠르게 디코딩하며, 더 긴 코드는 리프 노드(`value & 0x8000 != 0`)에 도달할 때까지 입력 비트를 1비트씩 읽으며 형제 노드 쌍(`value`와 `value + 1`)을 따라 내려갑니다.
+압축된 컨테이너 블록은 [Windows Huffman/LZ 포맷](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/data-transforms/compression)과 동일한 3바이트 Huffman 트리 엔트리 및 4모드 토큰 인코딩을 사용합니다. 테이블의 각 노드는 3바이트(`u16 value`, `u8 bit_len`)로 구성됩니다. 8비트 조회 테이블로 초기 루트 노드를 선택하고 16비트 프리픽스 테이블로 짧은 코드를 빠르게 디코딩하며, 더 긴 코드는 리프 노드(`value & 0x8000 != 0`)에 도달할 때까지 입력 비트를 1비트씩 읽으며 형제 노드 쌍(`value`와 `value + 1`)을 따라 내려갑니다.
 
 ## 토큰 모드
 

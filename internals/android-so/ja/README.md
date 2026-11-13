@@ -22,4 +22,4 @@ flowchart LR
 
 ## Windows 版フォーマットとの関係
 
-Android 版では、3 バイト単位の Huffman/LZ トークン符号化と、ワード単位でバイト反転された AES-256 復号ラウンド鍵スケジュールが [CrackProof for Windows の内部構造](https://app.gitbook.com/s/XSPACE_WINDOWS_JA/)と共通しています。一方、GF(2³²) ワード暗号、入れ子構造の `0xE2`..`0xE8` レコードストリーム、補助 ELF コンテナーによる再配置情報の保持、およびユーザーモードで完結する環境チェックは Android 版固有の仕組みです。
+Android 版では、3 バイト単位の Huffman/LZ トークン符号化と、ワード単位でバイト反転された AES-256 復号ラウンド鍵スケジュールが [CrackProof for Windows の内部構造](https://app.gitbook.com/s/DDUo0VKfH9uzyTcguGIx/)と共通しています。一方、GF(2³²) ワード暗号、入れ子構造の `0xE2`..`0xE8` レコードストリーム、補助 ELF コンテナーによる再配置情報の保持、およびユーザーモードで完結する環境チェックは Android 版固有の仕組みです。

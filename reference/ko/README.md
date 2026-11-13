@@ -5,7 +5,7 @@ icon: flask
 
 # 검증 및 레퍼런스
 
-이 섹션은 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/XSPACE_WINDOWS_KO/)의 기반이 되는 실행 가능한 전체 레퍼런스 코드와 테스트 벡터, 그리고 익명화된 런타임 디버그 로그를 수록합니다.
+이 섹션은 [CrackProof Windows 내부 구조](https://app.gitbook.com/s/FlY9nVrA6FxLQBrkLIc2/)의 기반이 되는 실행 가능한 전체 레퍼런스 코드와 테스트 벡터, 그리고 익명화된 런타임 디버그 로그를 수록합니다.
 
 ## 검증 스위트
 

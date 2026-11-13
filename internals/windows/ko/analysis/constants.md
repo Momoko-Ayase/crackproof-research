@@ -72,4 +72,4 @@ icon: sliders
 
 ## 검증 스위트
 
-위의 모든 변환 연산은 [검증 및 레퍼런스](https://app.gitbook.com/s/XSPACE_REFERENCE_KO/)에 수록된 25개 기준 테스트 항목을 대상으로 독립적인 Rust 구현체와 총 31회 비교하여 교차 검증합니다. 저장소 루트에서 `python verification/run_tests.py`와 `python verification/verify_docs.py`를 실행하면 모든 구현체와 문서 내 코드 블록을 다시 검증할 수 있습니다.
+위의 모든 변환 연산은 [검증 및 레퍼런스](https://app.gitbook.com/s/B5aYhrgw97Xp8Yd3YI4L/)에 수록된 25개 기준 테스트 항목을 대상으로 독립적인 Rust 구현체와 총 31회 비교하여 교차 검증합니다. 저장소 루트에서 `python verification/run_tests.py`와 `python verification/verify_docs.py`를 실행하면 모든 구현체와 문서 내 코드 블록을 다시 검증할 수 있습니다.

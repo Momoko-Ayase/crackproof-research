@@ -129,4 +129,4 @@ def decompress(d, src, dest, key_offset, s_size, d_size):
     return written == d_size
 ```
 
-`decompress` は木の最大深さ、後方参照の境界、`pending` のバイト幅、および出力長 `written == d_size` の完全一致を検査するため、[ローディングとセクション復元](../loading-and-pe-repair/loading/README.md)における試行展開で誤ったステージ鍵、右ローテート幅（`shift`）の候補、偽陽性のバイトコードスタブを確実に除外できます。また、[CrackProof for Android SO の内部構造](https://app.gitbook.com/s/XSPACE_ANDROID_JA/data-transforms/compression)でも、これと同一の 3 バイトテーブルエントリと 4 種類のトークンモードが使用されています。
+`decompress` は木の最大深さ、後方参照の境界、`pending` のバイト幅、および出力長 `written == d_size` の完全一致を検査するため、[ローディングとセクション復元](../loading-and-pe-repair/loading/README.md)における試行展開で誤ったステージ鍵、右ローテート幅（`shift`）の候補、偽陽性のバイトコードスタブを確実に除外できます。また、[CrackProof for Android SO の内部構造](https://app.gitbook.com/s/Uiv7ZqRm9GbUFbENk158/data-transforms/compression)でも、これと同一の 3 バイトテーブルエントリと 4 種類のトークンモードが使用されています。
