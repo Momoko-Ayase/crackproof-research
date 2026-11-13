@@ -1,49 +1,50 @@
 ---
-description: 已觀察到的 Htsysm 代際、內核職責與版本標記。
+description: "三代 Htsysm 核心驅動架構：Ring-0 shellcode、EPROCESS 修改與控點權限過濾。"
+icon: gears
 ---
 
-# Htsysm 內核組件
+# Htsysm 核心元件
 
-## Htsysm 第一代：無鑑權的內核 shellcode（HtsysmNT）
+CrackProof 選配的核心保護層（`Htsysm`）先後演進出三代截然不同的驅動程式架構：
 
-最舊驅動的招牌特性是一個**讓任意進程執行內核態 shellcode 的無鑑權 IOCTL**。CrackProof 用它手動映射內核態 DLL（`HtsyskNT.dll`，然後是 `HtpecmNT.dll`），並調用它們的 `_FarEntry@0` 導出——其實現其餘內核功能，包括按模塊說明的監視並終止分析進程。
+{% tabs %}
+{% tab title="第 1 代：HtsysmNT" %}
+### 未經驗證的核心 shellcode 執行
 
-安全設計名副其實地糟糕：系統上的任何進程都能要求該驅動在 ring 0 運行任意代碼。
+第 1 代驅動對外開放了一組未經驗證的 IOCTL，可直接以 Ring-0 權限執行呼叫端傳入的 shellcode。CrackProof 的使用者模式輔助模組 `cm` 會利用這項原語，將兩個核心模式 DLL（狀態碼 `B21` 的 `HtsyskNT.dll` 與狀態碼 `BB0` 的 `HtpecmNT.dll`）手動映射進核心空間，並呼叫其匯出的 `_FarEntry@0` 以執行核心記憶體存取與行程終止。由於本機任何使用者模式行程都能送出同一組 IOCTL，一旦安裝此驅動，等於讓整台機器上的任意程式都取得 Ring-0 任意程式碼執行能力。
+{% endtab %}
 
-## Htsysm 第二代：EPROCESS 編輯（Htsysm7679）
+{% tab title="第 2 代：Htsysm7679" %}
+### 限定範圍的 `EPROCESS` 遮罩 DWORD 修改（`0xAA01`）
 
-第二代在意圖上受限得多：它讓進程**寫自己的 `EPROCESS`**，允許它編輯關於自身的信息。CrackProof 只使用其中一個特性：設置 **Protected Process（PP）標誌**，使用戶態工具無法打開、讀取或注入受保護進程（狀態 `C03`/`C04`）。
+第 2 代（`Htsysm7679`，裝置類型 `0xAA01`，IOCTL 為 `0xAA013880` / `0xAA013884` / `0xAA013888`）移除了通用的 shellcode 執行功能，改為針對 `IoGetCurrentProcess() + offset`（限制無號數 `offset < 0x1000`）執行帶遮罩的 32 位元清除、設定或讀取操作。
 
-另外兩個細節：
+* **受保護行程（`PP`）切換：** 在階段 `C03` / `C04`，載入器會設定目前行程 `EPROCESS` 內的受保護行程（Protected Process）位元欄位，阻止使用者模式的除錯器與注入工具開啟完整權限控點。由於啟用 `PP` 會導致部分 Win32 / NT 呼叫（如 `NtCreateSection`）失敗，使用者模式載入器會在 `C04` 對這些函式掛上 hook，先暫時清除 `PP`、呼叫原始 API，完成後再重新設回 `PP`。
+* **BYOVD 攻擊面：** 驅動對呼叫端的驗證僅依賴一套可逆的 PID 加密轉換；本機任何行程只要重現該 PID 轉換，就能修改自身 `EPROCESS`（`offset < 0x1000`）內的欄位，或趕在目標行程於 `C04` 啟用 `PP` 之前先行注入。
+{% endtab %}
 
-* 某些 API 在 PP 下行為異常（`NtCreateSection` 在列），因此加載器鉤住這些函數：臨時摘掉 PP 標誌、調用原函數、再重新啟用。被鉤函數列表出現在調試日誌中。
-* 訪問“鑑權”是一種按進程 ID 的加密方案——但任何能正確加密自身進程 ID 的程序都獲得同樣的 `EPROCESS` 寫原語，等價於任意內核內存訪問。第二條濫用路徑：在進程獲得 PP 之前注入 DLL，然後讓注入代碼享受受保護狀態。儘管如此，該驅動仍帶著有效的 WHQL 簽名發佈，成為實用的自帶漏洞驅動（BYOVD）候選。
+{% tab title="第 3 代：Htsysm767901 與 Htsysm1B4001" %}
+### `ObRegisterCallbacks` 控點權限過濾（`0xAA02`）
 
-解除 PP 標誌需要內核級手段（內核或虛擬機監控器調試器、PP 切換驅動，或在標誌設置前鉤住 `DeviceIoControl`）。
+第 3 代（`Htsysm767901` 與 `Htsysm1B4001`，裝置類型 `0xAA02`，共 12 組 IOCTL `0xAA023800..0xAA02382C`）不再直接修改 `EPROCESS`，改以 `ObRegisterCallbacks` 向物件管理員註冊回呼（`Htsysm1B4001` 的回呼 Altitude 為衍生自 `1B4001` 的 `88180.011104000001`），最多追蹤 100 個受保護行程，並維護一組 12 筆項目的環狀記錄緩衝區。
 
-## Htsysm 第三代：句柄限制（Htsysm767901）
+* **剝除存取權限遮罩（`& 0xFFFFFFC5`，清除 `0x3A`）：** 針對未獲授權的控點開啟與複製（Duplicate）請求，一併拔除 `PROCESS_CREATE_THREAD`（`0x02`）、`PROCESS_VM_OPERATION`（`0x08`）、`PROCESS_VM_READ`（`0x10`）與 `PROCESS_VM_WRITE`（`0x20`）權限。
+* **豁免規則：** 放行 `KernelHandle`、行程自我存取、最多 5 組預先設定的呼叫端 PID（`0xAA02380C`）、最多 3 組預先設定的呼叫端父行程 PID（`0xAA023810`），以及 `csrss.exe`、`lsass.exe`、`conhost.exe` 或 `svchost.exe`（**但前提是必須從設定的系統目錄下執行**，對應 `0xAA023800`；其中 `svchost.exe` 還必須符合 `0xAA023814` 設定的預期父行程 PID）。
+* **三態交握驗證：** 註冊受保護行程時改採自身程式碼與返回位址雜湊驗證，不再使用靜態 PID 加密，且完全不向使用者模式呼叫端提供任何核心記憶體寫入原語。
+{% endtab %}
+{% endtabs %}
 
-最新一代完全放棄了授予權限的做法。它改為**拒絕未批准進程以危險訪問權打開受保護進程的句柄**：`PROCESS_CREATE_THREAD`、`PROCESS_VM_OPERATION`、`PROCESS_VM_READ` 與 `PROCESS_VM_WRITE`。獲批進程是固定的系統二進制白名單（`svchost.exe`、`csrss.exe`、`lsass.exe`、`conhost.exe`）。
+## 版本戳記（`0x7679` 與 `1B40`）
 
-這一代的鑑權檢查比前代更徹底，不授予受保護進程任何特殊權力，對惡意軟件也沒有利用價值——是這條驅動線上第一個把自己限定在防禦上的設計。
+`Htsysm7679` / `Htsysm767901` 名稱中的 `0x00007679`，正對應 PE32 `EighthStage` 與第 5 階段特徵標記表中的 `0x00007679` 組態叢集戳記（參見 [PE32、DLL 與無特徵標記配置](../loading-and-pe-repair/loading/layout-variants.md)）。較新的 Windows 組建在 `C02` / `C03` 記錄 `Htsysm1B4001` 時，則與 Android 組建共用 `1B40` 世代戳記，採用第 3 代 `0xAA02` 回呼驅動（因此在 `C04` 需要 hook 的使用者模式 API 更少），且經常一併啟用 `E` 系列裝置檢查（`E55`、`E91`）。
 
-## `0x7679` 版本戳
+## 元件總表
 
-驅動名中編碼了構建戳：`Htsysm7679` 與 `Htsysm767901`（即 `7679` 變體 `01`）。同一 dword `0x00007679` 也出現在受保護文件內部，作為 32 位加載器最終階段的**配置簇戳**（見 [PE32、DLL 與無標記佈局](../loading-and-pe-repair/loading/layout-variants.md)），以及 stage-5 標記表內一個 8 字節標籤的一半。它充當把受保護構建與其驅動世代聯繫起來的版本標識符，在分類未知樣本時是有用的指紋。
-
-## `Htsysm1B4001` 設備名
-
-部分較新構建在 `C02`/`C03` 記下的設備名是 `Htsysm1B4001`，而不是 `Htsysm7679` 或 `Htsysm767901`。`1B40` 戳也出現在 Android 原生庫家族中。這是另一個已觀察的服務與設備名，不是擁有獨立權限模型的第四代。一份已觀察的該設備名日誌在 `C04` 列出的鉤子更少，並進入[啟動序列與狀態報告](startup-status.md)中的 `E` 段。
-
-## 速查
-
-| 組件              | 種類             | 用途                                |
-| --------------- | -------------- | --------------------------------- |
-| `HtpecIt.dll`   | 手動映射用戶態 DLL    | 防篡改/注入/VM 檢查（`Axx` 階段）            |
-| `HtdpStub2.dll` | 手動映射用戶態 DLL    | 加載器擴展；頁錯誤按需解密處理器                  |
-| `HtsyskNT.dll`  | 內核 DLL（經第一代驅動） | 內核手動映射器與 I/O（`B21`）               |
-| `HtpecmNT.dll`  | 內核 DLL（經第一代驅動） | 進程監控/終止（`BB0`）                    |
-| HtsysmNT        | 內核驅動，第一代       | 無鑑權內核 shellcode IOCTL             |
-| Htsysm7679      | 內核驅動，第二代       | `EPROCESS` 寫；Protected Process 標誌 |
-| Htsysm767901    | 內核驅動，第三代       | 句柄訪問權限制                           |
-| Htsysm1B4001    | 設備/服務名          | 出現在 `1B40` 家族的 Windows 構建中           |
+| 元件 | 所屬層級 | 職責 |
+| --- | --- | --- |
+| `HtpecIt.dll`（`it`） | 手動映射使用者模式 DLL | `Axx` 防竄改、反注入、VM 與宿主行程檢查 |
+| `HtdpStub2.dll`（`dt`） | 手動映射使用者模式 DLL | 隨選分頁解密例外處理常式與分頁描述表 |
+| `HtsyskNT.dll`（`sk`）/ `HtpecmNT.dll`（`pm`） | 第 1 代核心模式 DLL | 核心手動映射器（`B21`）與行程監控（`BB0`） |
+| `HtsysmNT` | 核心驅動程式（第 1 代） | 未經驗證的 Ring-0 shellcode 執行 |
+| `Htsysm7679` | 核心驅動程式（第 2 代，`0xAA01`） | 目前行程 `EPROCESS` 的限定範圍（`offset < 0x1000`）遮罩 DWORD 修改 |
+| `Htsysm767901` / `Htsysm1B4001` | 核心驅動程式（第 3 代，`0xAA02`） | `ObRegisterCallbacks` 控點權限過濾與路徑／PID 豁免機制 |

@@ -1,86 +1,75 @@
 ---
-description: 容器格式、加載器與運行時各處使用的常量、偏移與編碼速查表。
+description: "彙整特徵魔數、容器計算公式、加密演算法、PE32/PE32+ 欄位偏移與位元組碼運算碼的參考總表。"
+icon: sliders
 ---
 
-# 常量與偏移
+# 常數與偏移量
 
-## 格式 magic
+## 容器常數與特徵魔數
 
-| magic  | 值            | 含義  |
-| ------ | ------------ | --- |
-| `KONN` | `0x4E4E4F4B` | 容器戳 |
+| 項目 | 數值 |
+| --- | --- |
+| 格式魔數（`info[1]`） | `0x4E4E4F4B`（小端序 ASCII 為 `KONN`） |
+| 外層 PE 標頭區間／`info` 偏移量 | `4096`（`0x1000`） |
+| 加密 `info` 標頭長度 | `32` 位元組（`8` 個 dword） |
+| 候選檔案最小長度 | `4128`（`0x1020`）位元組 |
+| `decrypt_size`（標準／完整酬載 PE32） | `info[6] - info[3] + 8192` / `info[5]`（精簡 PE32 備援值） |
+| 區段資料檔案基底 | `(~u32@0x1080 + 0x1000) & 0xFFFFFFFF` |
+| 伴生檔案（`._`）配對檢查 | `stub[4096..4128] == companion[0..32]` |
+| 伴生檔案進入點 thunk 標記（`+53` / `+58`） | `~0x1000` / `~u32("._\0\0")`（單一檔案 PE32+ 為 `~0`） |
+| 複製酬載後寫入 `image[info[3]]` 的 dword | `4096`（`0x1000`） |
+| PE32 `EighthStage` 組態叢集戳記 | `0x00007679`（若存在） |
+| 64 位元第 5 階段特徵標記（傳統配置） | `70 6D 00 00 63 6D 00 00`（`"pm\0\0cm\0\0"`）與 `00 00 00 40 01 00 00 00` |
 
-## 容器常量
+## 加密演算法與檢驗和速查表
 
-| 項                                 | 值                                                     |
-| --------------------------------- | ----------------------------------------------------- |
-| 頭區大小 / info 頭偏移                   | `4096`（`0x1000`）                                      |
-| info 頭大小                          | 32 字節（8 個 dword）                                      |
-| 最小識別長度                            | 4128 字節                                               |
-| `decrypt_size`（payload 鏈長度）       | `info[6] - info[3] + 8192`                            |
-| 節數據文件基址                           | `(~u32@0x1080) + 0x1000`                              |
-| 伴生體配對檢查                           | `stub[4096..4128] == companion[0..32]`                |
-| payload 拷貝後寫入映像 `info[3]` 的 dword | `4096`                                                |
-| 配置簇版本戳（32 位）                      | `0x00007679`                                          |
-| stage-5 標記（64 位標記佈局）              | `70 6D 00 00 63 6D 00 00` 與 `00 00 00 40 01 00 00 00` |
+| 原語 | 計算公式（無號 8 / 32 位元溢位迴繞） |
+| --- | --- |
+| `header_kdf` | `info[i + 1] = k ^ cell; k = (i * i) ^ ((k + cell - i) & MASK32)` |
+| `payload_xor_chain` | `k0 = info[0] + ~decrypt_size; out = k ^ cell; k = (i * i) ^ ((k + cell + i) & MASK32)` |
+| `xor_ror_dwords`（`dd3`） | `v = x ^ key; key += i; out = ror32(v, shift) - i`（64 位元為 `19`/`21`；32 位元為 8 組位移集合） |
+| `byte_rotate3`（`dd4`） | `b = ((addr >> 8) + addr) & 0xFF; b2 = b + 1`；`rol8` 左旋 3 位元共三次，先 XOR `b2` 再 XOR `b` |
+| `byte_rotate2`（`dd5`） | `b = va & 0xFF; b2 = b + 1`；`rol8` 左旋 2 位元共三次，先 XOR `b2` 再 XOR `b`（僅與單一位址相關） |
+| `lfsr_keystream`（`dd6`） | 種子 `1`、多項式 `0x8003`、每位元組 8 位元由 LSB 優先；明文長度位於 `pos + 95` |
+| `string_cipher`（`dd7`） | `ror8(b, 4) - key`（`0 -> -key`），每步 `key += 67`；初始金鑰為 `name_rva & 0xFF` 或 `hint_name_rva & 0xFF` |
+| `page_scramble`（`dd8`，64 位元） | `mixed = ror32(key, 15) + i; key = mixed + i`；對 `i >= 1` 執行 `page[i * 16 + (mixed & 0xF)] ^= key & 0xFF` |
+| `page_scramble_pe32`（`dd8`，32 位元） | 預先推進 `key = ror32(pk, 15)`（`pk = page + 1` 或 `0x8000 * (page + 1)`），再對 `i = 1..255` 迭代 |
+| `crc32` 與 `calculate_checksum` | 反向多項式 CRC-32（`0xEDB88320`）；區間檢驗和為 `crc32(region) ^ length` |
+| `advance_key` | 對 `m in 0..iterations` 依序累加 `1 .. ((m + 1) * 100)` |
+| `aes_decrypt` | 零 IV 之 AES-CBC；`key_offset + 2` 處 `u16` 為輪數；狀態字組採大端序；使用標準 GF(2⁸) 逆向 T-table |
 
-## 原語速查
+## PE 標頭偏移量（`pe = u32@0x3C`）
 
-| 原語               | 公式                                                                             |
-| ---------------- | ------------------------------------------------------------------------------ |
-| 頭部 KDF           | `info[i+1] = k ^ cell; k = i² ^ (k + cell − i)`                                |
-| payload 鏈        | `out = k ^ cell; k = i² ^ (k + cell + i)`                                      |
-| XOR-ROR dword 密碼 | `v = x ^ key; key += i; out = ror(v, shift) − i`（shift 19/21）                  |
-| 字節 rotate-3      | 三次 `rol3`，間插 XOR `b2`、`b`；密鑰逐字節 +1                                             |
-| 字節 rotate-2      | 三次 `rol2`，間插 XOR `b2`、`b`；以地址低字節為鑰                                             |
-| LFSR             | 種子 1，反饋 `0x8003`，每字節 8 位 LSB 優先；塊長度在 `+95`                                     |
-| 字符串密碼            | `ror4(b) − key`（0 → `−key`），`key += 67` 逐字節                                    |
-| 頁擾動（64 位）        | `mixed = ror15(key)+i; key = mixed+i; page[i*16 + (mixed&0xF)] ^= key`，塊 0 只推進 |
-| 頁擾動（32 位）        | 同循環，前置 `key = ror15(pk)`；`pk = page+1` 或 `0x8000*(page+1)`                     |
-| CRC-32           | 反射，多項式 `0xEDB88320`                                                            |
-| 校驗和描述符           | `crc32(region) ^ length`                                                       |
-| 三角數調度            | 每輪 `m`：`key += 1..(m+1)*100`                                                   |
-| AES              | CBC 解密；輪數為調度表+2 處 u16；狀態大端；標準逆 T 表                                             |
+| 欄位 | PE32+（`0x20B`） | PE32（`0x10B`） |
+| --- | --- | --- |
+| `Characteristics`（`IMAGE_FILE_DLL = 0x2000`） | `pe + 0x16` | `pe + 0x16` |
+| `OptionalHeader.Magic` | `pe + 0x18` | `pe + 0x18` |
+| `AddressOfEntryPoint` | `pe + 0x28` | `pe + 0x28` |
+| `SizeOfImage` | `pe + 0x50` | `pe + 0x50` |
+| `DllCharacteristics` | `pe + 0x5E` | `pe + 0x5E` |
+| 資料目錄陣列起點 | `pe + 0x88`（`136`） | `pe + 0x78`（`120`） |
+| 匯出表目錄（`DD[0]`） | `pe + 0x88` | `pe + 0x78` |
+| 匯入表目錄（`DD[1]`） | `pe + 0x90` | `pe + 0x80` |
+| 資源目錄（`DD[2]`） | `pe + 0x98` | `pe + 0x88` |
+| 基底重定位表（`DD[5]`） | `pe + 0xB0` | `pe + 0xA0` |
+| TLS 目錄（`DD[9]`） | `pe + 0xD0` | `pe + 0xC0` |
+| IAT（`DD[12]`） | `pe + 0xE8` | `pe + 0xD8` |
+| CLR / COM 描述元（`DD[14]`） | `pe + 0xF8` | `pe + 0xE8` |
 
-## PE 字段偏移
+## 各組建專屬 `AL` 位元組碼運算碼
 
-| 字段                    | PE32+                                   | PE32             |
-| --------------------- | --------------------------------------- | ---------------- |
-| `AddressOfEntryPoint` | `pe + 0x28`                             | `pe + 0x28`      |
-| 數據目錄基址                | `pe + 0x88`（136）                        | `pe + 0x78`（120） |
-| 導入目錄（DD\[1]）          | `pe + 0x90`                             | `pe + 0x80`      |
-| 基址重定位（DD\[5]）         | `pe + 0xB0`                             | `pe + 0xA0`      |
-| TLS（DD\[9]）           | `pe + 0xD0`                             | `pe + 0xC0`      |
-| IAT（DD\[12]）          | `pe + 0xE8`                             | `pe + 0xD8`      |
-| CLR/COM 描述符（DD\[14]）  | `pe + 0xF8`                             | `pe + 0xE0`      |
-| `DllCharacteristics`  | `pe + 0x5E`                             | `pe + 0x5E`      |
-| `SizeOfImage`         | `pe + 0x50`                             | `pe + 0x50`      |
-| `IMAGE_FILE_DLL` 位    | Characteristics（`pe + 0x16`）中的 `0x2000` | 相同               |
+| 位元組 | 組語指令 | 解碼後操作 |
+| --- | --- | --- |
+| `04 ib` | `ADD AL, imm8` | `("add", imm)` |
+| `2C ib` | `SUB AL, imm8` | `("sub", imm)` |
+| `34 ib` | `XOR AL, imm8` | `("xor", imm)` |
+| `90` | `NOP` | 略過 |
+| `C0 C0 ib` | `ROL AL, imm8` | `("rol", imm)` |
+| `C0 C8 ib` | `ROR AL, imm8` | `("ror", imm)` |
+| `FE C0` | `INC AL` | `("inc",)` |
+| `FE C8` | `DEC AL` | `("dec",)` |
+| `C3` | `RET` | stub 結束 |
 
-## 字節碼 stub 操作碼錶
+## 驗證測試套件
 
-| 字節         | 指令             | 操作  |
-| ---------- | -------------- | --- |
-| `04 ib`    | `ADD AL, imm8` | add |
-| `2C ib`    | `SUB AL, imm8` | sub |
-| `34 ib`    | `XOR AL, imm8` | xor |
-| `90`       | `NOP`          | 無   |
-| `C0 /0 ib` | `ROL AL, imm8` | rol |
-| `C0 /1 ib` | `ROR AL, imm8` | ror |
-| `FE /0`    | `INC AL`       | inc |
-| `FE /1`    | `DEC AL`       | dec |
-| `C3`       | `RET`          | 結束  |
-
-ModR/M 必須是寄存器直接尋址的 `AL`（`mod=3, rm=0`）；其餘一律無效。
-
-## 交叉引用
-
-* 狀態碼與啟動序列：[啟動序列與狀態報告](../runtime/startup-status.md#啟動序列與狀態碼)
-* 模塊代碼與驅動世代：[Htsysm 內核組件](../runtime/kernel-components.md)
-* 按需頁密碼：[頁保護與加載器代碼](../runtime/page-protection.md#按需頁密碼)
-* il2cpp 元數據常量：[il2cpp 元數據混淆](il2cpp-metadata.md)
-* Huffman 表/token 格式：[Huffman 與 LZ 壓縮](../data-transforms/compression.md#huffmanlz-壓縮格式)
-
-## 驗證套件
-
-每個函數的輸出在相同輸入上與算法的獨立參考移植一致（32 個測試向量，全部匹配）。完整可運行的片段文件與比對工具發佈在本站的[驗證與參考](https://app.gitbook.com/s/2p7kzW649ZlKfmpYdJ87/)欄目中。運行 `python run_tests.py` 可重跑全部比對。
+上述每項轉換皆已透過[驗證與參考實作](https://app.gitbook.com/s/2p7kzW649ZlKfmpYdJ87/)中的 25 組具名參考 fixture、共 31 項交叉比對，與另一套獨立的 Rust 實作逐位元組核對無誤。在儲存庫根目錄執行 `python verification/run_tests.py` 與 `python verification/verify_docs.py`，即可重新驗證所有參考實作與各頁面中的程式碼區塊。

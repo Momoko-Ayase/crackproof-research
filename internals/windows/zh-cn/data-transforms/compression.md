@@ -1,23 +1,35 @@
 ---
-description: 压缩节记录所用的 Huffman 与 LZ 组合流格式。
+description: "3 字节 Huffman 树节点表，以及字面量、计数累加、游程填充与 LZ 四种令牌模式。"
+icon: file-zipper
 ---
 
 # Huffman 与 LZ 压缩
 
-## Huffman/LZ 压缩格式
+## 混合 Huffman/LZ 位流格式
 
-多数 payload 块用一种定制混合格式压缩：Huffman 编码的 token 流，token 分字面量、游程填充与 LZ 回拷三类。解码表随数据同行，位于同一缓冲区的 `key_offset` 处。
+Stage 3 至 Stage 5 与压缩节数据块通过工作缓冲区 `key_offset` 处的 Huffman 表（每节点 3 字节）解码为 10 位令牌流：
 
-**表格式。** 表是 3 字节表项构成的森林：一个 u16 符号/子节点字段与一个 u8 码长字段。根选择读 8 位输入作为表项索引。最高位（`0x8000`）标记叶子；内部节点存储兄弟节点对中首个的索引，再多读 1 位输入在二者间选择。存储的长度字节累计迄今消耗的位数（根为 8），因此走过 N 层内部节点到达的叶子，其总码长为 8 + N 位。
+```mermaid
+flowchart LR
+    BITS["8 位根表索引\n(word & 0xFF) * 3"] --> LEAF{"tab & 0x8000\n（叶子节点位）?"}
+    LEAF -- "否" --> WALK["逐层遍历兄弟节点对\n每层消耗 1 个输入比特\n（depth <= 64）"]
+    WALK --> LEAF
+    LEAF -- "是" --> MODE["10 位符号:\nmode = sym & 0x300\npayload = sym & 0xFF"]
+    MODE --> M0["0x000: 字面量字节"]
+    MODE --> M1["0x100: 大端序累加 pending 计数"]
+    MODE --> M2["0x200: 将前序 1/2/4B 单元重复 max(pending,1) 次"]
+    MODE --> M3["0x300: 从 dest 往前 pending+payload 处回溯拷贝 payload 字节"]
+```
 
-**token 格式。** token 的 8–9 位选择模式，0–7 位是载荷：
+* **3 字节节点表项：** 每个表项结构为 `(u16 tab, u8 bits)`。读取低 8 位输入比特直接索引根表：`tab & 0x8000` 置位代表叶子节点；否则为内部节点，存放下一层兄弟节点对的下标，之后每向下一层额外消耗 1 个输入比特选择左/右分支（总消耗位数为 `8 + depth`）。
+* **10 位叶子符号：** 位 `8..9` 选择令牌模式，位 `0..7` 携带参数 `payload`：
 
-| 模式      | 含义                                                  |
-| ------- | --------------------------------------------------- |
-| `0x000` | 字面量：输出载荷字节                                          |
-| `0x100` | 计数累加器：把载荷拼进一个大端 pending 值（本身不输出）                    |
-| `0x200` | 游程填充：把刚写出的 1/2/4 字节单元重复 `pending × payload` 次       |
-| `0x300` | LZ 回拷：从输出游标前 `pending + payload` 字节处拷贝 `payload` 字节 |
+| 模式（`tab & 0x300`） | 参数（`tab & 0xFF`） | 操作 |
+| --- | --- | --- |
+| `0x000` | 字面量字节 | 写出 `payload`（写入 `1` 字节） |
+| `0x100` | 计数字节 | 若 `pending >= 256` 则报错返回；否则移位并入 `pending = (pending << 8) \| payload`（写入 `0` 字节） |
+| `0x200` | 单元宽度（`1`、`2` 或 `4`） | 令 `reps = max(pending, 1)`，将紧邻的前序 `payload` 字节单元重复写出 `reps` 次（共写入 `reps * payload` 字节），并将 `pending` 清零 |
+| `0x300` | 拷贝长度（`payload`） | 从当前 `dest` 往前 `pending + payload` 字节处拷贝 `payload` 字节，随后将 `pending` 清零 |
 
 ```python
 def decompress(d, src, dest, key_offset, s_size, d_size):
@@ -117,4 +129,4 @@ def decompress(d, src, dest, key_offset, s_size, d_size):
     return written == d_size
 ```
 
-布尔返回值是损坏信号，也提供了明确的校验条件：当容器没有记录某个密钥或移位选择时，就逐个尝试候选，直到某个能干净解压为止。[加载与节恢复](../loading-and-pe-repair/loading/README.md)中有多处这样的「试解-验证」点。同一套 token 类别与 3 字节 Huffman 项也出现在 [Android 原生库格式](https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/data-transforms/compression)中。
+由于 `decompress` 同时严格检查树深度上限、LZ 回溯边界、`pending` 位宽以及输出字节数精确满足 `written == d_size`，试探解压可在[加载流程与节还原](../loading-and-pe-repair/loading/README.md)各环节直接筛除错误的阶段密钥、移位猜测值与误命中的字节码存根候选。相同的 3 字节节点表项与四种令牌模式同样用于 [CrackProof for Android SO 内部机制](https://app.gitbook.com/s/Aoyn9wKiHAVzBKGSUifa/data-transforms/compression)。

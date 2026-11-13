@@ -1,126 +1,141 @@
 ---
-description: "Command-line usage: file, package, and folder targets, flags, and exit codes."
+description: "CLI commands, inspection reports, folder and Android package handling, display languages, flags, and exit codes."
+icon: terminal
 ---
 
 # Usage
 
 ```text
-senbei [unpack] <file|folder> [options]
-senbei inspect <file|folder> [--json] [options]
+senbei [inspect|unpack] <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]...
+    [--json] [--dry-run] [--threads N] [--color auto|always|never] [--scan-all]
+    [--strict-integrity] [--max-entry-mib N] [--max-total-mib N]
+    [--max-entries N] [--max-depth N] [--no-log] [--no-pause]
+    [-V|--version] [-h|--help]
 ```
 
-## Single file
+`senbei <path>` is equivalent to `senbei unpack <path>`. `inspect` and `unpack` are parsed as subcommands when placed before `<file|folder>` (pass `./inspect` or `.\inspect` to target a file or folder named `inspect`).
 
-Senbei writes the output below `<parent>/unpack/` with `.unpack` inserted before the extension. `--out DIR` changes both the output and the log directory.
+## Common workflows
+
+{% tabs %}
+{% tab title="Unpack" %}
+Write restored files below `<parent>/unpack/` (for a file) or `<root>/unpack/` (for a folder) with `.unpack` inserted before the extension, or redirect both outputs and run logs with `--out DIR`:
 
 ```cmd
 senbei app.exe
 senbei app.exe --out C:\out
+senbei game.apk --out C:\out
+senbei "C:\Games\SampleTitle"
 ```
 
-For `global-metadata.dat`, Senbei writes `global-metadata.unpack.dat` only when method fields change. Unsupported versions stay untouched. Folder runs report them as skipped; a direct-file restore reports an error.
+For `global-metadata.dat`, Senbei writes `global-metadata.unpack.dat` only when method tokens or indices actually change; already-canonical or unsupported versions are skipped in folder runs and reported as errors on direct single-file unpacks.
+{% endtab %}
 
-## Inspection and JSON reports
-
-The following commands are development features and aren't in a released build yet. The original `senbei PATH` form still restores files; `senbei unpack PATH` is an alias.
+{% tab title="Inspect & JSON" %}
+`inspect` runs full static recovery in memory to collect research evidence without saving output files or run logs, and never executes the target:
 
 ```cmd
 senbei inspect module.dll
 senbei inspect module.dll --json
 senbei inspect module.dll --strict-integrity --json
-senbei unpack module.dll --dry-run --json
-senbei unpack module.dll --json --strict-integrity --no-pause
 ```
 
-`inspect` is the research-oriented command. It reports source hashes, parsed format structures, decoded protection headers, candidate reasoning, discovered stage parameters, and structural checks. It runs the static recovery pipeline where needed to obtain that evidence, then discards recovered images instead of writing normal outputs or logs. It never executes the target. Ordinary file scanning still uses lightweight detection; inspection deliberately prioritizes detail over minimum processing time.
+Reports include source hashes, parsed PE/ELF/metadata headers, decoded protection tables, every attempted recovery route with rejection reasons, the selected route, discovered stage parameters (distinguishing physical file offsets, companion-spliced offsets, and working-image RVAs), and static validation findings.
+{% endtab %}
 
-For Windows inputs, the report distinguishes the physical source, a companion-spliced analysis view when used, and the recovered image. It shows section ranges and permissions, data-directory mappings, unsectioned file regions, payload declarations, and actual discovery events with file-offset or working-image-RVA provenance. Header flags are declarations, not runtime guarantees. Probe limits and unavailable prerequisites are reported explicitly; a rejected candidate remains visible even when a later route succeeds.
+{% tab title="Dry run & CI" %}
+`--dry-run` runs recovery and static validation without saving output files or logs (or collecting the `inspect` trace). Temporary Android extraction workspaces are cleaned up automatically:
 
-Recognition doesn't establish that recovery succeeds. A metadata signature identifies IL2CPP data, not protection; a known header version doesn't validate its table layout. The research report preserves recovery failures as findings rather than replacing them with an unexplained unrecognized verdict. A successful inspection exit means the input was examined, not that recovery succeeded. Unreadable inputs and infrastructure failures still fail the command; `--strict-integrity` additionally checks any actual recovered-image verdict.
+```cmd
+senbei unpack module.dll --dry-run
+senbei unpack module.dll --dry-run --json --strict-integrity
+senbei unpack folder --strict-integrity --no-pause -q
+```
 
-`--dry-run` checks the normal restoration and validation paths without retaining outputs or logs; it doesn't request the richer research trace. Senbei removes any temporary workspace when the run ends. `--dry-run` can't be combined with `--out`. Inspection also rejects `--out` and `--dry-run`, because discarding outputs is already part of inspection. `inspect --strict-integrity` can fail the command when an image actually recovered for inspection has a suspect integrity result.
+Neither `inspect` nor `--dry-run` can be combined with `--out`.
+{% endtab %}
+{% endtabs %}
 
-`--json` writes a versioned machine-readable report to standard output instead of the banner, progress, and human-readable summary. An explicit JSON request still emits the report with `-q`; it disables run logs and the exit prompt. It records available profiles, actual stage outcomes, candidate attempts, diagnostics, and pairing provenance. Unattempted stages aren't marked successful. Static checks don't establish runtime loadability or complete analysis-tool coverage. Reports can contain local paths and content hashes; review them before sharing.
+## Android libraries and packages
 
-## Android targets
+Senbei restores protected AArch64 `.so` binaries (`libil2cpp.unpack.so` or `<stem>.unpack.so`) and processes `.apk`, `.apks`, and `.xapk` packages directly:
 
-Senbei restores protected `.so` files from their encrypted payload sections and writes them as `libil2cpp.unpack.so` or the corresponding input name. It treats APK, APKS, and XAPK files as containers: it reads their manifests first, follows nested APKs when necessary, and extracts only `.so` and exact `global-metadata.dat` entries.
+1. Reads the ZIP central directory first and follows nested `.apk` entries inside `.apks`/`.xapk` bundles up to `--max-depth`.
+2. Streams only `.so` and exact `global-metadata.dat` entries to temporary files under the configured `--max-entry-mib`, `--max-total-mib`, and `--max-entries` budgets.
+3. Pairs external `v24.1` metadata with the owning app's module `0x0C` (scoped by `AndroidManifest.xml` package + version across split APKs, or `<root>/lib/<abi>/` + `<root>/assets/`), unwraps slim `v24` XOR blobs into `global-metadata.unpack.dat`, and deduplicates identical loose and packaged files.
 
-If a restored library contains embedded metadata, Senbei writes the unwrapped blob beside it as `global-metadata.unpack.dat`. It restores identical loose and package entries once, preferring the loose file.
+## Folder scanning and companions
 
-## Folder mode
+Folder mode walks subdirectories recursively while pruning `unpack` directories (case-insensitively, unless the root target itself is named `unpack`) and skipping NTFS reparse-point subdirectories below the root:
 
-Folder mode walks recursively, skips directories named `unpack`, and mirrors recognized outputs below `<root>/unpack/` or `--out DIR`. Windows candidates are `.exe`, `.dll`, and `global-metadata.dat`; Android candidates are `.so` and `global-metadata.dat`. A matching `.exe._` or `.dll._` payload is consumed by its stub and is excluded from the skipped count.
+* **Scanned target names (case-insensitive):** `.exe`, `.dll`, `.so`, `global-metadata.dat`, `.apk`, `.apks`, and `.xapk`. Sibling split `.apk` files sharing a manifest package and version are grouped automatically. Candidates smaller than `4,128` bytes are skipped without opening unless `--scan-all` (or `SENBEI_SCAN_ALL`) is set.
+* **Windows `._` companions:** sibling `.exe._` and `.dll._` files are consumed by their matching stub rather than counted as skipped files. Managed companion DLLs require both `Module.dll` and `Module.dll._` so Senbei can overlay the stub's `COR20` tables onto the decrypted IL method bodies.
 
-Managed DLL companions retain CLR metadata and related runtime tables in the original DLL. Both the DLL and its matching `._` file must be available; Senbei restores the declared CLR regions from the DLL while retaining method bodies decrypted from the companion. Missing or unreadable referenced regions are reported as errors.
+{% hint style="info" %}
+**Companion diagnostics.** `Missing companion file` is reported only when a PE32+ entry record explicitly carries the `._` companion declaration (`~0x1000` and `~"._\0\0"`) and `<input>._` is absent. `Companion doesn't match` means `<input>._` is shorter than 32 bytes or its `0x00..0x20` header differs from `stub[0x1000..0x1020]`.
+{% endhint %}
 
-`Companion missing?` means Senbei recognized a PE32+ loader entry record that explicitly declares the `._` suffix, but no companion was supplied. Put `<input>._` beside the input, keeping the complete filename (for example, `module.dll._`), or add both files in the browser. This check validates the PE structure, protection signature, and entry record; it doesn't prove that every part of the stub is intact. File size, hollow sections, and unpack failures alone don't trigger this hint. Damaged or unrecognized entry records keep the original unpack error.
+## Display language and terminal colors
 
-If a supplied companion is too short to contain the 32-byte pairing header or its header differs from the recognized loader's, Senbei reports `Companion doesn't match`. Use both files from the same build; either file may be damaged. A companion that can't be read produces a file-read error. A matching header followed by a decryption failure keeps the original unpack error.
+Senbei supports five display languages: `en` (English), `zh-CN` (Simplified Chinese), `zh-TW` (Traditional Chinese), `ja` (Japanese), and `ko` (Korean).
 
-The summary has the form `12 unpacked · 3 skipped · 0 errors · 1 suspect · 2 metadata`; the package count is appended when packages were opened. Each file is isolated, so one failed target doesn't stop the folder run.
-
-## Terminal colors
-
-Unpack and inspection output use colors to distinguish headings, values, successful outcomes, warnings, and errors. Color supplements the text; it doesn't replace status labels or imply that a structural candidate was recovered successfully.
-
-The default `--color auto` enables color separately for standard output and standard error when each stream is a terminal. Redirected output stays plain. A nonempty `NO_COLOR` environment variable or `TERM=dumb` disables automatic color. Use `--color always` to force color in human-readable output, including redirected output, or `--color never` to disable it. Explicit `always` and `never` override these environment variables. JSON reports and saved run logs never contain presentation colors, even with `--color always`.
-
-## Display language
-
-Console language selection isn't in a released build yet. Senbei shows console messages in English, Simplified Chinese, Traditional Chinese, Japanese, or Korean. To choose a language, set the `SENBEI_LANG` environment variable to `en`, `zh-CN`, `zh-TW`, `ja`, or `ko`.
-
+{% tabs %}
+{% tab title="Command Prompt" %}
 ```cmd
 set SENBEI_LANG=ja
 senbei inspect module.dll
 ```
+{% endtab %}
 
-Values are case-insensitive, and an underscore works in place of the hyphen. `zh-Hant`, `zh-HK`, and `zh-MO` also select Traditional Chinese; any other `zh` tag selects Simplified Chinese. A value that names no supported language selects English.
+{% tab title="PowerShell" %}
+```powershell
+$env:SENBEI_LANG = "zh-TW"
+senbei inspect module.dll
+```
+{% endtab %}
 
-When `SENBEI_LANG` is unset or empty, Senbei uses the first supported language in the Windows display-language list. On other systems, it follows the message locale (`LC_ALL`, `LC_MESSAGES`, or `LANG`) and the GNU `LANGUAGE` priority list, as gettext does. If no supported language is found, Senbei uses English.
+{% tab title="POSIX / Bash" %}
+```sh
+SENBEI_LANG=ko senbei inspect module.dll
+```
+{% endtab %}
+{% endtabs %}
 
-The language applies to help, command-line errors, per-file lines with their warnings and errors, the summary, verbose stage titles, the summary lines of `inspect`, and the exit prompt. Inspection evidence, verbose detail lines, JSON reports, and saved run logs stay English, so their content doesn't depend on the machine. Messages that have no translation, such as some low-level errors, also stay English. When a translated error leaves out part of the underlying cause, Senbei shows the full English message on the next line.
+* **Locale resolution:** `SENBEI_LANG` strips `.encoding` and `@modifier` suffixes, matches case-insensitively with `-` or `_`, and gives script subtags (`Hans` / `Hant`) priority over regions (`zh-Hans-HK` -> Simplified Chinese; `zh-Hant`, `zh-TW`, `zh-HK`, `zh-MO` -> Traditional Chinese). When `SENBEI_LANG` is unset, Senbei checks the Windows UI language list or `LC_ALL` / `LC_MESSAGES` / `LANG` / `LANGUAGE`, falling back to English.
+* **What stays English:** `--json` output, saved `.log` files, `inspect` structural evidence tables, and `-v` stage detail lines always stay in English; when a localized error summarizes a more detailed internal error, the full English detail prints on the next line.
+* **Colors (`--color MODE` or `--color=MODE`):** `auto` (default) checks TTY status per stream and disables colors when `NO_COLOR` is non-empty or `TERM=dumb`; `always` forces ANSI colors in human-readable output; `never` disables them. `--json` and `.log` files never contain ANSI escapes.
 
-## Integrity check
+## Static validation and browser limits
 
-Senbei checks PE outputs for valid headers, section ranges, entry-point mapping, readable import names, relocation requirements, and managed metadata signatures. It validates Android outputs during ELF restoration, including decoded container sizes, fixup bounds, and rebuilt dynamic tables.
+Static validation checks restored PE headers, section mappings, entry-point reachability and CRT branch targets, up to 256 import descriptors, native data directories, and CLR `BSJB` streams, alongside Android ELF `PT_LOAD` bounds, dynamic tables, symbol hashes, relocations, and constructor pointers. Outputs with structural warnings or non-fatal errors are still written during `unpack` and counted as `suspect`; `--strict-integrity` turns any `suspect` result (in `unpack`, `--dry-run`, or `inspect`) into exit code `1`.
 
-A clean report isn't a proof of correctness. Reports distinguish errors from warnings: a warning needs investigation, but doesn't necessarily mean that the loader rejects the file. New structural diagnostics don't change the existing DLL layout-selection gates. Suspect PE files are still written and counted separately. `--strict-integrity` doesn't change that write; it only changes the process exit code.
+In the WebAssembly browser app, **Input limit per module (MiB)** defaults to `256` (`8`..`4096` MiB, counting a stub and its `._` companion together before reading them into memory), and **Export JSON** downloads a local `senbei.browser-report` v1 file. Android `.so` and package restoration require native `senbei` or `senbei-gui`.
 
-## Browser reports and input limits
-
-The development browser build shows header-only profile information before recovery and the actual recovery and integrity results afterward. **Export JSON** downloads the report locally, including failures and blocked inputs. Metadata transformation runs in a disposable worker too; its report doesn't claim an independent PE/ELF integrity check.
-
-**Input limit per module (MiB)** defaults to `256` and accepts values from `8` to `4096`. The browser budgets a base module and its matching `._` companion together before reading their full contents; staging reads only a small header slice. This isn't a peak-memory limit. Inputs, output images, and scratch buffers can coexist, and completed outputs remain available for download. For several large files, process them separately and clear completed rows. Raising the input limit doesn't guarantee that a file fits the browser's memory.
-
-Android ELF and package recovery still require the native CLI. Browser inputs and reports aren't uploaded.
-
-## Flags
+## Flags reference
 
 | Flag | Behavior |
 | --- | --- |
-| `--out DIR` | Write outputs and logs below `DIR` during a normal restore. |
-| `--dry-run` | Development feature. Run restoration without retaining outputs or logs. |
-| `--json` | Development feature. Write the structured report instead of human-readable standard output. |
-| `--threads N` | Development feature. Set a positive worker cap for this run, overriding `SENBEI_THREADS`. `1` selects sequential processing. |
-| `--color auto\|always\|never` | Development feature. Control human-readable terminal colors. Default `auto`; JSON reports and saved logs stay plain. |
-| `-v`, `--verbose` | Print per-stage progress. |
-| `-q`, `--quiet` | Hide progress and per-file lines; repeat to suppress all standard output. |
-| `--no-log` | Don't write a run log. |
-| `--scan-all` | Probe every selected target-name candidate, including files too small for the default scan to open. |
-| `--strict-integrity` | Not in a released build yet. Exit non-zero when any output fails the static integrity check (a suspect) or a file errors. Off by default: a suspect is still written and the process exits `0` unless a file errors. Repeat `-q` is unchanged. |
-| `--max-entry-mib N` | Not in a released build yet. Android only. Positive MiB ceiling for one ZIP entry during decompression, one decoded buffer, one artifact read, and one output file. Default `2048` (1 MiB = 1,048,576 bytes). |
-| `--max-total-mib N` | Not in a released build yet. Android only. Positive MiB ceiling for cumulative archive bytes across a folder, plus separately accounted extraction and restoration work inside one engine task. Default `8192`. This is not a peak-memory cap. |
-| `--max-entries N` | Not in a released build yet. Android only. Positive ceiling for archive entries and stage-2 records, counted across nested archives. Default `100000`. |
-| `--max-depth N` | Not in a released build yet. Android only. Nesting ceiling for nested APKs and stage-2 streams. The root is depth `0`, and `0` is allowed. Default `32`. |
-| `--no-pause` | Disable the Explorer-friendly Windows exit prompt. |
-| `-V`, `--version` | Print the version and exit. |
-| `-h`, `--help` | Show usage. |
+| `--out DIR` | Write unpacked files and run logs under `DIR` (`unpack` mode only). |
+| `--dry-run` | Run recovery and validation without saving output files or logs. |
+| `--json` | Emit a versioned JSON report on `stdout` (even with `-q -q`); disables run logs and exit pause. |
+| `--threads N` | Worker thread limit (`N >= 1`), overriding `SENBEI_THREADS` (`1` runs sequentially). |
+| `--color auto\|always\|never` | Control ANSI terminal colors (`--color=MODE` also accepted). |
+| `-v`, `--verbose` | Print per-stage progress lines. |
+| `-q`, `--quiet` | Hide banner/per-file progress; pass `-q -q` (separate flags) to silence all `stdout` and runtime `stderr`. |
+| `--no-log` | Skip writing `senbei-YYYYMMDD-HHMMSS.log`. |
+| `--scan-all` | Probe target-named files smaller than `4,128` bytes during folder scans. |
+| `--strict-integrity` | Exit `1` if any recovered image is marked `suspect` (applies to `unpack`, `--dry-run`, and `inspect`). |
+| `--max-entry-mib N` | Maximum size in MiB (`N >= 1`) per Android ZIP entry, decoded container, artifact, or output file (default `2048`). |
+| `--max-total-mib N` | Maximum cumulative MiB (`N >= 1`) for Android archive extraction and per-task recovery (default `8192`). |
+| `--max-entries N` | Maximum archive entries and Stage 2 records (`N >= 1`) across nested Android archives (default `100000`). |
+| `--max-depth N` | Maximum nesting depth (`0` allowed) for nested Android APKs and Stage 2 streams (default `32`). |
+| `--no-pause` | Skip the interactive exit prompt when launched from Windows Explorer. |
+| `-V`, `--version` / `-h`, `--help` | Print version or usage help and exit `0`. |
 
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
-| `0` | The requested restore completed without errors. A suspect output still exits `0` unless `--strict-integrity` is set. |
-| `1` | A target failed, a scan probe was unreadable, or a single-file restore errored. With `--strict-integrity` (not released yet), any suspect output also exits `1`. Outputs are still written. An Android resource limit that is exceeded also exits `1`; Senbei doesn't silently truncate that work. |
-| `2` | The command line was rejected. A resource-limit value that isn't an unsigned decimal integer is a command-line error, as is `0` for every limit except `--max-depth`. |
+| `0` | Command succeeded (`unpack`, `--dry-run`, `inspect`, `--help`, or `--version`), with no target errors (and no `suspect` outputs when `--strict-integrity` is set). |
+| `1` | One or more targets failed, a scan/file probe was unreadable, an Android resource limit was exceeded, or `--strict-integrity` encountered a `suspect` image. |
+| `2` | Invalid command-line arguments (including invoking `senbei` with no arguments, incompatible flags, or invalid numeric limits). |

@@ -1,10 +1,11 @@
 ---
-description: "逐構建的自定義字節變換：x86 樁解碼器、解釋器、翻譯表與逆變換鏈。"
+description: "依建置產生的 AL x86 位元組碼剖析器、直譯器與 256 位元組查表。"
+icon: microchip
 ---
 
 # bytecode\_vm.py
 
-這是解碼每個構建獨有 x86 樁的字節碼 VM，記載見 [按構建定製的字節變換](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/bytecode-transform)。
+剖析並執行各建置產生的 `AL` 位元組碼存根，可預先計算 256 位元組查表與反轉換，詳見[依建置產生的位元組轉換](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/bytecode-transform)。
 
 ```python
 """The per-build custom byte transform ("bytecode VM").

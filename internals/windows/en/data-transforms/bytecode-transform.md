@@ -1,14 +1,15 @@
 ---
-description: "The compact instruction stream that defines a build-specific byte permutation."
+description: "Per-build nine-opcode AL x86 bytecode stubs, 256-byte LUT precomputation, and family-specific stub discovery."
+icon: microchip
 ---
 
 # Per-build byte transform
 
-## The per-build bytecode permutation
+## Per-build `AL` bytecode permutation
 
-The most distinctive layer: CrackProof doesn't hardcode a fixed per-byte transform for payload data. At pack time it **generates a unique x86 stub for each build**, a function that takes one byte in `AL`, applies a short random sequence of arithmetic/rotate instructions, and returns. The loader runs this stub over every payload byte between the block-cipher pass and decompression. Two protected files from different builds therefore share no payload permutation.
+At pack time, CrackProof synthesizes two short per-build x86 functions that accept one byte in `AL`, apply a random chain of arithmetic and bit-rotation instructions, and return (`RET`): one stub decodes the final loader stage, and a second stub decodes every section payload block between AES-CBC decryption and Huffman/LZ decompression.
 
-The stub is stored wrapped in the [LFSR keystream](lfsr-strings-pages.md#the-lfsr-keystream). Only a narrow instruction subset ever appears:
+Each stub occupies a 96-byte slot masked by the [LFSR keystream](lfsr-strings-pages.md#lfsr-keystream-dd6) (program byte length in plaintext at `+95`). Only nine x86 instruction encodings appear:
 
 | Bytes | x86 instruction | Decoded op |
 | --- | --- | --- |
@@ -16,13 +17,13 @@ The stub is stored wrapped in the [LFSR keystream](lfsr-strings-pages.md#the-lfs
 | `2C ib` | `SUB AL, imm8` | `("sub", imm)` |
 | `34 ib` | `XOR AL, imm8` | `("xor", imm)` |
 | `90` | `NOP` | skipped |
-| `C0 /0 ib` | `ROL AL, imm8` | `("rol", imm)` |
-| `C0 /1 ib` | `ROR AL, imm8` | `("ror", imm)` |
-| `FE /0` | `INC AL` | `("inc",)` |
-| `FE /1` | `DEC AL` | `("dec",)` |
+| `C0 C0 ib` (`mod=3, reg=0, rm=0`) | `ROL AL, imm8` | `("rol", imm)` |
+| `C0 C8 ib` (`mod=3, reg=1, rm=0`) | `ROR AL, imm8` | `("ror", imm)` |
+| `FE C0` (`mod=3, reg=0, rm=0`) | `INC AL` | `("inc",)` |
+| `FE C8` (`mod=3, reg=1, rm=0`) | `DEC AL` | `("dec",)` |
 | `C3` | `RET` | end of program |
 
-For `C0`/`FE` the ModR/M byte must encode register-direct `AL` (`mod=3, rm=0`); the reg field selects the sub-operation. Anything else fails the parse, and that strictness is what makes trial-decoding candidate stub locations reliable: decrypted garbage essentially never parses as a valid program ending in `RET`.
+Any other opcode or `ModR/M` byte rejects the candidate slot.
 
 ```python
 def generate(data, offset=0):
@@ -102,9 +103,11 @@ def apply_ops(ops, x):
     return x
 ```
 
-Two structural properties follow directly:
+## Bijection and stub-discovery rules
 
-- **The chain is a permutation of the 256 byte values.** Every op is reversible (`add↔sub`, `xor` self-inverse, `rol↔ror`, `inc↔dec`), so the whole map is a bijection. It can be precomputed as a 256-entry translation table (`bytes(apply_ops(ops, i) for i in range(256))`), and an inverse chain exists by walking the op list backwards with each op swapped for its inverse.
-- **Finding the stub is a search problem, not a fixed offset.** Because the keystream is data-independent, candidate positions are trial-XORed and parsed; the lowest position that decodes to a valid program (enough real operations, terminating in `RET`) is the real stub. Later valid parses are coincidental decodes of trailing filler.
-
-One build carries **two** such stubs: one used while decrypting the final loader stage, and a second, independent one applied to every section data block.
+* **256-byte lookup table:** every operation on `AL` is invertible (`add <-> sub`, `xor` self-inverse, `rol <-> ror`, `inc <-> dec`), so any valid program defines a bijection over `0..255` that precomputes into `lut = bytes(apply_ops(ops, i) for i in range(256))`.
+* **Family-specific stub location:**
+  * **Dedicated 64-bit DLL:** fixed offsets (`addr4 + 3200` for stub 1 and `addr5 + 12400` for stub 2).
+  * **64-bit Stage 4 / classic Stage 5:** 16-byte-strided LFSR scan where the first valid parse with sufficient non-NOP instructions is the stub.
+  * **PE32 `SevenStage`:** scans backward from `seven_dsz - 96` down to `seven_dsz / 2` before falling back to a forward scan.
+  * **Marker-less 64-bit Stage 5 and PE32 `EighthStage`:** 1-byte-stepped LFSR scan where coincidental short valid parses can appear *before* the real stub; candidates are disambiguated by `fileCS` pointer proximity (`stub - 0x58` on 64-bit) and by replaying the first compressed section block through `decompress`.

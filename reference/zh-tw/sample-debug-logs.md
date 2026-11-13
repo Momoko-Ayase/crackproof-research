@@ -1,22 +1,31 @@
 ---
-description: "受保護宿主、原生 DLL 和託管 DLL 的脫敏調試日誌。"
+description: "擷取自頁面加密宿主 EXE、原生外掛 DLL 與 Managed DLL 的去識別化執行階段除錯記錄。"
+icon: file-lines
 ---
 
-# 調試日誌示例
+# 除錯記錄範例
 
-這些是真實的 CrackProof 調試日誌，捕獲方式是在 `%temp%` 下創建該可執行文件對應的 12 個十六進制字符文件夾並啟動受保護程序（見 [調試日誌](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status#調試日誌)）。路徑與產品名已替換為通用佔位符；選項標誌、狀態碼、地址、hook 列表等其餘內容均為原文。
+啟動程式前先於 `%temp%` 底下建立各二進位檔專屬的 12 位十六進位字元資料夾，即可擷取真實的 CrackProof 執行階段記錄（請參閱 [除錯記錄](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status#debug-logging)）。下列檔案路徑與產品名稱已替換為通用代稱；保護器選項旗標、狀態碼、記憶體位址與被 hook 的 API 清單皆保留原始輸出。
 
-## 如何閱讀日誌
+## 記錄檔結構
 
-* **第 1 行**——受保護模塊的路徑。
-* **第 2 行**——該構建打包時使用的保護選項標誌（每個 `-XX` 記號對應一個打包器選項）。
-* **第 3/4 行**——時間戳與模塊的加載基址。
-* **後續行**——12 位 [狀態碼](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status#啟動序列與狀態碼)，每個 stage 一行；縮進的 `000`–`00N` 行攜帶 stage 特定的細節（地址、計數、被 hook 的函數）。
-* **最後幾行**——完成時間戳與 9 位錯誤碼（`000-000-000` = 成功）。
+* **第 1 行：** 受保護 EXE 或 DLL 的完整檔案路徑。
+* **第 2 行：** 編譯進該模組的保護器選項標記（如 `-CF`、`-CP`、`-PP` 等）。
+* **第 3 與第 4 行：** 啟動時間戳記與十六進位模組載入基底位址。
+* **主體行：** 12 位元[狀態碼](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/startup-status#the-boot-sequence-and-status-codes)，搭配縮排的 `000`..`00D` 明細行記錄各階段參數、驅動程式名稱與被 hook 的函式位址。
+* **結尾行：** 結束時間戳記與 `AAA-BBB-CCC` 結果碼（正常啟動完成時為 `000-000-000`）。
 
-## 宿主 EXE，頁加密
+## 實測擷取記錄
 
-```
+{% tabs %}
+{% tab title="宿主 EXE（頁面加密）" %}
+此筆追蹤記錄的觀察重點：
+
+* **`C00`（`01A065F4 01A037AB`）：** 每個 dword 格式皆為 `0x01A00000 + build`，記錄主機端 Windows 組建編號 `26100`（`0x65F4`）以及最低允許組建編號 `14251`（`0x37AB`）。
+* **`C03` 與 `C04`：** 初始化第 2 代驅動程式 `Htsysm7679`（請參閱 [Htsysm 核心元件](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/kernel-components)），並 hook 15 個 `kernel32` / `kernelbase` / `ntdll` API，以便在執行不相容的系統呼叫前後動態切換受保護行程（Protected Process）狀態。
+* **`610 -> 640 -> 655 -> 6E1 -> 800..840 -> 660 -> 280`：** 批次解密可執行區段（`640`）、套用重定位（`655`）、hook `KiUserExceptionDispatcher` 並將頁面權限設為 `PAGE_NOACCESS`（`840`）、執行頁面保護後的交接程序 `660`，最後跳轉至 OEP（`280`）。
+
+```text
 E:\Package\app.exe
  -CF -CP -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -EUT64 -DE -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NDEP1 -NDC -NPD
 2026/05/15 04:55:07.178
@@ -93,18 +102,15 @@ A06
 2026/05/15 04:55:07.278
 000-000-000
 ```
+{% endtab %}
 
-值得注意的點：
+{% tab title="原生外掛 DLL（一次性批次解密）" %}
+此筆追蹤記錄的觀察重點：
 
-* `C03` 給出驅動代際：`Htsysm7679`——第二代 Htsysm（見 [Htsysm 內核組件](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/kernel-components)）。
-* `C04` 列出為 Protected-Process 開關 hook 的全部 API（`NtCreateSection`、`NtAlpcSendWaitReceivePort`、`NtDuplicateObject`、`NtConnectPort`、`NtOpenProcess`、`NtOpenThread`……）以及加載器攔截 hook（`CreateProcessInternal*`、`CreateRemoteThread*`、`LdrLoadDll`、`CreateActCtxW`）。
-* `640 … 840`——該模塊是**頁加密**的：先整體解密，隨後重新加密並安裝異常處理 hook。`840` 之後的 `002` 行攜帶三個地址（重新加密的區間與處理程序數據）。
-* `570` 與 `A06` 在啟動後期 hook 更多 API（`user32!SetFocus`、`CreateWindowExA/W`、`uxtheme!ThemeInitApiHook`）。
-* `660` 是一個不在公開狀態表中的 stage——在此處出現於 `840` 與最終的 `280`（跳轉 OEP）之間。
+* **`A11` -> `5D0` -> `A15`：** `A11` 驗證宿主 EXE 帶有 CrackProof 宿主標記；`A15` 則於 `5D0` 之後輸出，作為代表宿主驗證已通過的純 DLL 流程標記。
+* **無 `640` / `840`（`-NCP`）：** 各區段於 `610` 一次解密完成，於 `655` 套用重定位，接著依序經過 `800 -> 830 -> 280`，所有程式碼頁面皆直接常駐於記憶體中。
 
-## 原生插件 DLL，僅整體解密
-
-```
+```text
 E:\Package\app_Data\Plugins\native_plugin.dll
  -CF -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -DE -NCP -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NEUT64 -NDEP1 -NDC -NPD
 2026/05/15 04:55:14.518
@@ -133,17 +139,14 @@ A15
 2026/05/15 04:55:14.619
 000-000-000
 ```
+{% endtab %}
 
-值得注意的點：
+{% tab title="Managed DLL" %}
+此筆追蹤記錄的觀察重點：
 
-* `A11`——DLL 的宿主進程檢查，僅存在於受保護 DLL。
-* `A15` 跟在宿主進程檢查之後。它是不帶檢查體的純標記：宿主驗證已通過，啟動進入解密前奏。
-* **沒有 `640`/`840`**——該構建只整體解密一次（`610`），從不做頁加密；對比上面的宿主 EXE。頁加密是逐模塊的選項。
-* `800` 攜帶單個地址——新填充的映像區域。
+* 執行精簡的 CLR DLL 啟動流程：`510` 載入器 CRC 檢查、`A09` 虛擬機器登錄檔檢查、`A11` 宿主 EXE 檢查、解密前置階段 `5D0..5A0`、於 `610` 解密區段與方法主體，隨即於 `280` 交接控制權（不執行驅動程式初始化、重定位或頁面加密保護）。
 
-## 託管 DLL，最簡序列
-
-```
+```text
 E:\Package\app_Data\Managed\Assembly-CSharp.dll
  -CF -CP -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -EUT64 -DE -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NDEP1 -NDC -NPD
 2026/05/15 04:55:09.342
@@ -163,5 +166,5 @@ A11
 2026/05/15 04:55:09.368
 000-000-000
 ```
-
-託管構建運行最短的流水線：環境檢查、節解密（`610`），然後直達 OEP（`280`）——無驅動初始化、無頁加密、無重定位 stage。
+{% endtab %}
+{% endtabs %}

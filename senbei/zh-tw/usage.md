@@ -1,126 +1,141 @@
 ---
-description: "命令行用法：文件、包與文件夾目標，標誌與退出碼。"
+description: "CLI 命令、結構檢查報告、資料夾與 Android 套件處理、顯示語言、旗標與結束代碼。"
+icon: terminal
 ---
 
-# 用法
+# 使用說明
 
 ```text
-senbei [unpack] <file|folder> [options]
-senbei inspect <file|folder> [--json] [options]
+senbei [inspect|unpack] <file|folder> [--out DIR] [-v|--verbose] [-q|--quiet]...
+    [--json] [--dry-run] [--threads N] [--color auto|always|never] [--scan-all]
+    [--strict-integrity] [--max-entry-mib N] [--max-total-mib N]
+    [--max-entries N] [--max-depth N] [--no-log] [--no-pause]
+    [-V|--version] [-h|--help]
 ```
 
-## 單個文件
+`senbei <path>` 等同於 `senbei unpack <path>`。當 `inspect` 與 `unpack` 置於 `<file|folder>` 之前時會解析為子命令（若要指定名為 `inspect` 的檔案或資料夾，請傳入 `./inspect` 或 `.\inspect`）。
 
-Senbei 把輸出寫到 `<parent>/unpack/` 下，並在擴展名前插入 `.unpack`。`--out DIR` 同時改變輸出目錄與日誌目錄。
+## 常見工作流程
+
+{% tabs %}
+{% tab title="解包" %}
+預設會在 `<上層目錄>/unpack/`（單一檔案）或 `<根目錄>/unpack/`（資料夾）下寫入還原後的檔案，並在副檔名前插入 `.unpack`；亦可透過 `--out DIR` 統一指定輸出檔案與執行記錄檔目錄：
 
 ```cmd
 senbei app.exe
 senbei app.exe --out C:\out
+senbei game.apk --out C:\out
+senbei "C:\Games\SampleTitle"
 ```
 
-對於 `global-metadata.dat`，只有方法字段發生變化時 Senbei 才寫出 `global-metadata.unpack.dat`。不支持的版本保持原樣。文件夾運行報告為跳過；直接恢復單個文件時報告為錯誤。
+處理 `global-metadata.dat` 時，Senbei 僅在方法 token 或索引確實發生變更時才會寫出 `global-metadata.unpack.dat`；已是標準格式或不支援的版本在資料夾掃描中會自動略過，直接對單一檔案執行解包時則會回報錯誤。
+{% endtab %}
 
-## 檢查與 JSON 報告
-
-以下命令屬於開發中功能，尚未進入已發佈構建。原有的 `senbei PATH` 形式仍用於恢復文件；`senbei unpack PATH` 是它的別名。
+{% tab title="結構檢查與 JSON" %}
+`inspect` 會在記憶體中執行完整靜態還原以收集分析證據，不會寫入輸出檔案或執行記錄檔，也不會執行目標檔案：
 
 ```cmd
 senbei inspect module.dll
 senbei inspect module.dll --json
 senbei inspect module.dll --strict-integrity --json
-senbei unpack module.dll --dry-run --json
-senbei unpack module.dll --json --strict-integrity --no-pause
 ```
 
-`inspect` 是面向研究的命令。它報告源文件哈希、解析出的格式結構、解碼後的保護頭部、候選判斷依據、發現的階段參數與結構檢查結果。必要時會執行靜態恢復流程以取得這些證據，然後丟棄恢復映像，而不是寫出普通產物或日誌。它絕不執行目標程序。普通文件掃描仍使用輕量檢測；檢查模式明確優先提供細節，而不是追求最短處理時間。
+報告內容包含原始檔雜湊值、解析後的 PE/ELF/中繼資料標頭、解碼後的保護表、每條嘗試過的還原路徑與排除原因、最終採用的路徑、定位出的各階段參數（明確區分實體檔案偏移、附屬檔拼接偏移與工作映像 RVA），以及靜態驗證結果。
+{% endtab %}
 
-對於 Windows 輸入，報告區分物理源文件、使用伴生文件時的拼接分析視圖，以及恢復映像。內容包括節範圍與權限、數據目錄映射、不屬於節的文件區域、載荷聲明，以及帶文件偏移或工作映像 RVA 來源的實際發現事件。頭部標誌只是聲明，不是運行時保證。探測上限與不可用的前置條件會明確報告；即使後續流程成功，被拒絕的候選也仍然可見。
+{% tab title="試執行與 CI" %}
+`--dry-run` 會執行還原與靜態驗證，但不儲存輸出檔案或記錄檔（也不收集 `inspect` 追蹤細節）。Android 暫存解壓縮工作區會在結束時自動清理：
 
-識別成功不代表恢復一定成功。元數據簽名只能說明數據屬於 IL2CPP，不能說明存在保護；已知頭部版本也不代表表佈局已通過驗證。研究報告會保留恢復失敗及其原因，而不是把它們替換成無法解釋的“未識別”。檢查命令以成功狀態退出只表示已分析輸入，不表示恢復成功。輸入不可讀或基礎處理失敗仍會使命令失敗；`--strict-integrity` 還會檢查實際恢復映像的完整性結論。
+```cmd
+senbei unpack module.dll --dry-run
+senbei unpack module.dll --dry-run --json --strict-integrity
+senbei unpack folder --strict-integrity --no-pause -q
+```
 
-`--dry-run` 檢查正常的恢復與驗證流程，但不保留輸出或日誌，也不會請求更豐富的研究跟蹤。Senbei 會在運行結束時移除使用過的臨時工作區。`--dry-run` 不能與 `--out` 一起使用。檢查模式也拒絕 `--out` 與 `--dry-run`，因為丟棄輸出已經是檢查模式的行為。若為了檢查而實際恢復的映像存在可疑完整性結果，`inspect --strict-integrity` 可使命令以失敗狀態退出。
+`inspect` 與 `--dry-run` 皆不可與 `--out` 同時使用。
+{% endtab %}
+{% endtabs %}
 
-`--json` 向標準輸出寫入帶格式版本的機器可讀報告，替代橫幅、進度與人類可讀彙總。明確請求 JSON 時，即使帶有 `-q` 也仍會輸出報告，並關閉運行日誌與退出提示。報告記錄可用的 profile、實際階段狀態、候選嘗試、診斷與配對來源。未嘗試的階段不會標為成功。靜態檢查不能證明運行時可加載，也不能證明分析工具能完整識別內容。報告可能包含本地路徑與內容哈希；分享前請檢查。
+## Android 程式庫與應用程式套件
 
-## Android 目標
+Senbei 可還原受保護的 AArch64 `.so` 二進位檔（輸出為 `libil2cpp.unpack.so` 或 `<stem>.unpack.so`），並直接處理 `.apk`、`.apks` 與 `.xapk` 套件：
 
-Senbei 從加密載荷節恢復受保護的 `.so` 文件，寫出為 `libil2cpp.unpack.so` 或對應的輸入名。APK、APKS、XAPK 文件按容器處理：Senbei 先讀取清單，必要時跟進嵌套 APK，只提取 `.so` 與精確匹配 `global-metadata.dat` 的條目。
+1. 先讀取 ZIP 中央目錄，並依 `--max-depth` 上限追蹤 `.apks`/`.xapk` 內的巢狀 `.apk` 條目。
+2. 在設定的 `--max-entry-mib`、`--max-total-mib` 與 `--max-entries` 配額內，僅將 `.so` 與檔名完全相符的 `global-metadata.dat` 條目串流寫入暫存檔。
+3. 將外部 `v24.1` 中繼資料與所屬應用程式的模組 `0x0C` 配對（跨 split APK 時依 `AndroidManifest.xml` 的套件名稱與版本配對，目錄模式下則依 `<root>/lib/<abi>/` 與 `<root>/assets/` 配對），將精簡型 `v24` XOR 資料解碼為 `global-metadata.unpack.dat`，並在獨立檔案與套件內檔案內容相同時去除重複項目。
 
-如果恢復後的庫包含內嵌元數據，Senbei 會把解包後的數據塊作為 `global-metadata.unpack.dat` 寫到它旁邊。內容相同的鬆散文件與包內條目只恢復一次，優先取鬆散文件。
+## 資料夾掃描與附屬檔
 
-## 文件夾模式
+資料夾模式會遞迴走訪子目錄，自動略過名為 `unpack` 的目錄（不分大小寫，除非根目標本身就叫 `unpack`），並略過根目錄以下的 NTFS 重新解析點（reparse point）子目錄：
 
-文件夾模式遞歸遍歷，跳過名為 `unpack` 的目錄，並把識別到的輸出按相對路徑寫到 `<root>/unpack/` 或 `--out DIR` 下。Windows 候選名為 `.exe`、`.dll` 與 `global-metadata.dat`；Android 候選名為 `.so` 與 `global-metadata.dat`。匹配的 `.exe._`、`.dll._` 載荷由其 stub 消費，不計入跳過數。
+* **掃描目標檔名（不分大小寫）：** `.exe`、`.dll`、`.so`、`global-metadata.dat`、`.apk`、`.apks` 與 `.xapk`。共用相同 manifest 套件名稱與版本的同層 split `.apk` 檔案會自動歸為同一組。除非設定 `--scan-all`（或環境變數 `SENBEI_SCAN_ALL`），否則小於 `4,128` 位元組的候選檔案預設不會開啟，直接略過。
+* **Windows `._` 附屬檔：** 同目錄下的 `.exe._` 與 `.dll._` 檔案會由對應的 stub 合併讀取，不會計入已略過檔案。Managed 附屬 DLL 必須同時具備 `Module.dll` 與 `Module.dll._`，Senbei 才能將 stub 內的 `COR20` 資料表覆寫至解密後的 IL 方法主體上。
 
-託管 DLL 伴生文件在原始 DLL 中保留 CLR 元數據及相關運行時表。DLL 與其匹配的 `._` 文件必須同時可用；Senbei 從 DLL 恢復聲明的 CLR 區域，同時保留從伴生文件解密的方法體。被引用區域缺失或不可讀時報告為錯誤。
+{% hint style="info" %}
+**附屬檔診斷訊息。** 唯有當 PE32+ 入口記錄明確帶有 `._` 附屬檔宣告（`~0x1000` 與 `~"._\0\0"`）且缺少 `<input>._` 時，才會回報 `Missing companion file`。`Companion doesn't match` 代表 `<input>._` 短於 32 位元組，或其 `0x00..0x20` 標頭與 `stub[0x1000..0x1020]` 不一致。
+{% endhint %}
 
-`Companion missing?` 表示 Senbei 識別到明確聲明 `._` 後綴的 PE32+ 加載器入口記錄，但未提供伴生文件。把 `<input>._` 放在輸入文件旁邊，保留完整文件名（例如 `module.dll._`），或在瀏覽器中同時添加兩個文件。此檢查會驗證 PE 結構、保護簽名與入口記錄，但不能證明 stub 的每個部分均完好。僅文件較小、節被清空或解包失敗不會觸發此提示。入口記錄損壞或無法識別時，保留原始解包錯誤。
+## 顯示語言與終端機色彩
 
-若已提供的伴生文件不足以容納 32 字節配對頭部，或頭部與已識別加載器中的內容不同，Senbei 會報告 `Companion doesn't match`。請使用同一構建中的兩個文件；任一文件都有可能損壞。伴生文件無法讀取時報告文件讀取錯誤。頭部匹配但後續解密失敗時，保留原始解包錯誤。
+Senbei 支援五種顯示語言：`en`（英文）、`zh-CN`（簡體中文）、`zh-TW`（繁體中文）、`ja`（日文）與 `ko`（韓文）。
 
-彙總行形如 `12 unpacked · 3 skipped · 0 errors · 1 suspect · 2 metadata`；打開過包時追加包計數。每個文件相互隔離，單個目標失敗不會中斷文件夾運行。
-
-## 終端顏色
-
-解包與檢查輸出用顏色區分標題、數值、成功結果、警告與錯誤。顏色只補充文字，不替代狀態標籤，也不表示結構候選已經成功恢復。
-
-默認的 `--color auto` 會分別檢查標準輸出與標準錯誤是否連接到終端，再決定是否著色。重定向輸出保持純文本。非空的 `NO_COLOR` 環境變量或 `TERM=dumb` 會關閉自動著色。使用 `--color always` 可強制為人類可讀輸出著色，包括重定向輸出；使用 `--color never` 可關閉著色。顯式指定的 `always` 與 `never` 優先於這些環境變量。即使傳入 `--color always`，JSON 報告與保存的運行日誌也不會包含用於顯示顏色的轉義序列。
-
-## 顯示語言
-
-控制檯語言選擇尚未進入已發佈構建。Senbei 可以用英語、簡體中文、繁體中文、日語或韓語顯示控制檯消息。要選擇語言，請將 `SENBEI_LANG` 環境變量設為 `en`、`zh-CN`、`zh-TW`、`ja` 或 `ko`。
-
+{% tabs %}
+{% tab title="Command Prompt" %}
 ```cmd
 set SENBEI_LANG=ja
 senbei inspect module.dll
 ```
+{% endtab %}
 
-取值不區分大小寫，也可以用下劃線代替連字符。`zh-Hant`、`zh-HK` 與 `zh-MO` 同樣選擇繁體中文；其他 `zh` 標籤選擇簡體中文。不對應任何受支持語言的值會選擇英語。
+{% tab title="PowerShell" %}
+```powershell
+$env:SENBEI_LANG = "zh-TW"
+senbei inspect module.dll
+```
+{% endtab %}
 
-未設置 `SENBEI_LANG` 或其值為空時，Senbei 使用 Windows 顯示語言列表中第一個受支持的語言。在其他系統上，它像 gettext 一樣遵循消息區域設置（`LC_ALL`、`LC_MESSAGES` 或 `LANG`）與 GNU `LANGUAGE` 優先級列表。找不到受支持的語言時，Senbei 使用英語。
+{% tab title="POSIX / Bash" %}
+```sh
+SENBEI_LANG=ko senbei inspect module.dll
+```
+{% endtab %}
+{% endtabs %}
 
-所選語言適用於幫助、命令行錯誤、逐文件行及其中的警告與錯誤、彙總、詳細輸出中的階段標題、`inspect` 的摘要行，以及退出提示。檢查證據、詳細輸出中的細節行、JSON 報告與保存的運行日誌保持英文，因此其內容不隨機器而變化。沒有譯文的消息（例如部分底層錯誤）同樣保持英文。若翻譯後的錯誤省略了底層原因的一部分，Senbei 會在下一行顯示完整的英文消息。
+* **語系解析規則：** `SENBEI_LANG` 會先去除 `.encoding` 與 `@modifier` 後綴，不分大小寫比對 `-` 或 `_`，且文字系統子標籤（`Hans` / `Hant`）優先於地區碼（`zh-Hans-HK` -> 簡體中文；`zh-Hant`、`zh-TW`、`zh-HK`、`zh-MO` -> 繁體中文）。未設定 `SENBEI_LANG` 時，Senbei 會依序檢查 Windows UI 語言清單或 `LC_ALL` / `LC_MESSAGES` / `LANG` / `LANGUAGE`，皆無對應時回退為英文。
+* **維持英文輸出的項目：** `--json` 輸出、儲存的 `.log` 記錄檔、`inspect` 結構證據表格，以及 `-v` 各階段明細行一律維持英文；若在地化錯誤訊息僅為詳細內部錯誤的摘要，下一行會接著印出完整的英文錯誤訊息。
+* **色彩控制（`--color MODE` 或 `--color=MODE`）：** `auto`（預設）會依個別輸出串流檢查 TTY 狀態，並在 `NO_COLOR` 非空或 `TERM=dumb` 時停用色彩；`always` 會在一般文字輸出中強制啟用 ANSI 色彩；`never` 停用色彩。`--json` 輸出與 `.log` 檔案不會包含 ANSI 跳脫序列。
 
-## 完整性檢查
+## 靜態驗證與瀏覽器限制
 
-PE 輸出會檢查有效頭部、節範圍、入口點映射、可讀導入名、重定位需求與託管元數據簽名。Android 輸出在 ELF 恢復過程中驗證，包括解碼後的容器大小、修復表邊界與重建的動態表。
+靜態驗證會檢查還原後的 PE 標頭、區段映射、進入點可達性與 CRT 分支目標、最多 256 筆匯入描述元、原生資料目錄與 CLR `BSJB` 資料流，同時檢查 Android ELF 的 `PT_LOAD` 範圍、動態表、符號雜湊表、重定位項目與建構函式指標。帶有結構警告或非致命錯誤的輸出在 `unpack` 時仍會寫入磁碟並標記為 `suspect`；加上 `--strict-integrity` 後，任何 `suspect` 結果（無論在 `unpack`、`--dry-run` 或 `inspect` 下）都會使結束代碼變為 `1`。
 
-乾淨的報告不是正確性證明。報告區分錯誤與警告：警告需要檢查，但不一定表示加載器會拒絕文件。新增的結構診斷不會改變現有 DLL 佈局選擇的接受條件。可疑 PE 文件仍會寫出並單獨計數。`--strict-integrity` 不改變這一寫出行為，只改變進程退出碼。
+在 WebAssembly 瀏覽器應用程式中，**Input limit per module (MiB)** 預設為 `256`（範圍 `8`..`4096` MiB，會在讀入記憶體前合併計算 stub 與其 `._` 附屬檔大小），點選 **Export JSON** 可下載本機 `senbei.browser-report` v1 檔案。Android `.so` 與套件還原則須使用原生版 `senbei` 或 `senbei-gui`。
 
-## 瀏覽器報告與輸入上限
+## 旗標一覽
 
-開發版瀏覽器前端在恢復前顯示僅來自頭部的 profile 信息，在恢復後顯示實際恢復與完整性結果。**Export JSON** 在本地下載報告，包含失敗與因上限而未嘗試的輸入。元數據變換也在一次性 worker 中運行；其報告不會聲稱執行了獨立的 PE/ELF 完整性檢查。
-
-**Input limit per module (MiB)** 默認為 `256`，允許的範圍是 `8` 至 `4096`。瀏覽器在讀取完整內容前，把主模塊與匹配的 `._` 伴生文件一起計入預算；暫存階段只讀取一小段頭部。這不是內存峰值上限。輸入、輸出映像與臨時緩衝區可能同時駐留，已完成的輸出也會保留以供下載。多個大文件請分開處理，並清除已完成的條目。提高輸入上限不保證文件能放入瀏覽器內存。
-
-Android ELF 與包恢復仍需要原生 CLI。瀏覽器不會上傳輸入或報告。
-
-## 標誌
-
-| 標誌 | 行為 |
+| 旗標 | 行為說明 |
 | --- | --- |
-| `--out DIR` | 正常恢復時把輸出與日誌寫到 `DIR` 下。 |
-| `--dry-run` | 開發中功能。執行恢復，但不保留輸出或日誌。 |
-| `--json` | 開發中功能。寫出結構化報告，替代人類可讀標準輸出。 |
-| `--threads N` | 開發中功能。為本次運行設置正整數工作線程上限，優先於 `SENBEI_THREADS`。`1` 選擇串行處理。 |
-| `--color auto\|always\|never` | 開發中功能。控制人類可讀終端輸出的顏色。默認 `auto`；JSON 報告與保存的日誌保持純文本。 |
-| `-v`, `--verbose` | 打印各階段進度。 |
-| `-q`, `--quiet` | 隱藏進度與逐文件行；重複使用可抑制全部標準輸出。 |
-| `--no-log` | 不寫運行日誌。 |
-| `--scan-all` | 探測每個選定的目標名候選，包括低於大小下限的文件。 |
-| `--strict-integrity` | 尚未進入已發佈構建。任一輸出未通過靜態完整性檢查（可疑）或任一文件出錯時，以非零狀態退出。默認關閉：可疑輸出仍會寫出，並且除非有文件出錯，進程以 `0` 退出。重複 `-q` 的行為不變。 |
-| `--max-entry-mib N` | 尚未進入已發佈構建。僅用於 Android。正數 MiB 上限，約束解壓過程中的單個 ZIP 條目、單個解碼緩衝區、單次工件讀取與單個輸出文件。默認 `2048`（1 MiB = 1,048,576 字節）。 |
-| `--max-total-mib N` | 尚未進入已發佈構建。僅用於 Android。正數 MiB 上限，約束文件夾內累計的歸檔字節，以及單個引擎任務中另行記賬的提取與恢復工作。默認 `8192`。這不是進程內存峰值上限。 |
-| `--max-entries N` | 尚未進入已發佈構建。僅用於 Android。正數上限，約束歸檔條目與 stage-2 記錄，並跨嵌套歸檔計數。默認 `100000`。 |
-| `--max-depth N` | 尚未進入已發佈構建。僅用於 Android。嵌套 APK 與 stage-2 流的嵌套深度上限。根的深度為 `0`，允許傳入 `0`。默認 `32`。 |
-| `--no-pause` | 關閉便於資源管理器雙擊運行的 Windows 退出提示。 |
-| `-V`, `--version` | 打印版本並退出。 |
-| `-h`, `--help` | 顯示用法。 |
+| `--out DIR` | 將解包後的檔案與執行記錄檔寫入 `DIR` 底下（僅限 `unpack` 模式）。 |
+| `--dry-run` | 執行還原與驗證，但不儲存輸出檔案或記錄檔。 |
+| `--json` | 在 `stdout` 輸出具版本號的 JSON 報告（即使搭配 `-q -q` 亦會輸出）；同時停用執行記錄檔與結束暫停提示。 |
+| `--threads N` | 工作執行緒數量上限（`N >= 1`），會覆寫 `SENBEI_THREADS`（設為 `1` 時循序執行）。 |
+| `--color auto\|always\|never` | 控制終端機 ANSI 色彩（亦接受 `--color=MODE`）。 |
+| `-v`, `--verbose` | 印出各階段執行進度明細。 |
+| `-q`, `--quiet` | 隱藏標題列與逐檔進度；分開傳入 `-q -q` 可關閉所有 `stdout` 與執行期 `stderr` 輸出。 |
+| `--no-log` | 略過寫入 `senbei-YYYYMMDD-HHMMSS.log` 記錄檔。 |
+| `--scan-all` | 在資料夾掃描時一併探測小於 `4,128` 位元組的目標檔名檔案。 |
+| `--strict-integrity` | 若有任何還原映像標記為 `suspect`，即以結束代碼 `1` 結束（適用於 `unpack`、`--dry-run` 與 `inspect`）。 |
+| `--max-entry-mib N` | 單一 Android ZIP 條目、解碼後容器、產物或輸出檔案的大小上限，單位為 MiB（`N >= 1`，預設 `2048`）。 |
+| `--max-total-mib N` | Android 套件解壓縮與單一工作還原累計處理量的 MiB 配額上限，並非行程峰值記憶體上限（`N >= 1`，預設 `8192`）。 |
+| `--max-entries N` | 跨巢狀 Android 套件的壓縮檔條目與 Stage 2 記錄數量上限（`N >= 1`，預設 `100000`）。 |
+| `--max-depth N` | 巢狀 Android APK 與 Stage 2 串流的最大巢狀深度（允許 `0`，預設 `32`）。 |
+| `--no-pause` | 從 Windows 檔案總管啟動時，略過結束前的互動暫停提示。 |
+| `-V`, `--version` / `-h`, `--help` | 印出版本資訊或使用說明，並以結束代碼 `0` 結束。 |
 
-## 退出碼
+## 結束代碼
 
-| 代碼 | 含義 |
+| 代碼 | 意義 |
 | --- | --- |
-| `0` | 請求的恢復已完成，沒有錯誤。未設置 `--strict-integrity` 時，可疑輸出仍以 `0` 退出。 |
-| `1` | 目標失敗、掃描探測不可讀，或單文件恢復出錯。加上尚未發佈的 `--strict-integrity` 後，任一可疑輸出也以 `1` 退出。輸出仍會寫出。超出 Android 資源上限時也以 `1` 退出；Senbei 不會靜默截斷這部分工作。 |
-| `2` | 命令行無法解析。資源上限不是無符號十進制整數時屬於命令行錯誤；除 `--max-depth` 外，傳入 `0` 同樣是命令行錯誤。 |
+| `0` | 命令執行成功（`unpack`、`--dry-run`、`inspect`、`--help` 或 `--version`），無任何目標發生錯誤（啟用 `--strict-integrity` 時亦無 `suspect` 輸出）。 |
+| `1` | 至少一個目標失敗、掃描或檔案探測無法讀取、超出 Android 資源配額限制，或在 `--strict-integrity` 下遇到 `suspect` 映像。 |
+| `2` | 命令列引數無效（包含未帶任何引數呼叫 `senbei`、旗標彼此衝突，或數值限制無效）。 |

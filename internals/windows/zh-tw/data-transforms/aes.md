@@ -1,15 +1,16 @@
 ---
-description: "AES-CBC 層及其存放在緩衝區內的擴展密鑰表。"
+description: "使用緩衝區內建展開金鑰排程與 T-table 逆運算輪的全零 IV AES-CBC 解密。"
+icon: key
 ---
 
-# AES-CBC 層
+# AES-CBC 加密層
 
-## 分組密碼：內嵌密鑰調度的 AES-CBC
+## 搭配緩衝區內建金鑰排程的 AES-CBC
 
-大塊內容（階段與節數據塊）以 CBC 模式的 AES 解密保護。兩個設計選擇值得注意：
+Stage 3 至 Stage 5 以及壓縮區段區塊皆經過全零 IV 的 AES-CBC 解密，其金鑰排程直接存放在工作映像緩衝區內：
 
-- **密鑰調度表就存在數據緩衝區內部。** `key_offset` 處有一個小頭部存放輪數（`key_offset + 2` 處的小端 u16），其後是 `(rounds + 1)` 個 16 字節輪密鑰。沒有獨立密鑰材料可提取；調度表隨其他一切一併解出。
-- **這些表是標準的 AES 解密 T 表**（InvSubBytes 融合 InvMixColumns），下面由 GF(2⁸) 運算生成——公開的 AES 常量，並非專有數據。狀態字按大端讀寫。
+* **緩衝區內建金鑰排程：** `key_offset` 開頭為 4 位元組標頭，其中 `key_offset + 2` 的小端序 `u16` 指定輪數（`10`、`12` 或 `14`），緊接著自 `key_offset + 4` 起存放 `(rounds + 1)` 組各 16 位元組的解密輪金鑰。
+* **標準 GF(2⁸) 逆向 T-table：** 中間各輪將 `InvSubBytes`、`InvShiftRows` 與 `InvMixColumns`（約化多項式 `0x1B`，乘數 `0x0B`、`0x0D`、`0x09`、`0x0E`）融合為四張 256 項的 `u32` 查表；最後一輪則套用 `InvSubBytes` 搭配 `InvShiftRows` 位元組通道置換（`n0 | n3 | n2 | n1` 跨字組旋轉）。狀態字組皆以大端序載入與寫回。
 
 ```python
 def _gf_mul(a, b):
@@ -113,5 +114,4 @@ def aes_decrypt(d, pos, size, key_offset):
         prev = cur
 ```
 
-每個分組經 `_aes_round` 解密（初始密鑰異或、`rounds − 1` 輪 T 表輪變換、以及僅含 SubBytes/ShiftRows 的末輪——教科書式 AES 逆結構），再與前一組密文異或（零 IV）。
-
+每個 16 位元組區塊依序執行初始輪金鑰 XOR、`rounds - 1` 輪等價逆向解密（Equivalent Inverse Cipher）T-table 查表，以及最後一輪 `InvSubBytes`/`InvShiftRows`，最後再與前一個密文區塊（`prev`，初始為 16 個零位元組）做 XOR。

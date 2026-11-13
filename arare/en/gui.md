@@ -1,45 +1,43 @@
 ---
-description: "WPF front-end that builds arare protect command lines from a job list."
+description: "WPF desktop front-end for building, previewing, and running batch arare protect and verify jobs."
+icon: window-maximize
 ---
 
 # GUI
 
-WPF front-end for the Arare CLI. It builds `arare protect` invocations from a job list, shows the exact command before running it, and executes jobs sequentially with optional post-protect verification.
+`Arare.Gui.exe` is a Windows Presentation Foundation (WPF) front-end that builds `arare protect` command lines from a job queue, previews the exact CLI invocation, and runs sequential protection with optional post-protect decoding checks.
 
-Building requires the .NET 10 SDK, the same SDK used by the managed tools. Packaged GUI binaries require the .NET 10 Desktop Runtime for the package architecture. The native CLI doesn't need .NET unless it packs managed inputs.
+## Building and launching
+
+Building requires the .NET 10 SDK; running a packaged GUI build requires the matching .NET 10 Desktop Runtime.
 
 ```powershell
 dotnet build gui/ArareGui.slnx -c Release
-dotnet run --project gui/Arare.Gui
+dotnet run --project gui/Arare.Gui -c Release
 ```
 
-Keep `Arare.Gui.exe` beside `arare.exe`. The GUI looks for `arare.exe` beside itself, then on `PATH`. If detection fails, select **Locate…** in the status bar to choose a different location.
-
-Positional command-line arguments pre-add files and folders:
+Place `Arare.Gui.exe` in the same folder as `arare.exe` (or keep `arare.exe` on `PATH`), or select **Locate…** in the status bar to pick another binary. Startup arguments can pre-populate files and folders:
 
 ```powershell
 Arare.Gui.exe app.exe game_folder\
 ```
 
-With subfolder scanning disabled, the folder picker scans the root and recursively scans any `Managed` or `Plugins` directories found up to three levels deep. Enabling subfolder scanning includes the whole selected tree.
+* **Folder picker:** with subfolder recursion off, scans the selected folder plus any `Managed` or `Plugins` subdirectories up to three levels deep; enabling subfolder recursion walks the entire tree.
+* **Positional folder arguments:** always use the non-recursive scan (`root` plus `Managed`/`Plugins` up to depth 3) regardless of the saved subfolder checkbox.
 
-## Behavior
+## Queue, overrides, and verification
 
-- Each job row owns its protection profile. The suggested profile comes from the PE: x86 maps to `pe32`, x64 to `pe64-modern`, AnyCPU managed images to `pe32`. `legacy-dll` is only a valid choice for 64-bit DLLs.
-- Output defaults to `.\arare-protected\` next to each input, or one chosen output folder with filenames preserved.
-- Jobs with duplicate output paths or outputs that overlap any queued input are rejected. This includes companion files and applies even with **Replace existing outputs** enabled. Use separate output folders for inputs that share a filename.
-- Environment checks, page encryption, and scribble follow the CLI's per module-type defaults, including the CLI's rule that `disk-integrity` replaces `clean-code`. The checkbox shows the resolved state for the selected row; overriding an option marks it and offers a reset.
-- The command preview shows the selected CLI path and protection arguments. **Copy as .ps1** exports PowerShell commands with literal arguments, creates output directories, includes the selected post-protect verification, and stops on a nonzero CLI exit code.
-- **Protect** runs jobs sequentially. **Cancel** lets the current protection and optional verification finish, then stops the remaining jobs. Closing during a run asks for confirmation and waits for that file to finish.
-- With **Check encoding after protect** enabled, each output is checked with `arare verify`. That decoder check doesn't launch the program.
-- Settings live in `Arare.Gui.settings.json` next to the executable. The job list is not persisted.
+* **Per-row profiles:** suggested automatically from the PE header (`x86` -> `pe32`, `x64` -> `pe64-modern`, `AnyCPU` managed -> `pe32`; `legacy-dll` is restricted to 64-bit DLLs).
+* **Output paths and collision checks:** output defaults to `.\arare-protected\` beside each input (or a single chosen folder). Duplicate output paths or any output (including `._` companions) that would overwrite a queued input are blocked before execution, even when **Replace existing outputs** is checked.
+* **Resolved option state:** checkboxes for environment checks, page encryption, scribble, and the **ErrLog** mailslot report (`--errlog`) display the effective default for the selected module kind (including `disk-integrity` superseding `clean-code`), mark per-row overrides, and provide a one-click reset. `--antidebug-av` is not exposed in the GUI and follows the CLI's per-module default (`on` for EXEs, `off` for DLLs).
+* **Script export and execution:** **Copy as .ps1** exports literal PowerShell invocations that create output directories, run `arare protect` (plus optional `arare verify`), and stop on non-zero exit codes. **Protect 1 file** / **Protect N files** runs the queue sequentially; **Cancel** finishes the active item before stopping.
+* **Standalone verification:** **Verify existing…** runs `arare verify` across candidate profiles for an already-protected file without launching it; enabling **Check encoding after protect** runs `arare verify` automatically after each job.
+* **Persistence:** UI preferences are saved to `Arare.Gui.settings.json` beside the executable; the job queue itself is session-only.
 
-## Tests
+## Smoke tests
 
 ```powershell
-dotnet run --project gui/Arare.Gui.SmokeTests
+dotnet run --project gui/Arare.Gui.SmokeTests -c Release
 ```
 
-Covers PE classification, command construction, the override/default model, preview generation, validation, the protect/verify flow against a fake backend, the close-during-run handshake, folder scanning rules, and settings persistence.
-
-AGPL-3.0-only, matching the CLI.
+The suite exercises PE classification, CLI argument generation, per-module default/override resolution, `.ps1` script generation, path-collision validation, protect/verify state transitions against a mock backend, close-during-run confirmation, folder-scanning depth rules, and settings persistence. Licensed under `AGPL-3.0-only`.

@@ -1,5 +1,5 @@
 """Execute the Windows Markdown Python blocks and compare their results with
-the checked-in reference vectors for English and both Chinese variants.
+the checked-in reference vectors across all five published languages.
 
 Run from the repository root with: python verification/verify_docs.py
 """
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LANGUAGES = ("en", "zh-cn", "zh-tw")
+LANGUAGES = ("en", "zh-cn", "zh-tw", "ja", "ko")
 PYTHON_BLOCK = re.compile(r"^```python[ \t]*\n(.*?)^```[ \t]*$", re.M | re.S)
 
 PAGES = [

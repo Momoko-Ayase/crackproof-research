@@ -1,15 +1,16 @@
 ---
-description: "The AES-CBC layer and its in-buffer expanded key schedule."
+description: "Zero-IV AES-CBC decryption using an in-buffer expanded key schedule and T-table inverse rounds."
+icon: key
 ---
 
 # AES-CBC layer
 
-## The block cipher: AES-CBC with an in-buffer key schedule
+## AES-CBC with an in-buffer key schedule
 
-Bulk content (stages and section blocks) is protected with AES decryption in CBC mode. Two design choices stand out:
+Stages 3 through 5 and compressed section blocks pass through zero-IV AES-CBC decryption using a schedule stored inside the working image buffer itself:
 
-- **The key schedule lives inside the data buffer itself.** A small header at `key_offset` holds the round count (little-endian u16 at `key_offset + 2`), followed by `(rounds + 1)` 16-byte round keys. No separate key material needs extracting; the schedule is unpacked along with everything else.
-- **The tables are the standard AES decryption T-tables** (InvSubBytes fused with InvMixColumns), generated from GF(2⁸) arithmetic in the snippet that follows: public AES constants, not proprietary data. State words are loaded and stored big-endian.
+* **In-buffer schedule:** `key_offset` starts with a 4-byte header whose little-endian `u16` at `key_offset + 2` gives the round count (`10`, `12`, or `14`), followed immediately at `key_offset + 4` by `(rounds + 1)` 16-byte decryption round keys.
+* **Standard GF(2⁸) inverse T-tables:** middle rounds fuse `InvSubBytes`, `InvShiftRows`, and `InvMixColumns` (polynomial `0x1B`, multipliers `0x0B`, `0x0D`, `0x09`, `0x0E`) into four 256-entry `u32` tables, while the final round applies `InvSubBytes` with the `InvShiftRows` byte lane permutation (`n0 | n3 | n2 | n1` rotated across words). State words load and store big-endian.
 
 ```python
 def _gf_mul(a, b):
@@ -113,4 +114,4 @@ def aes_decrypt(d, pos, size, key_offset):
         prev = cur
 ```
 
-Each block is decrypted with `_aes_round` (initial key XOR, `rounds − 1` T-table rounds, and a final SubBytes/ShiftRows-only round, the canonical AES inverse structure) and then XORed with the previous ciphertext block (zero IV).
+Each 16-byte block runs initial round-key XOR, `rounds - 1` Equivalent Inverse Cipher T-table rounds, and the final `InvSubBytes`/`InvShiftRows` round before XORing with the previous ciphertext block (`prev`, initialized to 16 zero bytes).

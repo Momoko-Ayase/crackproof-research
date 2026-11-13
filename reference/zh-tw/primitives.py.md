@@ -1,10 +1,11 @@
 ---
-description: "滾動密鑰、旋轉、LFSR、字符串、頁置亂、按需頁、CRC-32、校驗和與三角調度。"
+description: "滾動、旋轉、LFSR、字串、分頁密碼、CRC-32 與金鑰推進參考程式碼。"
+icon: code
 ---
 
 # primitives.py
 
-這是除分組密碼、解壓器與字節碼 VM 之外全部數據變換的參考實現，對應 [數據變換](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/data-transforms) 中記載的各密碼與校驗和。
+除 AES-CBC、Huffman/LZ 解壓縮與位元組碼 VM 外的全部 Windows 資料轉換參考實作，詳見[資料轉換](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/data-transforms)。
 
 ```python
 """Reference implementations of the protection scheme's data transforms.
@@ -197,7 +198,8 @@ def lfsr_decrypt_block(d, pos):
 
 def string_cipher(d, pos, key):
     """Decrypt a NUL-terminated string in place: nibble swap, rolling
-    subtract (step 67). The initial key is the low byte of the string RVA."""
+    subtract (step 67). Initial key is name_rva & 0xFF for DLL names, or
+    hint_name_rva & 0xFF for IMAGE_IMPORT_BY_NAME strings at hint_name_rva + 2."""
     i = 0
     while d[pos + i] != 0:
         b = ror8(d[pos + i], 4)

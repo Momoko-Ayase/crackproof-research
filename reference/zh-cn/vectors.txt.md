@@ -1,12 +1,31 @@
 ---
-description: "Python 比对检查使用的 25 条具名参考记录。"
+description: "供 run_tests.py 与 verify_docs.py 比对使用的 25 条命名基准向量。"
+icon: table
 ---
 
 # vectors.txt
 
-这是比对检查使用的 25 条具名记录。每行包含一个名称与一个或多个值，并非每条记录都是单个十六进制数。前两条是标准的 CRC-32 已知答案（`crc32(b"123456789") == 0xCBF43926`）及其链式形式，可独立于其他变换进行校验。
+由 `rust_vectors.rs` 生成、供 `run_tests.py` 与 `verify_docs.py` 校验的 25 条命名基准记录：
 
-```
+| 记录名 | 覆盖变换 |
+| --- | --- |
+| `crc32_123456789`、`crc32_chain` | 反射型 CRC-32（`0xEDB88320`）标准测试值（`0xCBF43926`）与链式模式 |
+| `kdf_info` | 偏移 `0x1000` 处的 8 个 `header_kdf` 输出双字 |
+| `dd3_shift19`、`dd3_shift21` | 右旋位数为 `19` 与 `21` 的 `xor_ror_dwords` |
+| `dd4`、`dd5` | `byte_rotate3` 与 `byte_rotate2` 三重字节旋转 |
+| `lfsr96`、`dd6_len95` | `0x8003` LFSR 密钥流（96 字节）与 `lfsr_decrypt_block` |
+| `dd7_cipher`、`dd7_plain` | 按 RVA 低字节派生的 `string_cipher` 导入名（`KERNEL32.dll`） |
+| `dd8_shift0`、`dd8_shift15`、`dd8pe32_small`、`dd8pe32_big` | 4 KiB `.text` 页置乱（64 位移位 `0`/`15` 与 32 位 `page+1` / `0x8000*(page+1)`） |
+| `aes_3blocks` | 带缓冲区内置密钥调度的零 IV `aes_decrypt`（3 个 16 字节块） |
+| `checksum`、`advance_key`、`advance_key3` | `calculate_checksum`（`crc32 ^ len`）与三角数 `advance_key`（4 轮与 3 轮） |
+| `huff_ok`、`huff_out` | Huffman/LZ 混合 `decompress`（输出 `b"Hiiiiiii"`） |
+| `bc_ops`、`bc_lut256` | 按构建生成的 `AL` 字节码指令列表与 256 字节查找表 |
+| `dpkey`、`dpdec64` | 运行时按需页解密 `demand_page_key` 与 `demand_page_decrypt`（64 字节） |
+
+<details>
+<summary>vectors.txt 完整内容（25 条记录）</summary>
+
+```text
 crc32_123456789 cbf43926
 crc32_chain cbf43926
 kdf_info a07f35c4 08c23441 788c7e3e e4fcee52 30c61262 a5f0b9a7 8d927c7a cd491cb3
@@ -33,3 +52,4 @@ advance_key3 deaed18b
 dpkey b1a54a5a
 dpdec64 8d190727c292d6fb4bba98f253b6a1f0c38e31b92193682d55b5684706cf215f6e6412e5dac676cd4a1b9a478ebeb458aec899f9fba12a28653c796dc787ad0f
 ```
+</details>

@@ -1,5 +1,6 @@
 ---
-description: CrackProof 保護格式與運行時行為的獨立技術研究。
+description: "針對 CrackProof 保護格式與執行階段行為的獨立技術研究。"
+icon: house
 layout:
   width: wide
   title:
@@ -20,20 +21,20 @@ layout:
     visible: false
 ---
 
-# CrackProof 研究
+# CrackProof 技術研究
 
-CrackProof® 是 HyperTech 開發的一系列商用二進制保護系統。本站記錄通過獨立分析驗證的文件格式、數據變換、加載器與運行時組件。
+CrackProof® 是 HyperTech 推出的商業二進位保護系統系列。本站記錄經獨立驗證的檔案格式、資料轉換、分階段載入器與執行階段元件細節。
 
-當前研究範圍包括 Windows PE 文件和 Android 原生庫。兩個平臺使用不同的容器格式與恢復路徑，因此分別編寫內部機制文檔。
+研究範圍涵蓋受 CrackProof for Windows® 保護的 PE 檔案，以及受保護的 Android AArch64 共用程式庫。兩個平台採用不同的容器格式與還原流程，因此分區說明各自的內部機制。
 
-<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Windows 內部機制</strong></td><td>受保護 PE 佈局、數據變換、分階段加載、PE 重建與運行時行為。</td><td><a href="https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/">CrackProof for Windows 內部機制</a></td></tr><tr><td><strong>Android SO 內部機制</strong></td><td>受保護 AArch64 ELF 佈局、模塊流、容器解碼、ELF 恢復與 IL2CPP 元數據。</td><td><a href="https://app.gitbook.com/s/HezwIJwx0lhm5CUG7g8R/">CrackProof for Android SO 內部機制</a></td></tr><tr><td><strong>驗證與參考</strong></td><td>文中 Windows 數據變換的可執行測試向量與小型參考實現。</td><td><a href="https://app.gitbook.com/s/2p7kzW649ZlKfmpYdJ87/">驗證與參考</a></td></tr><tr><td><strong>Senbei</strong></td><td>本項目面向受保護 Windows PE 文件與 Android 共享庫的靜態解包器：用法、設計與開發。</td><td><a href="https://app.gitbook.com/s/v6LkixcUwwnaXW5PFCVE/">Senbei</a></td></tr><tr><td><strong>Arare</strong></td><td>本項目面向 Windows PE 的源碼生成保護器：用法、圖形界面、支持範圍、設計與開發。</td><td><a href="https://app.gitbook.com/s/7HowntiXDyzWEvoMUZzH/">Arare</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th width="48"></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><i class="fa-desktop"></i></td><td><strong>Windows 內部機制</strong></td><td>受保護的 PE 版面配置、加密演算法、分階段載入、PE 重建與執行階段檢查。</td><td><a href="https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/">CrackProof for Windows® 內部機制</a></td></tr><tr><td><i class="fa-mobile-screen-button"></i></td><td><strong>Android SO 內部機制</strong></td><td>受保護的 AArch64 ELF 版面配置、巢狀模組串流、容器解碼、ELF 還原與 IL2CPP 中繼資料。</td><td><a href="https://app.gitbook.com/s/HezwIJwx0lhm5CUG7g8R/">CrackProof for Android SO 內部機制</a></td></tr><tr><td><i class="fa-code"></i></td><td><strong>驗證與參考實作</strong></td><td>對應 Windows 資料轉換的可執行測試向量、Python 參考實作與去識別化除錯記錄。</td><td><a href="https://app.gitbook.com/s/2p7kzW649ZlKfmpYdJ87/">驗證與參考實作</a></td></tr><tr><td><i class="fa-screwdriver-wrench"></i></td><td><strong>Senbei</strong></td><td>支援受保護 Windows PE、Android 共用程式庫與 IL2CPP 中繼資料的靜態解包工具，涵蓋 CLI、桌面版 GUI、架構設計與開發說明。</td><td><a href="https://app.gitbook.com/s/v6LkixcUwwnaXW5PFCVE/">Senbei</a></td></tr><tr><td><i class="fa-shield-halved"></i></td><td><strong>Arare</strong></td><td>從原始碼建置並重現已知結構家族的 Windows PE 保護器，涵蓋 CLI、GUI、支援矩陣、架構設計與開發說明。</td><td><a href="https://app.gitbook.com/s/7HowntiXDyzWEvoMUZzH/">Arare</a></td></tr></tbody></table>
 
-## 研究邊界
+## 研究範圍
 
-文檔只描述可觀察的結構與行為。名稱來自二進制、日誌、已有平臺術語，或對字段作用的直白說明。只有經過多個樣本驗證，或能通過內部一致性約束證明的結論，才會寫成格式行為。
+文中記載的每項規則皆來自可觀測的二進位結構與執行階段行為。欄位與元件名稱依循二進位檔內建字串、除錯記錄輸出、標準平台規格，或直接描述位元組的實際作用。唯有在多個樣本呈現一致行為，或有內部一致性檢查強制約束時，才會歸納為格式通則。
 
-文檔不記錄受保護產品名稱、部署專用驅動名和可識別樣本的信息。研究頁面不點名用於驗證結論的實現項目；Senbei 與 Arare 欄目單獨記錄本項目自己的工具。
+研究章節全面略去受保護產品名稱、特定部署環境的驅動程式檔名，以及可識別樣本的路徑。Senbei 與 Arare 則於各自的產品專區獨立說明。
 
-## 法律聲明
-
-僅可將這些信息用於您擁有或已獲明確授權分析的二進制。各司法轄區的規避限制與許可條款不同。本文檔是獨立研究成果，不包含廠商源代碼或密鑰，與 HyperTech 無隸屬關係，也不授權再分發恢復後的二進制。
+{% hint style="warning" %}
+**法律聲明。** 本站內容僅供分析您本人擁有或已取得明確授權的二進位檔。各司法管轄區對於規避科技保護措施的法令與授權條款規定不同。本獨立研究不包含任何廠商原始碼或金鑰，與 HyperTech 無任何關聯，亦不授權重新散佈還原後的二進位檔。
+{% endhint %}

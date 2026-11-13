@@ -10,4 +10,4 @@
 * [verify\_docs.py](verify_docs.py.md)
 * [rust\_vectors.rs](rust_vectors.rs.md)
 * [vectors.txt](vectors.txt.md)
-* [調試日誌示例](sample-debug-logs.md)
+* [範例除錯記錄](sample-debug-logs.md)

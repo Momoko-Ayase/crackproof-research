@@ -1,10 +1,11 @@
 ---
-description: "Rolling, rotation, LFSR, string, page, on-demand page, CRC-32, checksum, and key-schedule reference code."
+description: "Rolling, rotation, LFSR, string, page, demand-page, CRC-32, checksum, and key-schedule reference code."
+icon: code
 ---
 
 # primitives.py
 
-The reference implementations of every data transform except the block cipher, the decompressor, and the bytecode VM. These are the ciphers and checksums documented in [Data transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/data-transforms).
+Reference implementations of every Windows transform except AES-CBC, Huffman/LZ decompression, and the bytecode VM; see [Data transforms](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/data-transforms).
 
 ```python
 """Reference implementations of the protection scheme's data transforms.
@@ -197,7 +198,8 @@ def lfsr_decrypt_block(d, pos):
 
 def string_cipher(d, pos, key):
     """Decrypt a NUL-terminated string in place: nibble swap, rolling
-    subtract (step 67). The initial key is the low byte of the string RVA."""
+    subtract (step 67). Initial key is name_rva & 0xFF for DLL names, or
+    hint_name_rva & 0xFF for IMAGE_IMPORT_BY_NAME strings at hint_name_rva + 2."""
     i = 0
     while d[pos + i] != 0:
         b = ror8(d[pos + i], 4)

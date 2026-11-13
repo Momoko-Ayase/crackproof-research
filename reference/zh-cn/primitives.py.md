@@ -1,10 +1,11 @@
 ---
-description: "滚动密钥、旋转、LFSR、字符串、页置乱、按需页、CRC-32、校验和与三角调度。"
+description: "滚动、旋转、LFSR、字符串、页密码、CRC-32 与密钥递进参考代码。"
+icon: code
 ---
 
 # primitives.py
 
-这是除分组密码、解压器与字节码 VM 之外全部数据变换的参考实现，对应 [数据变换](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/data-transforms/data-transforms) 中记载的各密码与校验和。
+除 AES-CBC、Huffman/LZ 解压与字节码 VM 外的全部 Windows 数据变换参考实现，详见[数据变换](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/data-transforms/data-transforms)。
 
 ```python
 """Reference implementations of the protection scheme's data transforms.
@@ -197,7 +198,8 @@ def lfsr_decrypt_block(d, pos):
 
 def string_cipher(d, pos, key):
     """Decrypt a NUL-terminated string in place: nibble swap, rolling
-    subtract (step 67). The initial key is the low byte of the string RVA."""
+    subtract (step 67). Initial key is name_rva & 0xFF for DLL names, or
+    hint_name_rva & 0xFF for IMAGE_IMPORT_BY_NAME strings at hint_name_rva + 2."""
     i = 0
     while d[pos + i] != 0:
         b = ror8(d[pos + i], 4)

@@ -1,45 +1,43 @@
 ---
-description: "根据作业列表生成 arare protect 命令行的 WPF 前端。"
+description: "用于构建、预览和批量运行 arare protect 与 verify 任务的 WPF 桌面前端。"
+icon: window-maximize
 ---
 
-# 图形界面
+# 桌面 GUI
 
-Arare 命令行的 WPF 前端。它根据作业列表生成 `arare protect` 调用，运行前显示确切命令，并按顺序执行作业，可选在保护后验证。
+`Arare.Gui.exe` 是基于 Windows Presentation Foundation（WPF）构建的桌面前端，可根据任务队列拼装 `arare protect` 命令行、实时预览完整的 CLI 调用，并按顺序执行批量加壳与可选的加壳后静态解码校验。
 
-构建需要 .NET 10 SDK，与托管工具使用的 SDK 相同。打包后的图形界面需要对应包架构的 .NET 10 Desktop Runtime。原生命令行只在打包托管输入时需要 .NET。
+## 编译与启动
+
+从源码编译需要 .NET 10 SDK；直接运行打包好的 GUI 需要对应版本的 .NET 10 Desktop Runtime。
 
 ```powershell
 dotnet build gui/ArareGui.slnx -c Release
-dotnet run --project gui/Arare.Gui
+dotnet run --project gui/Arare.Gui -c Release
 ```
 
-把 `Arare.Gui.exe` 放在 `arare.exe` 旁边。图形界面先在自身旁边查找 `arare.exe`，再查 `PATH`。探测失败时，选择状态栏中的 **Locate…** 指定其他位置。
-
-位置参数会预先加入文件与文件夹：
+可将 `Arare.Gui.exe` 与 `arare.exe` 放在同一目录（或确保 `arare.exe` 在 `PATH` 中），也可点击底部状态栏的 **Locate…** 手动指定其他 `arare.exe`。启动时传入文件或目录参数即可预填充队列：
 
 ```powershell
 Arare.Gui.exe app.exe game_folder\
 ```
 
-关闭子文件夹扫描时，文件夹选择器扫描根目录，并递归扫描在最多三层深度内找到的 `Managed` 或 `Plugins` 目录。开启子文件夹扫描会包含所选的整棵目录树。
+* **文件夹选择器：** 未勾选子目录递归时，仅扫描所选根目录以及最多三层深度内的 `Managed` 和 `Plugins` 子目录；勾选子目录递归后会遍历整棵目录树。
+* **命令行位置参数：** 通过启动参数传入的文件夹固定采用非递归规则（根目录加三层以内的 `Managed`/`Plugins`），不受已保存的子目录递归复选框影响。
 
-## 行为
+## 队列、参数覆盖与结果校验
 
-- 每一行作业拥有自己的保护配置。建议配置来自 PE：x86 对应 `pe32`，x64 对应 `pe64-modern`，AnyCPU 托管映像对应 `pe32`。`legacy-dll` 只对 64 位 DLL 有效。
-- 输出默认写到各输入旁的 `.\arare-protected\`，或写到选定的输出文件夹并保留文件名。
-- 输出路径重复，或输出与任一排队输入重叠的作业会被拒绝。伴生文件也包括在内，即使启用 **Replace existing outputs** 仍适用。对于文件名相同的输入，应使用各自的输出文件夹。
-- 环境检查、页加密与 scribble 跟随命令行按模块类型的默认值，包括 `disk-integrity` 取代 `clean-code` 的规则。复选框显示所选行的解析状态；覆盖某选项会做标记并提供复位。
-- 命令预览显示选定的命令行路径与保护参数。**Copy as .ps1** 导出把参数视为字面值的 PowerShell 命令，创建输出目录，包含选定的保护后验证，并在命令行返回非零退出码时停止。
-- **Protect** 按顺序运行作业。**Cancel** 会让当前文件的保护与可选验证完成，再停止剩余作业。运行期间关闭窗口会先请求确认，并等待该文件完成。
-- 启用 **Check encoding after protect** 时，每个输出用 `arare verify` 检查。该解码器检查不启动程序。
-- 设置保存在可执行文件旁的 `Arare.Gui.settings.json`。作业列表不会持久化。
+* **逐行配置推荐：** 根据 PE 头部自动预选布局配置（`x86` -> `pe32`，`x64` -> `pe64-modern`，`AnyCPU` 托管模块 -> `pe32`；`legacy-dll` 仅限 64 位 DLL 选择）。
+* **输出路径与冲突拦截：** 输出默认写入各输入文件同级的 `.\arare-protected\` 目录（也可统一指定单个输出目录）。若存在重复输出路径，或任意输出（含 `._` 伴随文件）会覆盖队列中的输入文件，即使勾选了 **Replace existing outputs**，程序也会在运行前直接拦截。
+* **生效配置展示：** 环境检查、页面加密、scribble 与 **ErrLog** 邮件槽上报（`--errlog`）复选框会实时显示当前模块类型的默认生效状态（包括 `disk-integrity` 自动取代 `clean-code` 的联动关系），高亮标出单行手动覆盖项，并提供一键重置按钮。`--antidebug-av` 不在界面中单独列出，直接沿用 CLI 按模块类型的默认设置（EXE 为 `on`，DLL 为 `off`）。
+* **脚本导出与批量执行：** 点击 **Copy as .ps1** 会生成可直接运行的 PowerShell 脚本，自动创建输出目录、调用 `arare protect`（及可选的 `arare verify`），并在退出码非零时立即中止。点击 **Protect 1 file** / **Protect N files** 按顺序执行队列；点击 **Cancel** 会在当前条目处理完成后停止后续任务。
+* **独立校验：** **Verify existing…** 在不启动目标程序的前提下遍历候选配置，对已加壳文件执行 `arare verify`；勾选 **Check encoding after protect** 则会在每个加壳任务完成后自动调用 `arare verify`。
+* **保存配置：** 界面偏好保存在可执行文件同目录的 `Arare.Gui.settings.json` 中；任务队列本身仅在当前会话内保留。
 
-## 测试
+## 冒烟测试
 
 ```powershell
-dotnet run --project gui/Arare.Gui.SmokeTests
+dotnet run --project gui/Arare.Gui.SmokeTests -c Release
 ```
 
-覆盖 PE 分类、命令构造、覆盖/默认模型、预览生成、校验、针对假后端的保护/验证流程、运行中关闭握手、文件夹扫描规则与设置持久化。
-
-许可证为 AGPL-3.0-only，与命令行一致。
+测试套件覆盖 PE 分类、CLI 参数拼装、按模块类型的默认值与覆盖状态解析、`.ps1` 脚本导出、路径冲突检查、基于 Mock 后端的加壳/校验状态切换、运行中关闭窗口确认、目录扫描深度规则及配置保存。许可证为 `AGPL-3.0-only`。

@@ -1,10 +1,11 @@
 ---
-description: "基於內容識別並分類受保護文件（KONN、原生/託管 EXE 與 DLL）。"
+description: "基於 KONN 標頭 KDF 的受保護 PE 識別與模組分類程式碼。"
+icon: fingerprint
 ---
 
 # detect.py
 
-這是識別與分類的參考實現，邏輯與 [識別與構建家族](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/file-structure/recognition) 中的記載一致。
+`KONN` 標頭金鑰衍生識別與 PE32/PE32+ 原生/受控模組分類參考實作，詳見[識別與建置家族](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/file-structure/recognition)。
 
 ```python
 """Content-based detection and classification of a protected PE file.

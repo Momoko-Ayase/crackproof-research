@@ -1,18 +1,19 @@
 ---
-description: Windows 載荷階段使用的滾動 XOR、dword 旋轉與字節旋轉變換。
+description: "滾動 XOR 負載鏈、XOR 右旋 dword 區塊與三重位元組旋轉加密。"
+icon: rotate
 ---
 
-# 滾動密鑰與旋轉密碼
+# 滾動金鑰與旋轉加密
 
-容器的每一層都由一小組原語構成。一旦逐個定義清楚，分階段加載器就只是「在偏移 X 處以密鑰 Y 調用原語 N」的嚴格有序重複。本頁精確定義每個原語，並給出 Python 實現。
+階段標頭與指標表採用四種小型原地（in-place）加密演算法，皆建立在 8 位元與 32 位元無號溢位回繞運算之上。
 
 {% hint style="success" %}
-本頁所有代碼片段都已實際執行並與受保護二進制中實現的算法核對：每個函數的輸出都在相同輸入上與參考移植逐字節比對一致。
+本頁所有 Python 函式皆會由 `verification/verify_docs.py` 自動執行，並與獨立參考測試向量逐位元組比對驗證。
 {% endhint %}
 
-## 約定
+## 共用位元寬度輔助函式
 
-所有緩衝區都是可變字節數組（`bytearray`）；原始算法原地工作。全文使用的輔助函數：
+以下所有函式皆直接在 `bytearray` 緩衝區上原地運算：
 
 ```python
 MASK32 = 0xFFFFFFFF
@@ -32,9 +33,9 @@ def rol8(x, n):  return ((x << n) | (x >> (8 - n))) & 0xFF
 def ror8(x, n):  return ((x >> n) | (x << (8 - n))) & 0xFF
 ```
 
-## 滾動密鑰家族
+## 負載滾動 XOR 鏈
 
-兩個密碼共享同一滾動密鑰設計：密鑰從種子開始，每個單元與當前密鑰異或，隨後密鑰混入單元值、循環索引與索引平方向前滾動。頭部 KDF（見[容器與加密頭](../file-structure/container-layout.md)）是 8 單元實例；payload 主體密碼是同族的長形式，種子與更新規則不同：
+`payload_xor_chain` 與 `header_kdf`（見[容器結構與加密標頭](../file-structure/container-layout.md)）共用相同的索引平方回饋結構，但回饋項由 `- i` 改為 `+ i`，初始種子則為 `info[0] + ~decrypt_size`：
 
 ```python
 def payload_xor_chain(file_data, out, info, decrypt_size):
@@ -47,11 +48,11 @@ def payload_xor_chain(file_data, out, info, decrypt_size):
         k = (i * i) ^ ((k + cell + i) & MASK32)
 ```
 
-由於密鑰逐 dword 向前滾動，該鏈必須從頭開始解——不重放整條鏈就無法對 payload 做隨機訪問。
+由於 `k` 每輪都會混入密文 dword `cell`，解密必須以精確的 `decrypt_size`（一般為 `info[6] - info[3] + 8192`，全負載加密的精簡型 PE32 組建則為 `info[5]`）從 `i = 0` 依序算起。
 
-## XOR + 循環右移 dword 密碼
+## XOR 與右旋 dword 加密（`dd3`）
 
-這個密碼用於解開每個階段的指針塊。它從緩衝區自身讀出 `(base_addr, length)` 描述符，然後變換每個 dword：與滾動密鑰異或、按固定移位量循環右移、再減去循環索引。移位量按調用點取 19 或 21。
+`xor_ror_dwords` 會先從 `pos` 讀取 `{base_addr, length}`，接著將每個 dword 與 `key` 做 XOR、右旋 `shift` 位元（64 位元階段為 `19` 或 `21`），最後減去 dword 索引 `i`：
 
 ```python
 def xor_ror_dwords(d, pos, key, shift):
@@ -64,11 +65,11 @@ def xor_ror_dwords(d, pos, key, shift):
         put_u32(d, off, (ror32(v, shift) - i) & MASK32)
 ```
 
-32 位構建還會對其中一個階段在候選集 `[19, 21, 17, 23, 15, 25, 13, 11]` 上爆破移位量，接受輸出能解析為合法階段表的那個（見[加載與節恢復](../loading-and-pe-repair/loading/README.md)）。
+PE32 組建會對其中一個階段逐一測試 8 組候選旋轉位數 `[19, 21, 17, 23, 15, 25, 13, 11]`，並保留輸出能通過後續階段表驗證的那一組（詳見[PE32、專用 DLL 與無標記版型](../loading-and-pe-repair/loading/layout-variants.md)）。
 
-## 三重字節旋轉密碼
+## 三重位元組旋轉加密（`dd4` 與 `dd5`）
 
-兩個字節密碼共享同一結構：每字節三次位旋轉，旋轉之間異或兩個滾動密鑰字節。它們的區別在於旋轉量與初始密鑰的派生方式。
+這兩種位元組轉換在解密時皆將每個位元組左旋三次，並在旋轉之間與兩個遞增的金鑰位元組做 XOR：
 
 ```python
 def byte_rotate3(d, pos):
@@ -98,7 +99,7 @@ def byte_rotate2(d, va, size):
         b2 = (b2 + 1) & 0xFF
 ```
 
-位置密鑰變體有一個加載器各表遍歷重度依賴的性質：**每個輸出字節只依賴輸入字節與其地址的低 8 位**——無跨字節狀態。因此任意 4 字節都可以在不觸碰緩衝區其餘部分的情況下試解：
+在 `byte_rotate2` 中，位址 `va + i` 的解密結果僅取決於 `d[va + i]` 與 `(va + i) & 0xFF`，不依賴前序位元組的狀態；因此在探索描述子表時，可不改動原緩衝區直接試解 4 位元組：
 
 ```python
 def trial_byte_rotate2(d, va):
@@ -112,4 +113,4 @@ def trial_byte_rotate2(d, va):
     return get_u32(out, 0)
 ```
 
-加載器中貫穿始終的 16 字節描述符都用 `byte_rotate2` 加密，按位置串聯：每個描述符的密鑰來自其自身地址，遍歷在長度字段為零時終止。
+連續排列的 16 位元組載入器描述子陣列會在各項目自身的 RVA 處以 `byte_rotate2` 加密，並以 `length` 欄位為 `0` 的項目作為陣列結尾。

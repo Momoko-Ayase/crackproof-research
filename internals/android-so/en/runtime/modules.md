@@ -1,51 +1,52 @@
 ---
-description: "Observed roles of runtime modules, listed by identifier."
+description: "Catalog of Stage 2 module identifiers across stream interpreters, ELF/metadata restoration, and runtime checks."
+icon: layer-group
 ---
 
 # Runtime modules
 
-Command identifiers on this page come from stage 2 records. Roles are taken from the functions those modules run after they're materialized. Identifiers required for ELF restoration stay on [Module streams](../restoration/module-streams.md). Environment and integrity behavior is collected on [Environment and integrity checks](environment-checks.md).
+Stage 2 records register modules by a 1-byte `command_id` (`0x00`..`0xFF`). Static restoration uses the modules documented in [Module streams](../restoration/module-streams.md); the remaining modules run load-time checks or helper services.
 
-An identifier listed as “observed only” was present as a record; its meaning isn't known.
-
-## Interpreters and handoff
+## Stream interpreters and bootstrap slots
 
 | ID | Role |
 | --- | --- |
-| `0xE2`–`0xE8` | Nested record-stream interpreters. `0xE2` is stage 2 itself |
-| `0xF3`–`0xF8` | Direct data objects that feed the next interpreter |
-| `0xD0` | File-tail mapping handed over from stage 1 |
-| `0x98` | Final handoff: copies the restored image and invokes `.init_array`. Corresponds to Windows status `280` |
+| `0xE2`..`0xE8` | Nested record-stream interpreters (`0xE2` is the decrypted Stage 2 root image) |
+| `0xF3`..`0xF8` | Direct stream slices passed as input to `0xE3`..`0xE8` (`sid = command_id - 0x10`) |
+| `0xD0` | `SHT_LOUSER` file-tail mapping registered by Stage 2 from `(X6, X7)` |
 
-## Restoration
-
-| ID | Role |
-| --- | --- |
-| `0x9B` | Restore workflow: page permissions, consume `0x9D` and `0x9E` |
-| `0x9D` | Protected container: descriptors, segments, compressed-block streams |
-| `0x9E` | Hidden dynamic-symbol patches (`dynsym` / `dynstr`) |
-| `0xB9` | Metadata-related data. A real payload on IL2CPP libraries; empty or data-less on some native libraries |
-| `0x0C` | IL2CPP only. Replaces `mmap` with a hook that restores method tokens when `global-metadata.dat` is mapped. See [Method tokens](../metadata/method-tokens.md) |
-
-## Environment and integrity
+## Image, symbol, constructor, and metadata restoration
 
 | ID | Role |
 | --- | --- |
-| `0x81` | Decrypt a library name and symbol, `dlopen` / `dlsym`, cache the pointer |
-| `0x96` | 16-byte block transform used as a general decryptor |
-| `0x8F` | Read `/proc/self/cmdline`, query uid/gid/tid, create or reuse an environment token, check path owner and mode |
-| `0x97` | Scan `/proc` for same-uid processes; `mprotect` around code writes; start a detached worker thread |
-| `0x02` | UDP port 123 time query, then compare the reply with a configured threshold |
-| `0x69` | `fork` a child probe and wait for its exit status |
-| `0x60` | Scan system library directories, `/proc` environment, and runtime paths |
-| `0x40` | Check `base.apk` and sibling split APKs. Signature order: v3.1, then v3, then v2, then JAR/v1 |
-| `0x20` | Validate a target path, ELF header, `/proc/self/maps`, and a libc mapping |
-| `0x33` | Build a dex2oat option list and delete artifacts that don't match it |
-| `0x72` | Unix-domain socket `bind` / `listen` / `accept` |
-| `0xB0` | Transform a sentinel table |
+| `0x9B` | Restoration coordinator holding `Module9bConfig` (`header_seed`, `container_seed`, reversed AES-256 round keys, `skip_aes`); restores target segments and permissions |
+| `0x9D` | Direct payload holding the `0x5C` `ProtectedDescriptor`, the primary `PT_LOAD` container, and the auxiliary relocation/symbol container |
+| `0x9E` | Hidden `.dynsym` symbols and `.dynstr` strings stripped from the visible ELF |
+| `0x96` | 16-byte block decryptor holding `auxiliary_symbol_seed`, used to unpermute auxiliary relocation symbol indices |
+| `0x98` | Final constructor dispatcher: resolves and invokes the target library's `.init_array` callbacks after image restoration (analogous to Windows status `280`) |
+| `0x0C` | IL2CPP builds only: hooks `mmap` to deobfuscate `global-metadata.dat` at load time, and embeds the `v24.1` `methodIndex` seed plus 256-entry exception table |
+| `0xB9` | Auxiliary metadata-related blob (populated on IL2CPP builds; absent or empty on plain native libraries) |
 
-## Observed only
+## Environment, symbol lookup, and integrity helpers
+
+| ID | Role |
+| --- | --- |
+| `0x81` | Decrypts library and symbol names, resolves pointers via `dlopen` / `dlsym`, and caches them |
+| `0x8F` | Reads `/proc/self/cmdline`, queries `uid`/`gid`/`tid`, manages an environment token, and checks path ownership/mode |
+| `0x97` | Scans `/proc` for same-UID processes, brackets code writes with `mprotect`, and launches a detached monitor thread |
+| `0x02` | Sends a UDP port-123 NTP time query and checks the response against a threshold |
+| `0x69` | `fork`s a probe child process and checks its exit status |
+| `0x60` | Scans system library folders, `/proc` environment variables, and runtime paths |
+| `0x40` | Validates `base.apk` and split APK signatures (v3.1 -> v3 -> v2 -> v1/JAR) |
+| `0x20` | Verifies target file paths, ELF headers, `/proc/self/maps`, and the `libc` mapping |
+| `0x33` | Builds a `dex2oat` option list and removes non-matching oat/art artifacts |
+| `0x72` | Opens and accepts connections on a Unix-domain socket (`bind` / `listen` / `accept`) |
+| `0xB0` | Transforms an internal sentinel table |
+
+<details>
+<summary>Additional observed module IDs (unclassified)</summary>
 
 `0x8E`, `0x6A`, `0x68`, `0x54`, `0x71`, `0x53`, `0xA4`, `0x58`, `0x73`, `0xA0`, `0xB2`.
 
-These appear in the same interpreter layers as the tables earlier on this page. They're registered and, unless `flags & 0x100`, receive init/entry calls. Their meaning isn't known beyond that.
+These identifiers appear in nested Stage 2 streams alongside the modules above, register in the 256-slot table, and run `init`/`entry` callbacks unless `flags & 0x100` is set. Static ELF restoration does not depend on them.
+</details>

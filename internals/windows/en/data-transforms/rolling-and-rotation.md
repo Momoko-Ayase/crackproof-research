@@ -1,18 +1,19 @@
 ---
-description: "The rolling XOR, dword rotation, and byte rotation transforms used by Windows payload stages."
+description: "Rolling XOR payload chains, XOR-and-rotate dword blocks, and triple byte-rotation ciphers."
+icon: rotate
 ---
 
 # Rolling-key and rotation ciphers
 
-Every layer of the container is built from a small set of primitives. Once each one is defined, the staged loader is "apply primitive N at offset X with key Y" repeated in a strict order. This page defines each primitive precisely, with a Python implementation.
+Stage headers and pointer tables use four small in-place ciphers built on 8-bit and 32-bit unsigned wraparound.
 
 {% hint style="success" %}
-Every code snippet on this page has been executed and verified against the algorithms as implemented in protected binaries: each function's output was compared byte-for-byte with a reference port on identical inputs.
+Every Python function on this page is executed automatically by `verification/verify_docs.py` and checked byte-for-byte against independent reference test vectors.
 {% endhint %}
 
-## Conventions
+## Shared bit-width helpers
 
-All buffers are mutable byte arrays (`bytearray`); the original algorithms work in place. Helpers used throughout:
+All functions operate on mutable `bytearray` buffers in place:
 
 ```python
 MASK32 = 0xFFFFFFFF
@@ -32,9 +33,9 @@ def rol8(x, n):  return ((x << n) | (x >> (8 - n))) & 0xFF
 def ror8(x, n):  return ((x >> n) | (x << (8 - n))) & 0xFF
 ```
 
-## The rolling-key family
+## Payload rolling XOR chain
 
-Two ciphers share one rolling-key design: the key starts from a seed, each cell is XORed with the current key, and the key then rolls forward by mixing in the cell value, the loop index, and the square of the index. The header KDF (see [Container and encrypted header](../file-structure/container-layout.md)) is the 8-cell instance; the payload body cipher is the long-form instance with a different seed and update rule:
+`header_kdf` (on [Container and encrypted header](../file-structure/container-layout.md)) and `payload_xor_chain` share the same index-squared feedback structure with `+ i` instead of `- i` and seed `info[0] + ~decrypt_size`:
 
 ```python
 def payload_xor_chain(file_data, out, info, decrypt_size):
@@ -47,11 +48,11 @@ def payload_xor_chain(file_data, out, info, decrypt_size):
         k = (i * i) ^ ((k + cell + i) & MASK32)
 ```
 
-Because the key rolls forward with each dword, the chain must be decrypted from the start. Random access into the payload is impossible without replaying the chain.
+Because `k` incorporates every ciphertext dword `cell`, decryption must start at `i = 0` with the exact `decrypt_size` (`info[6] - info[3] + 8192`, or `info[5]` on full-payload compact PE32 builds).
 
-## XOR + rotate-right dword cipher
+## XOR and rotate-right dword cipher (`dd3`)
 
-This cipher unwraps each stage's pointer blocks. It reads a `(base_addr, length)` descriptor from the buffer itself, then transforms each dword: XOR with the rolling key, rotate right by a fixed shift, and subtract the loop index. The shift is 19 or 21 depending on the call site.
+This primitive reads `{base_addr, length}` at `pos`, then XORs each dword with `key`, rotates right by `shift` (`19` or `21` on 64-bit stages), and subtracts dword index `i`:
 
 ```python
 def xor_ror_dwords(d, pos, key, shift):
@@ -64,11 +65,11 @@ def xor_ror_dwords(d, pos, key, shift):
         put_u32(d, off, (ror32(v, shift) - i) & MASK32)
 ```
 
-32-bit builds additionally brute-force the shift for one stage from the candidate set `[19, 21, 17, 23, 15, 25, 13, 11]`, accepting the shift whose output parses as a valid stage table (see [Loading and section recovery](../loading-and-pe-repair/loading/README.md)).
+PE32 builds trial-decrypt one stage across the eight-shift candidate list `[19, 21, 17, 23, 15, 25, 13, 11]` and keep the shift whose output passes downstream stage-table validation (see [PE32, DLL, and marker-less layouts](../loading-and-pe-repair/loading/layout-variants.md)).
 
-## Triple byte-rotation ciphers
+## Triple byte-rotation ciphers (`dd4` and `dd5`)
 
-Two byte ciphers share a structure: three bit-rotations per byte, with two rolling key bytes XORed between rotations. They differ in rotation amount and in how the initial key is derived.
+Both byte ciphers rotate each byte left three times with two incrementing key bytes XORed between rotations:
 
 ```python
 def byte_rotate3(d, pos):
@@ -98,7 +99,7 @@ def byte_rotate2(d, va, size):
         b2 = (b2 + 1) & 0xFF
 ```
 
-The position-keyed variant has a property the loader's table walks rely on heavily: **each output byte depends only on the input byte and the low 8 bits of its address**. There's no cross-byte state. Any four bytes can therefore be trial-decrypted without touching the rest of the buffer:
+In `byte_rotate2`, byte `va + i` depends solely on `d[va + i]` and `(va + i) & 0xFF` with no carry from previous bytes, allowing non-destructive 4-byte lookahead during descriptor-table discovery:
 
 ```python
 def trial_byte_rotate2(d, va):
@@ -112,4 +113,4 @@ def trial_byte_rotate2(d, va):
     return get_u32(out, 0)
 ```
 
-16-byte descriptors throughout the loader are encrypted with `byte_rotate2`, chained positionally: each descriptor's key comes from its own address, and the walk terminates on a zero length field.
+Chained 16-byte loader descriptors are encrypted under `byte_rotate2` at their own RVAs and terminate on a zero `length` field.

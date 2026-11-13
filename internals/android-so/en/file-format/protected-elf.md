@@ -1,35 +1,51 @@
 ---
-description: "ELF properties and private-section facts used to identify protected Android libraries."
+description: "ELF64 properties, required dynamic sections, and private-section rules that identify protected Android libraries."
+icon: file-code
 ---
 
 # Protected ELF
 
 ## Required ELF shape
 
-Recognition accepts ELF64, little-endian files for AArch64. The file must contain the dynamic-linking information expected by a native shared library:
+A protected binary is a little-endian ELF64 shared object targeting AArch64 (`EM_AARCH64 = 183`, `e_phentsize = 0x38`, `e_shentsize = 0x40`). Section names are resolved from `.shstrtab`, which must be a valid UTF-8 `SHT_STRTAB` within file bounds.
 
-| Section | Why it matters |
-| --- | --- |
-| `.dynsym` and `.dynstr` | Dynamic symbols and their names |
-| `.gnu.hash` | GNU symbol lookup data |
-| `.gnu.version` | Symbol-version indexes |
-| `.gnu.version_r` | Required version definitions |
-| One `SHT_LOUSER` section | Private protection payload |
+| Section | Requirement | Purpose |
+| --- | --- | --- |
+| `.dynsym` and `.dynstr` | Required | Dynamic symbol records and symbol name strings |
+| `.gnu.hash` and/or `.hash` | At least one | Symbol hash lookup table (GNU hash, SysV hash, or both) |
+| `.gnu.version` | Required | Per-symbol version indices |
+| `.gnu.version_r` | Required | Required symbol version definitions |
+| `.dynamic`, `.rela.dyn`, `.rela.plt` | Once each (restoration) | Dynamic tags, data relocations, and PLT relocations |
+| `SHT_LOUSER` (`0x80000000`) | Exactly one, final section | Encrypted Stage 1 and Stage 2 protection payload |
 
-The private section is the distinguishing feature. More than one private section, a section whose file range is outside the file, or an ELF class/endianness mismatch is rejected before any decryption is attempted.
+Files with zero or multiple `SHT_LOUSER` sections, out-of-bounds section ranges, or another architecture or endianness are rejected before decryption runs. The `SHT_LOUSER` section is always the final entry in the section header table and starts at the 16-byte-aligned end of the file-backed `PT_LOAD` range (with zero padding in any alignment gap).
 
-Section names are read from the ELF string table (`.shstrtab`), which must be a well-formed `SHT_STRTAB`. A malformed string table is a format error, and names are never guessed.
+```mermaid
+flowchart TB
+    subgraph Protected["Protected ELF on disk"]
+        direction LR
+        P1["ELF hdr + PHDRs\n+ Stage 1 stub in .text"] --> P2["Hollowed PT_LOAD\n(zeroed code/data)"]
+        P2 --> P3["SHT_LOUSER\n(16B-aligned payload)"]
+        P3 --> P4[".shstrtab + Shdrs"]
+    end
+    subgraph Restored["Restored ELF"]
+        direction LR
+        R1["ELF hdr + PHDRs\n(e_entry = 0)"] --> R2["Recovered PT_LOADs\n+ rebuilt dynamic tables"]
+        R2 --> R3["Optional appended\nPF_R PT_LOAD"]
+        R3 --> R4[".shstrtab + Shdrs\n(SHT_LOUSER removed)"]
+    end
+    Protected --> Restored
+```
 
-Restoration additionally requires `.dynamic`, `.rela.dyn`, and `.rela.plt`, each exactly once. The private section is the last section header and begins at the 16-byte-aligned end of the file-backed `PT_LOAD` range.
+Inside `.init_array`, one `R_AARCH64_RELATIVE` entry points to the `0x84`-byte Stage 1 bootstrap wrapper in the intact `.text` head (saving `X1`..`X30` with 15 `STP` instructions, passing `SP` in `X0`, calling the bootstrap body, restoring registers, and returning). Other `.init_array` entries are either unsuppressed constructors kept in linker order, `RET`-only (`0xD65F03C0`) placeholders, or hollowed addresses that only become valid after restoration and constructor recovery via module `0x98`.
 
-`.init_array[0]` points at the stage 1 stub in the intact `.text` head. Later entries point into ranges that are empty on disk and only become valid after restoration.
+## Visible headers and companion files
 
-## What remains visible
+The protected file retains parseable ELF headers, program headers, section headers, and `.dynamic` entries, though several dynamic tables are truncated or stripped of hidden symbols and relocations. Identifying a protected binary requires matching this ELF layout alongside the checks in [Stage 1 header](stage1.md) and [Stage 2 streams](stage2-streams.md), rather than relying on the presence of `SHT_LOUSER` alone.
 
-The protected file still has a usable ELF header, program headers, section headers, and dynamic section. Their values may describe the protected layout rather than the final in-memory image, so they're treated as input to recovery, not as proof that the output is already correct.
+Protected APKs frequently include two auxiliary files alongside the target `.so`:
 
-The private section's name isn't used as the only recognition signal. Section type, range, header fields, and the stream checks described on [Stage 1 header](stage1.md) and [Stage 2 streams](stage2-streams.md) must agree.
+* `lib__XXXX__.so` (where `XXXX` is a short build stamp): a standalone copy of the Stage 1/2 protector stub.
+* `assets/<id>/data1.dat` (roughly 180 KiB of high-entropy data): a small configuration table listing protected library names and per-library settings.
 
-The same APK often ships a second native library whose file name is `lib__XXXX__.so`, where `XXXX` is a short build stamp, and a high-entropy `assets/<id>/data1.dat` of about 180 KiB.
-
-Those files are part of the protection, not of the restored ELF. The named library is a second copy of the stage 1/2 stub, and `data1.dat` holds a small record table (library names and per-library configuration). Neither is a substitute for the `SHT_LOUSER` checks in [Required ELF shape](#required-elf-shape).
+Both are runtime wrapper artifacts unused by the restored library.

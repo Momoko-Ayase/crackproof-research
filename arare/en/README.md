@@ -1,29 +1,26 @@
 ---
 description: "A source-built Windows PE protector that reproduces observed CrackProof layout families."
+icon: shield-halved
 ---
 
 # Arare
 
-Arare is a source-built Windows PE protector. It generates its own loader, keys, AES schedules, byte programs, compression tables, and stage metadata. There are no commercial donor executables or extracted stub profiles.
+Arare is a source-built Windows PE protector. It compiles its own native and managed loaders and generates per-build keys, AES schedules, bytecode programs, Huffman/LZ compression tables, and stage metadata without commercial donor binaries or extracted stub profiles.
 
-Native protection covers x86 EXEs/DLLs and x64 EXEs/DLLs through the PE32, classic PE32+, modern PE32+, and legacy-DLL families. Managed protection uses readable IL entry wrappers and an independent native decoder. Compatibility is checked against unchanged Senbei and by executing generated original, protected, and recovered programs. Commercial byte identity is not a target.
+Native protection covers x86 and x64 EXEs and DLLs across four structural families (`pe32`, `pe64-classic`, `pe64-modern`, and `legacy-dll`). Managed protection wraps IL assemblies with generated ECMA-335 startup types and an independent native decoder. Compatibility is verified against unchanged Senbei 1.3.1 and by executing original, protected, and unpacked programs on Windows 11 build 26100 (targeting Windows 10 and Windows 11).
 
-Windows 10 and Windows 11 are the target platforms. Current execution evidence is Windows 11 build 26100. Runtime behavior follows the observed CrackProof pipeline: per-build gated debug logging, configurable environment and anti-analysis checks running from manually mapped support modules, demand-decrypt page encryption, seeded loader-code variation, and erasure of spent runtime metadata. Logging uses observed status codes plus explicit Arare extensions, including the optional `541` Hyper-V guest policy. Check failures terminate silently with `AAA-BBB-CCC` failure codes. These shared mechanisms don't establish identical commercial checks or page ciphers; see [Design](design.md).
+The embedded runtime implements per-build `%TEMP%`-gated debug logging, configurable environment checks inside manually mapped helper DLLs, page encryption with on-fault decryption (`KiUserExceptionDispatcher`), seeded loader-code variation, and post-startup metadata erasure. Failed checks write an `AAA-BBB-CCC` closing code to active logs; native EXEs raise `EXCEPTION_ACCESS_VIOLATION` before terminating by default (`--antidebug-av=on`) so attached debuggers break, while DLLs, `--antidebug-av=off` native EXEs, and managed modules call `TerminateProcess` directly.
 
-The protection formats and runtime behavior behind these outputs are documented in [CrackProof for Windows internals](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/). Senbei, the project's static unpacker, is documented in [Senbei](https://app.gitbook.com/s/ul1YGOqMPNVceXYP7FFj/).
-
-Android, kernel components as a packer option, and standalone IL2CPP metadata obfuscation are deferred. An experimental kernel provider exists in the source tree; it is not a `protect` option.
+For the underlying formats, see [CrackProof for Windows internals](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/). Static unpacking is documented in [Senbei](https://app.gitbook.com/s/ul1YGOqMPNVceXYP7FFj/).
 
 ## In this section
 
-| Page | What it covers |
-| --- | --- |
-| [Usage](usage.md) | Command-line protect, inspect, and verify |
-| [GUI](gui.md) | WPF front-end that builds the same command lines |
-| [Support](support.md) | Tested families, hosts, and explicit refusals |
-| [Design](design.md) | Workspace layout, encoding, and runtime contract |
-| [Development](development.md) | Building, testing, and contributing |
+<table data-view="cards"><thead><tr><th width="48"></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><i class="fa-terminal"></i></td><td><strong>Usage</strong></td><td>CLI <code>protect</code>, <code>inspect</code>, and <code>verify</code> commands, profiles, environment checks, page encryption, and debug logs.</td><td><a href="usage.md">Usage</a></td></tr><tr><td><i class="fa-window-maximize"></i></td><td><strong>GUI</strong></td><td>WPF front-end for batch job queues, per-row profile and check overrides, PowerShell export, and verification.</td><td><a href="gui.md">GUI</a></td></tr><tr><td><i class="fa-circle-check"></i></td><td><strong>Support</strong></td><td>Supported native and managed families, tested CLR hosts, pack-time refusals, and structural limits.</td><td><a href="support.md">Support</a></td></tr><tr><td><i class="fa-diagram-project"></i></td><td><strong>Design</strong></td><td>Crate boundaries, store-once section and resource encoding, three-phase runtime startup, and remaining commercial gaps.</td><td><a href="design.md">Design</a></td></tr><tr><td><i class="fa-hammer"></i></td><td><strong>Development</strong></td><td>Building native loaders and managed tools, running the Senbei 1.3.1 oracle, and workspace conventions.</td><td><a href="development.md">Development</a></td></tr></tbody></table>
 
-## Licenses
+## Scope and licenses
 
-The CLI, format orchestration, and managed metadata writer are AGPL-3.0-only. The PE model, codec implementations, and independently written native and managed runtime are MIT. The AGPL metadata writer is not embedded in protected applications. Senbei is a read-only test reference and is excluded from ordinary workspace builds.
+Android targets, standalone IL2CPP `global-metadata.dat` obfuscation, and kernel driver options in `protect` are out of scope (an experimental kernel provider lives separately under `kernel/`).
+
+{% hint style="info" %}
+**Licensing split.** Host tooling (`arare-cli`, `arare-engine`, `tools/managed`, `gui`, and `verification/senbei-oracle`) is `AGPL-3.0-only`. The PE parser (`arare-pe`), codecs (`arare-codec`), and all embedded native and managed runtime code (`arare-runtime`, `runtime/`) are `MIT`, so no AGPL code is embedded into protected binaries.
+{% endhint %}

@@ -1,18 +1,15 @@
 ---
-description: "执行三种语言的 Windows Markdown Python 片段并检查结果。"
+description: "执行全部五种语言 Windows 文档中 80 个 Python 代码块的校验脚本。"
+icon: list-check
 ---
 
 # verify\_docs.py
 
-检查器读取文档仓库的 Windows 页面，为每种语言建立独立命名空间，执行全部 Python 代码块，并对照 `verification/vectors.txt` 比较选定结果。页面覆盖列表不完整时会拒绝继续。配置的输入在每种语言的九个页面、16 个 Python 代码块上产生 27 项比对。
-
-在文档仓库根目录运行 `python verification/verify_docs.py`。预期结束输出：`all Windows doc snippets verified (3 languages, 48 Python blocks, 81 checks)`。
-
-检查器需要文档目录树。它检查转录与配置的向量案例；仅执行函数定义不会测试所有分支，也不能证明运行时保护行为。
+提取并执行五种语言版本（`en`、`zh-cn`、`zh-tw`、`ja`、`ko`）九个 Windows 数据变换页面中的全部 16 个 Python 代码块（每种语言 27 项检查，共 80 个代码块、135 项检查）。在仓库根目录运行 `python verification/verify_docs.py`。
 
 ```python
 """Execute the Windows Markdown Python blocks and compare their results with
-the checked-in reference vectors for English and both Chinese variants.
+the checked-in reference vectors across all five published languages.
 
 Run from the repository root with: python verification/verify_docs.py
 """
@@ -22,7 +19,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LANGUAGES = ("en", "zh-cn", "zh-tw")
+LANGUAGES = ("en", "zh-cn", "zh-tw", "ja", "ko")
 PYTHON_BLOCK = re.compile(r"^```python[ \t]*\n(.*?)^```[ \t]*$", re.M | re.S)
 
 PAGES = [

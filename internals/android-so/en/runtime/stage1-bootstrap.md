@@ -1,57 +1,50 @@
 ---
-description: "How stage 1 finds the private section and decrypts the stage 2 image."
+description: "How the Stage 1 .init_array wrapper locates its ELF on disk, decrypts Stage 2, and transfers control."
+icon: bolt
 ---
 
 # Stage 1 bootstrap
 
-Stage 1 is the stub that remains in the visible `.text` head. `.init_array[0]` points at it. The stub locates its own file, reads the private section, decrypts the stage 2 image, and transfers control.
+One `.init_array` entry points to a `0x84`-byte register-saving wrapper in the intact `.text` head (15 `STP` instructions saving `X1`..`X30`, `MOV X0, SP`, `BL` into the bootstrap body, 15 `LDP` restores, and `RET`). The bootstrap locates its own file via `/proc/self/maps`, reads `SHT_LOUSER`, decrypts Stage 2 into anonymous memory, and jumps to its entry point.
 
 ```mermaid
 flowchart TD
-    A["Save registers and enter stage 1"] --> B["Compute the runtime image base"]
-    B --> C["Open and parse /proc/self/maps"]
-    C --> D["Read the ELF and the last PT_LOAD tail"]
-    D --> E["Find the SHT_LOUSER section"]
-    E --> F["Skip the 0x23C-byte outer wrapper"]
-    F --> G["Decrypt the 32-byte parameter header"]
-    G --> H["Anonymous RW map for stage 2"]
-    H --> I["Decrypt the stage 2 image in place"]
-    I --> J["Detect 4 KiB or 16 KiB pages"]
-    J --> K["Instruction-cache flush"]
-    K --> L["mprotect the stage 2 image"]
-    L --> M["Branch to the stage 2 entry"]
-    B -. any step fails .-> X["Error stub"]
-    C -. any step fails .-> X
-    D -. any step fails .-> X
-    E -. any step fails .-> X
-    G -. any step fails .-> X
+    A["Enter 0x84-byte .init_array wrapper\n(save X1..X30, X0 = SP)"] --> B["Compute runtime image base via ADR"]
+    B --> C["Decrypt path, open & parse /proc/self/maps"]
+    C --> D["Read ELF header, PHDRs, Shdrs & PT_LOAD tail"]
+    D --> E["Locate SHT_LOUSER (0x80000000)"]
+    E --> F["Skip 0x23C outer wrapper & decrypt 32B header"]
+    F --> G["Anonymous RW mmap for Stage 2"]
+    G --> H["Decrypt Stage 2 words with payload_key"]
+    H --> I["Detect 4 KiB or 16 KiB page size"]
+    I --> J["Flush caches (DC / IC / DSB / ISB) & mprotect"]
+    J --> K["Branch to stage2_base + entry_offset"]
+    B -. failure .-> X["Error stub"]
+    C -. failure .-> X
+    D -. failure .-> X
+    E -. failure .-> X
+    F -. failure .-> X
 ```
 
-## Finding the file
+## Locating `SHT_LOUSER`
 
-The stub takes its own runtime address with `ADR`, subtracts the link-time offset, and walks `/proc/self/maps` for the mapping that covers that address. The maps path is decrypted into a short buffer and wiped after `open`. A failed maps parse stops the stub.
+Stage 1 obtains its own PC with `ADR`, subtracts its link-time offset to get the loaded library's base address, decrypts `"/proc/self/maps"` into a stack buffer, opens it, and immediately wipes the path buffer. After finding the backing file path for its load base, it reads the ELF header, program headers, and section headers (`Elf64_Shdr` stride `0x40`) to locate `sh_type == 0x80000000` (`SHT_LOUSER`) after the last `PT_LOAD` segment.
 
-It then reads the ELF header and enough of the program and section header tables to find the last `PT_LOAD` segment. A second read starts at that segment's file end and covers the tail that holds the private section.
+Skipping the `0x23C`-byte outer wrapper reaches the `0x1000`-byte parameter area whose first 32 bytes decode under the family word constant `C` (`0xBF20165D` or `0xBF189BDD`; see [Stage 1 header](../file-format/stage1.md)).
 
-## The private section
+## Stage 2 mapping and register handoff
 
-Section headers are scanned at `Elf64_Shdr` stride `0x40` for `sh_type == 0x80000000` (`SHT_LOUSER`). After the section start, the stub skips `0x23C` (572) bytes, the outer wrapper documented in [Stage 1 header](../file-format/stage1.md), and treats the next 32 bytes as the encrypted parameter header.
-
-Two word constants have been observed for the header and payload cipher: `0xbf20165d` and `0xbf189bdd`. Each family uses one of them. The first word is the key and is restored after the 32-byte header is decrypted.
-
-## Handoff to stage 2
-
-The stub maps an anonymous writable region, copies the encrypted stage 2 image, decrypts it with the payload key, probes the page size (4 KiB or 16 KiB), flushes the instruction cache with `DC`/`IC`/`DSB`/`ISB`, and `mprotect`s the image. It then branches to `stage2_base + entry_offset` with:
+Stage 1 allocates an anonymous writable region of `payload_size` bytes, copies and decrypts the Stage 2 image with `payload_key`, detects 4 KiB vs 16 KiB system pages, flushes data and instruction caches (`DC` / `IC` / `DSB` / `ISB`), applies `mprotect` over `protect_size`, and branches to `stage2_base + entry_offset` with eight arguments:
 
 | Register | Value |
 | --- | --- |
-| `X0` | Loader context |
-| `X1` | Self image base |
-| `X2` | Stage 2 base |
-| `X3` | Stage 2 size |
-| `X4` | Remaining private-section base |
-| `X5` | Remaining private-section size |
+| `X0` | Loader context pointer |
+| `X1` | Protected library's runtime image base |
+| `X2` | Decrypted Stage 2 base address |
+| `X3` | Decrypted Stage 2 byte size (`payload_size`) |
+| `X4` | Remaining `SHT_LOUSER` stream base (4-byte-aligned end of Stage 2) |
+| `X5` | Remaining `SHT_LOUSER` stream size |
 | `X6` | File-tail mapping base |
 | `X7` | File-tail mapping size |
 
-`X6` and `X7` become module `0xD0` in the stage 2 table.
+Stage 2 immediately records `(X2, X3)` as module `0xE2` and `(X6, X7)` as module `0xD0`.

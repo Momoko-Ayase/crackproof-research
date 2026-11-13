@@ -1,81 +1,52 @@
 ---
-description: "Workspace layout and the Windows and Android restoration pipelines."
+description: "Nine-crate workspace layout, profiles and research traces, observer hooks, Windows and Android pipelines, and WebAssembly."
+icon: diagram-project
 ---
 
 # Design
 
-This page covers the Senbei workspace layout and the Windows and Android restoration pipelines.
+## Workspace architecture
 
-## Crate layout
+The Cargo workspace contains nine member crates, with `senbei-wasm` (browser bindings) and `fuzz` (`libFuzzer` harness) excluded as standalone crates:
 
-Seven crates make up the workspace; the browser binding `senbei-wasm` is a separate crate outside it.
-
-* `senbei-cli` is the command-line entry point.
-* `senbei-io` owns filesystem orchestration.
-* `senbei-pe` provides basic format parsing.
-* `senbei-elf` provides basic format parsing.
-* `senbei-crypto` provides shared primitives.
-* `senbei-metadata` restores metadata.
-* `senbei-engine` owns the protection-specific pipelines.
-
-Single-platform source stays directly under `src/`. Multi-platform crates keep platform code below `src/windows/` and `src/android/`, with shared code directly below `src/`.
-
-```text
-senbei-cli/src/main.rs
-senbei-crypto/src/
-senbei-crypto/src/android/
-senbei-crypto/src/windows/
-senbei-elf/src/
-senbei-engine/src/windows/
-senbei-engine/src/android/
-senbei-io/src/
-senbei-io/src/android/
-senbei-io/src/windows/
-senbei-metadata/src/
-senbei-metadata/src/windows/
-senbei-metadata/src/android/
-senbei-pe/src/
-senbei-wasm/src/
+```mermaid
+flowchart TD
+    CLI["senbei-cli\n(CLI & JSON)"] --> IO["senbei-io\n(scan, companion, APK, logs)"]
+    GUI["senbei-gui\n(egui/wgpu workbench)"] --> IO
+    CLI --> I18N["senbei-i18n\n(5-language catalog)"]
+    GUI --> I18N
+    IO --> I18N
+    WASM["senbei-wasm\n(WebAssembly API)"] --> IO
+    IO --> ENG["senbei-engine\n(Windows & Android pipelines)"]
+    ENG --> I18N
+    ENG --> PE["senbei-pe"]
+    ENG --> ELF["senbei-elf"]
+    ENG --> CRY["senbei-crypto"]
+    ENG --> META["senbei-metadata"]
 ```
 
-`senbei-pe` and `senbei-elf` own validated format models, address mapping, and ELF dynamic hash helpers. They don't depend on the unpacking engines, filesystem code, or platform protection logic.
+| Crate | Responsibility |
+| --- | --- |
+| `senbei-cli` | Command-line parser, terminal color/locale output, JSON emitter, and integration suites |
+| `senbei-gui` | Native `eframe`/`wgpu` desktop workbench (`Workbench` UI is filesystem-free; `native.rs` runs background jobs) |
+| `senbei-i18n` | `unsafe`-free 5-language catalog (`Msg`, `Step`, `Term`, `Cli`, `Message`); keeps English wire strings for `--json` and `.log` |
+| `senbei-io` | Folder scanning, Windows `._` splicing, Android `.apk`/`.apks`/`.xapk` streaming, `RunObserver`, and `CancelToken` |
+| `senbei-engine` | Windows PE and Android ELF static recovery pipelines, `profile.rs` report model, and bounded research trace sink |
+| `senbei-pe` / `senbei-elf` | Pure format parsers, RVA/offset mapping, and ELF SysV/GNU hash & layout helpers (zero filesystem I/O) |
+| `senbei-crypto` | Windows (`src/windows/`) and Android (`src/android/`) ciphers, AES schedules, bytecode VM, and Huffman/LZ |
+| `senbei-metadata` | Layout definitions (`layout.rs`), shared structural `v31` remap, and Android seeded `v24.1`/`v29`/`v31`/`v39` & slim `v24` restoration |
+| `senbei-wasm` | Standalone `wasm32-unknown-unknown` bindings driving `senbei-io`'s in-memory byte API inside disposable Web Workers |
 
-## Protection profiles
+Multi-platform crates isolate platform-specific code under `src/windows/` and `src/android/` while keeping shared models directly under `src/`.
 
-The development tree's shared `senbei-engine/src/profile.rs` model records observed format, protection evidence, candidate attempts, the selected route, recovery status, and final static-validation status. Its `format_version` describes the report schema, not a protector build. Detection doesn't replace trial-and-validate or assign a CrackProof version from an unverified fingerprint.
+## Protection profiles, research traces, and observer hooks
 
-Lightweight detection leaves recovery and validation unattempted. The research-oriented `inspect` command goes further: it combines parsed input structures and bounded local probes with the actual static-recovery trace, then discards the recovered bytes. A scoped, bounded trace sink records the parameters and choices the pipeline actually used; ordinary unpacking doesn't collect that trace. Facts distinguish source file offsets, decoded-payload offsets, and working-image RVAs.
+* **`senbei-engine/src/profile.rs`:** records input format, recognition evidence, every attempted candidate route and its rejection error, the winning route, recovery status, and static validation findings (`format_version` versions the report schema rather than a CrackProof build).
+* **Bounded research trace (`inspect`):** `inspect` combines parsed input structures and bounded header/stage probes with the trace events emitted during full static recovery, tagging every offset with its coordinate space (`file`, `spliced`, `payload`, or `rva`) before discarding temporary outputs.
+* **Observer and cooperative cancellation:** `senbei-engine::progress` streams stage transitions to `senbei-io::observe::RunObserver` (`scanned`, `input_started`, `progress`, `produced`, `input_finished`). `produced` fires before `Inspect` or `DryRun` cleans up its temporary workspace so `senbei-gui` can retain restored images up to its configured MiB cap, and `CancelToken` stops batch runs cleanly between inputs.
 
-A recovery report retains rejected candidates and their errors even if a later route succeeds. Companion preparation can block recovery before a candidate runs; post-overlay validation describes the returned image rather than the earlier candidate. Research inspection reports both the protected and recovered structures when available, without treating either a plausible table or a successful local probe as a complete recovery verdict. Static validation doesn't claim that Windows or the Android linker has loaded the image successfully.
+## Windows, Android, and metadata pipelines
 
-Metadata layout definitions live in `senbei-metadata/src/layout.rs`, separate from restoration algorithms. Header identification reports a raw version and implemented capabilities. `known` means that a layout definition exists, not that the input's tables passed validation. Version 24 still needs its owning app's module `0x0C` and layout validation; the raw version alone doesn't identify v24.1. Seeded method-token restoration supports the existing v29, v31, and compact v39 paths, while structural restoration remains v31-only. Unknown versions retain their numeric tag without claiming recovery support.
-
-## Windows engine
-
-`senbei-engine/src/windows/` contains PE detection, layout discovery, EXE and DLL restoration, deterministic block parallelism, and structural integrity checks. Candidate layouts are trial-decrypted and validated before an output is accepted.
-
-External companion inputs are reconstructed as `stub[..4096]` followed by the matching `._` payload. The stub's export, TLS, and declared CLR regions are overlaid after unpacking because those regions aren't present in the encrypted companion. Managed restoration follows the COR20 directory and referenced metadata, resources, and vtable fixups through each file's RVA mapping, preserving the decrypted method bodies.
-
-## Android engine
-
-`senbei-engine/src/android/extract/` decrypts the stage-1 header and stage-2 record streams and writes a temporary module workspace. `senbei-engine/src/android/restore/` applies decoded image and fixup containers to the hollowed ELF and rebuilds dynamic-linker tables. Both phases validate bounds and table placement before writing output.
-
-Windows protection primitives are in `senbei-crypto/src/windows/`, while Android protection primitives are in `senbei-crypto/src/android/`. Android seeded metadata restoration is in `senbei-metadata/src/android/`; the structural MethodDef transform is shared at the metadata crate root because both platform paths use it.
-
-Android ELF dynamic tables are located from the input section table and its actual file ranges. When the original gap is too small, restoration adds a validated read-only `PT_LOAD` after the existing load image and updates the dynamic tags; it never overwrites an adjacent section or emits a partial image.
-
-## Scanning and packages
-
-Folder scanning uses platform target names to avoid opening bulk assets: Windows candidates are `.exe`, `.dll`, and `global-metadata.dat`; Android candidates are `.so` and `global-metadata.dat`. The shared walker is in `senbei-io/src/scan.rs`; platform name filters and PE companion byte adaptation are in `senbei-io/src/windows/`, and Android package adaptation is in `senbei-io/src/android/`. A Windows `.exe._` or `.dll._` companion is auxiliary input for its sibling stub and is excluded from the skipped count.
-
-APK, APKS, and XAPK files are containers. Senbei reads their ZIP manifests first, follows nested APK entries when necessary, and extracts only `.so` and exact `global-metadata.dat` entries. Extraction streams directly to temporary files, so compressed and decompressed copies aren't held in memory together.
-
-## Validation
-
-Every heuristic layout uses trial-and-validate. A candidate that fails structural checks, checksums, or table bounds is rejected and the next candidate is tried. A failed restore is reported as an error rather than emitting a silently damaged binary.
-
-The PE integrity check verifies headers, section ranges, entry-point mapping, import names, relocation requirements, and managed metadata signatures. Android restoration validates ELF ranges, decoded container sizes, fixup bounds, and rebuilt dynamic tables.
-
-## WebAssembly
-
-The browser binding depends on `senbei-engine` through the I/O byte API. Native filesystem and Android package orchestration remain outside the browser workflow. Each browser unpack runs in a disposable worker because WebAssembly can't recover from a caught panic in the same way as native code.
+* **Windows (`senbei-engine/src/windows/`):** trial-decrypts and validates candidate anchors, shifts, seeds, and bytecode stubs across PE32 (standard and compact), 64-bit marker, 64-bit marker-less, dedicated 64-bit DLL, and `stub[..4096] ++ companion` (`._`) inputs, running deterministic parallel section decompression and post-recovery PE/CLR/directory integrity checks.
+* **Android (`senbei-engine/src/android/`):** `extract/` decodes Stage 1 and nested Stage 2 streams into a temporary workspace under `ResourceLimits`; `restore/` applies primary `PT_LOAD` writers and auxiliary relocation containers (`0x9B`, `0x9D`, `0x9E`, plus reversing optional `0x96` symbol permutations and interpreting `0x98` AArch64 constructors), placing rebuilt dynamic tables in-place or in an appended `PF_R` `PT_LOAD` and clearing `e_entry`.
+* **Scanning & packages (`senbei-io/`):** folder scans filter for `.exe`, `.dll`, `.so`, `global-metadata.dat`, `.apk`, `.apks`, and `.xapk` above the `4,128`-byte floor without opening bulk game assets. ZIP package handling reads the ZIP central directory first and streams only `.so` and `global-metadata.dat` entries to temporary files.

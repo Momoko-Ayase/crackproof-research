@@ -1,40 +1,55 @@
 ---
-description: "Build, test, and contribution workflow for the Arare workspace."
+description: "Build native and managed toolchains, run workspace and Senbei 1.3.1 oracle suites, and package releases."
+icon: hammer
 ---
 
 # Development
 
 ## Building
 
-Install Rust 1.98.1 or newer, Visual Studio C++ tools for x86/x64 including MASM, and a Windows SDK. Development used MSVC 14.51 and SDK 10.0.26100.
+Prerequisites: Rust `1.98.1` or newer, Visual Studio C++ x86/x64 build tools with MASM (`ml` / `ml64`), and the Windows 10/11 SDK (tested with MSVC `14.51` and SDK `10.0.26100`). Managed packing and the WPF GUI additionally require the .NET 10 SDK and .NET Framework 4 reference assemblies.
+
+{% stepper %}
+{% step %}
+### Build the native CLI and embedded loaders
+
+`cargo build` compiles both x86 and x64 C/ASM runtime loaders from source:
 
 ```powershell
 rustup target add i686-pc-windows-msvc
 cargo build --release -p arare-cli
 ```
+{% endstep %}
 
-Both native loader architectures are compiled from source during the build. Managed packing additionally needs the .NET 10 SDK/reference pack and .NET Framework 4 reference assemblies:
+{% step %}
+### Build the managed metadata tools (required for CLR inputs)
+
+`tools/managed/build.ps1` has zero NuGet dependencies (pass `-Dotnet <path>` if `dotnet.exe` is not in its default location) and emits `Arare.ManagedHost.dll`, `Arare.ManagedHost.runtimeconfig.json`, and `Arare.Bootstrap.dll`:
 
 ```powershell
 & tools/managed/build.ps1
 $env:ARARE_MANAGED_TOOLS = (Resolve-Path target/managed-tools).Path
 ```
 
-For development runs, `ARARE_MANAGED_TOOLS` must be an absolute directory containing `Arare.ManagedHost.dll`, `Arare.ManagedHost.runtimeconfig.json`, and `Arare.Bootstrap.dll`. A distribution can instead place those three files in `managed/` beside `arare.exe`. Tool discovery uses these explicit locations.
+Re-run `tools/managed/build.ps1` whenever files under `runtime/` or `tools/managed/` change. At runtime, `arare` and the Python test harnesses look for `dotnet.exe` at `C:/Program Files/dotnet/dotnet.exe` unless `ARARE_DOTNET` specifies an absolute `dotnet.exe` path.
+{% endstep %}
 
-The managed writer has no NuGet dependencies. Create a local binary package after building:
+{% step %}
+### Package a release archive (optional)
+
+Assemble the standalone `arare-windows-x64` or `arare-windows-x86` distribution (including `managed/` and optionally `Arare.Gui.exe`):
 
 ```powershell
 & tools/package.ps1 -Architecture x64 -IncludeGui
 ```
-
-CI uploads the same `arare-windows-x64` and `arare-windows-x86` packages.
-
-Running the packaged GUI needs the matching .NET 10 Desktop Runtime. Managed packing needs the .NET 10 runtime; native-only CLI use doesn't.
+{% endstep %}
+{% endstepper %}
 
 ## Testing
 
-Normal workspace builds do not resolve Senbei. They compile the independent runtime artifacts and use source-generated fixtures:
+{% tabs %}
+{% tab title="Workspace checks" %}
+Standard workspace tests use generated fixtures and never require a Senbei checkout:
 
 ```powershell
 cargo test --workspace
@@ -42,45 +57,33 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 cargo test --workspace --target i686-pc-windows-msvc
 ```
+{% endtab %}
 
-Set `SENBEI_SOURCE` to the absolute path of an unchanged Senbei source checkout, then use the oracle runner:
-
-Full oracle execution also needs a selected 32-bit Mono runtime. Set `ARARE_MONO_X86` to its existing absolute executable path before starting the runner. This prerequisite is checked when a Mono case runs; missing or invalid selection fails that case rather than skipping it.
+{% tab title="Senbei 1.3.1 oracle" %}
+`verification/run_oracle.py` verifies every packed profile against an **unchanged Senbei `1.3.1` checkout** (`version = "=1.3.1"`; pointing `SENBEI_SOURCE` at a newer Senbei version is rejected by the version check) plus live execution of original, protected, and unpacked binaries. Set `ARARE_MONO_X86` to an absolute 32-bit `mono.exe` path before running, and execute the x64 and x86 targets sequentially because they share generated artifact paths:
 
 ```powershell
 python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release
 python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release --target i686-pc-windows-msvc
 ```
+{% endtab %}
 
-The runner resolves the selected source and supplies `ARARE_MANAGED_TOOLS` when the variable is absent before invoking Cargo. Run the two oracle targets sequentially because their harnesses share generated artifact locations. Rebuild managed tools after runtime C or C# changes.
-
-Focused managed parser and tool-discovery checks:
+{% tab title="Managed & GUI suites" %}
+Run the ECMA-335 parser/rewriter tests, managed tool-discovery unit tests, and WPF smoke suite:
 
 ```powershell
 python verification/managed/parser_tests.py
 cargo test -p arare-engine --lib managed::tool_discovery_tests
-```
-
-The parser checks need the .NET 10 SDK/reference pack and write generated artifacts under `target/managed-parser-tests/`. Supply `ARARE_MANAGED_TOOLS` before launching source-tree managed execution or its Cargo tests. Native-only builds and protection don't need these files.
-
-Managed fixture compilation selects the newest complete release .NET 10 SDK in the configured `ARARE_DOTNET` installation, using numeric version ordering and checking that Roslyn is present. It reports a prerequisite error when that installation has no suitable compiler.
-
-GUI smoke tests:
-
-```powershell
 dotnet build gui/ArareGui.slnx -c Release
 dotnet run --project gui/Arare.Gui.SmokeTests -c Release --no-build
 ```
+{% endtab %}
+{% endtabs %}
 
-A successful private decoder round trip is insufficient. Format integration must pass unmodified Senbei, and runtime claims require actual execution or DLL loading. Never exclude whole sections from comparisons to conceal differences.
+## Contributor rules
 
-## Conventions
-
-- Host tools are AGPL-3.0-only. `arare-codec`, `arare-pe`, and independently written embedded-runtime code are MIT. Do not introduce AGPL implementation code into the embedded runtime.
-- Treat Senbei as a reference. Never import a commercial donor executable, extracted stub, opaque profile, or protected application into the repository.
-- Public tests use generated fixtures. Existing sample directories outside the repository are user-managed.
-- PE file offsets and RVAs are distinct. Validate both before reading, copying, allocating, or writing.
-- Keep Android and IL2CPP metadata obfuscation out of the current implementation.
-- Do not add attribution trailers to commits.
-
-Living contracts live under `docs/design/`. Dated reviews and implementation plans live under `docs/notes/`. Operator documentation is this GitBook section.
+* Keep `arare-pe`, `arare-codec`, and all embedded runtime code (`arare-runtime`, `runtime/`) `MIT`-clean; never move `AGPL-3.0-only` code into the embedded runtime.
+* Never import commercial donor binaries, extracted stubs, or real protected samples into the repository; test exclusively with generated fixtures.
+* Treat file offsets and RVAs as distinct coordinate spaces and validate both before slicing or writing.
+* Verify every format change against unchanged Senbei recovery and real OS process/DLL execution rather than private round-trip decoders or section exclusions.
+* Keep architecture specs in `docs/design/`, dated evidence and plans in `docs/notes/`, and user-facing documentation in this GitBook section. Do not add attribution trailers to commits.

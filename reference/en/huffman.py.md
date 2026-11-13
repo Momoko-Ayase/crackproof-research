@@ -1,10 +1,11 @@
 ---
-description: "The Huffman/LZ hybrid decompressor: 3-byte table entries, literal/run-fill/back-reference tokens."
+description: "3-byte Huffman tree decoder and four-mode literal, run-fill, and LZ decompressor."
+icon: file-zipper
 ---
 
 # huffman.py
 
-The decompressor used for stages and section blocks. It matches the algorithm documented in [Huffman and LZ compression](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/compression).
+Hybrid Huffman/LZ block decompressor for stages and section payloads, matching [Huffman and LZ compression](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/compression).
 
 ```python
 """The Huffman/LZ hybrid decompressor.

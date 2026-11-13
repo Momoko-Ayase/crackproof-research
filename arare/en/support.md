@@ -1,46 +1,50 @@
 ---
-description: "Tested families, hosts, and explicit input refusals."
+description: "Supported PE and CLR input matrix, pack-time refusals, structural bounds, and runtime loading rules."
+icon: circle-check
 ---
 
 # Support
 
-The target is Windows 10/11. Current execution evidence is Windows 11 build 26100, with source-built x86/WOW64 and x64 programs. A separate Windows 10 run has not been performed.
+Arare targets Windows 10 and Windows 11, with execution verified on Windows 11 build 26100 across source-built x86/WOW64 and x64 native and managed programs (a separate Windows 10 test pass has not been run). Managed execution is verified on .NET Framework 4.8 (x86/x64), CoreCLR 10.0.12 (x64), and Mono 6.13 (x86).
 
-The optional kernel provider has a separate build and validation boundary. It is experimental, has no `protect` option, and is not a claim of commercial driver compatibility or verified kernel enforcement.
+## Supported input matrix
 
-| Input | Embedded families | Companion families |
+| Input kind | Embedded profiles | Companion (`._`) profiles |
 | --- | --- | --- |
-| Native x86 EXE/DLL | PE32 | PE32 |
-| Native x64 EXE/DLL | Classic/modern PE32+ | Classic/modern PE32+ |
-| Native x64 DLL | Legacy DLL | Not applicable |
-| IL-only x86/AnyCPU DLL | PE32 | PE32 |
-| Recognized IL-only x86/AnyCPU C# EXE | PE32 | PE32 |
-| IL-only x64 DLL | Legacy/classic/modern PE32+ | Classic/modern PE32+ |
-| IL-only x64 EXE | Classic/modern PE32+ | Classic/modern PE32+ |
-| Pure-IL x86/AnyCPU/x64 DLL with `ILONLY` clear | Same as the IL-only row for its architecture | Same as the IL-only row for its architecture |
+| Native x86 EXE or DLL | `pe32` | `pe32` |
+| Native x64 EXE or DLL | `pe64-classic`, `pe64-modern` | `pe64-classic` (nonzero entry required on DLLs), `pe64-modern` |
+| Native x64 DLL (dedicated layout) | `legacy-dll` | Not supported |
+| IL-only x86 or AnyCPU DLL | `pe32` | `pe32` |
+| Recognized IL-only x86 or AnyCPU C# EXE | `pe32` | `pe32` |
+| IL-only x64 DLL | `legacy-dll`, `pe64-classic`, `pe64-modern` | `pe64-classic`, `pe64-modern` |
+| IL-only x64 EXE | `pe64-classic`, `pe64-modern` | `pe64-classic`, `pe64-modern` |
+| Pure-IL DLL with `COR20` `ILONLY` clear | Same as IL-only DLL for its bitness | Same as IL-only DLL for its bitness |
 
-Native IL2CPP PEs use the native rows. Standalone `global-metadata.dat` obfuscation is outside this implementation.
+Native IL2CPP binaries (`GameAssembly.dll` and host EXEs) pack as ordinary native PEs; standalone `global-metadata.dat` obfuscation is outside Arare's scope.
 
-Managed execution covers Framework 4.8 x86/x64, CoreCLR 10.0.12 x64, and Mono 6.13 x86 on applicable hosts. Pure-IL assemblies with only the COR20 `ILONLY` bit clear are accepted when they satisfy the restrictions below.
+## Pack-time refusals
 
-## Explicit refusals
+`arare protect` rejects inputs with any of the following:
 
-- Native PE32 EXEs that require section-name or permission normalization for executable Senbei import recovery.
-- Native inputs with code exports and `IMAGE_GUARD_XFG_ENABLED`.
-- Exported data deliberately placed in an executable section.
-- Modern managed zero-import layouts whose unused RVA page `[0x1000,0x2000)` is occupied.
-- Writable executable sections when page encryption is effectively on.
+### Native and shared PE constraints
 
-Managed packing also refuses:
+* **Zero-entry classic companion DLLs:** `pe64-classic` companion DLLs with a zero `AddressOfEntryPoint` (use embedded storage or `pe64-modern` for entryless DLLs).
+* **Companion TLS overlap:** x64 companion inputs whose TLS entry range overlaps loader-preserved physical data.
+* **Page-encryption alignment and permissions:** writable executable (`RWX`) sections, `SectionAlignment < 0x1000`, or executable sections whose `VirtualAddress` is not `0x1000`-aligned when page encryption is active.
+* **Bound-only imports:** native import descriptors with `OriginalFirstThunk == 0` and no in-image hint/name RVA or VA.
+* **PE32 EXE import normalization:** native PE32 EXEs that would require section-name or permission rewriting for static unpacker import recovery.
+* **XFG code exports:** native modules combining code exports with `IMAGE_GUARD_XFG_ENABLED`.
+* **Image and header ceilings:** total image size (including added Arare sections) above `1 GiB`, section count above `96`, or section headers exceeding `0x1000` bytes (`pe64-*` / `legacy-dll`) or `0x400` bytes (`pe32`).
 
-- Genuine C++/CLI mixed mode, native CLR entry points or fixups, ReadyToRun/AOT, and non-IL method implementations.
-- Strong-named or delay-signed assemblies, multi-module assemblies, and linked or exported module content.
-- Native exports, native exception/startup tables, TLS, load configuration tables, or delay imports.
-- Sections whose `VirtualSize` exceeds `SizeOfRawData`, pre-existing pointer or Edit-and-Continue metadata tables, and implemented CLI vararg methods.
-- Input types in the reserved `Arare.Managed` namespace.
+### Managed assembly constraints
 
-These are input constraints, not differences between the listed CLR hosts. Disabling an environment check doesn't enable an unsupported assembly layout.
+* Genuine C++/CLI mixed-mode code, native CLR entry points or vtable fixups, ReadyToRun/AOT images, or non-IL method bodies.
+* Strong-named or delay-signed assemblies, multi-module assemblies, linked/exported module tables, embedded Portable PDBs, or CLI metadata tables `>= 45` (such as `/debug:embedded`).
+* x86 managed EXEs with `ILONLY` clear, PE32+ managed inputs with `32BITREQUIRED` or `32BITPREFERRED` set, `pe64-modern` zero-import assemblies whose RVA page `[0x1000, 0x2000)` is occupied, or `pe64-modern` managed inputs with a nonzero import directory whose first descriptor is empty.
+* Native exports, native exception/unwind or TLS directories, load-config tables, delay imports, sections with `VirtualSize > SizeOfRawData`, Edit-and-Continue/pointer metadata tables, CLI `vararg` methods, or types inside the reserved `Arare.Managed` namespace.
+* Metadata expansion above `524,288` added generic-padding `TypeDef` rows, or signature return types exceeding `128` nesting levels or `65,536` type elements.
 
-Managed preparation also limits metadata expansion to 524,288 added generic-padding TypeDefs. Signature parsing permits 128 type levels and 65,536 type elements per parsed return type. Inputs that exceed these work limits are rejected; the limits don't define a hard process-memory budget.
+## Layout and runtime loading notes
 
-Profiles describe observed structural families, not commercial cloud versions. Remaining commercial-fidelity gaps include host-directory admission, unidentified E-series objects, loaded-module integrity cadence, a verified commercial default matrix, and Windows 10 execution.
+* **Data exports inside executable sections:** PE export tables do not tag entries as code vs data, so non-forwarder exports pointing into an executable section are wrapped with a code-export guard thunk rather than rejected at pack time. Keep exported data symbols in non-executable data sections.
+* **Byte-array vs disk loads:** companion-packed managed assemblies require on-disk files and reject `Assembly.Load(byte[])`. Pure-IL DLLs with `ILONLY` clear follow standard CLR mixed-mode loading rules (on-disk load in a matching-bitness process on .NET Framework/CoreCLR; Mono loads both disk and byte-array forms).

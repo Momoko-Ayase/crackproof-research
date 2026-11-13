@@ -1,16 +1,18 @@
 ---
-description: "命令行保护、检查与验证：配置文件、检查项、页加密与发布。"
+description: "命令行 protect、inspect 与 verify：布局配置、环境检查、页面加密与调试日志。"
+icon: terminal
 ---
 
-# 用法
+# 命令行用法
 
-普通构建产出 `target/release/arare.exe`，不需要 Senbei 检出。托管打包需要另行构建的托管工具与 .NET 10 运行时。把三个托管工具文件放入 `arare.exe` 旁的 `managed/` 目录，或把 `ARARE_MANAGED_TOOLS` 设为这些文件所在的绝对目录；详见[开发](development.md)。生成相同命令行的 WPF 前端见[图形界面](gui.md)。
+构建 `arare-cli` 即可生成 `target/release/arare.exe`，无需检出 Senbei 仓库。对托管程序集加壳还需安装 .NET 10 运行时，并将三个托管工具文件（`Arare.ManagedHost.dll`、`Arare.ManagedHost.runtimeconfig.json`、`Arare.Bootstrap.dll`）放在 `arare.exe` 同级的 `managed/` 目录中，或通过环境变量 `ARARE_MANAGED_TOOLS` 指定其路径（详见 [开发指南](development.md)）。图形界面批处理用法见 [桌面 GUI](gui.md)。
 
 ```text
-arare protect INPUT --output OUTPUT --profile PROFILE
+arare protect INPUT -o|--output OUTPUT --profile PROFILE
     [--seed 64_HEX_DIGITS] [--no-compression]
     [--storage embedded|companion] [--check NAME=on|off]...
-    [--page-encrypt on|off] [--scribble on|off] [--errlog on|off]
+    [--page-encrypt on|off] [--scribble on|off]
+    [--errlog on|off] [--antidebug-av on|off]
     [--force] [--json]
 
 arare inspect INPUT [--json]
@@ -18,96 +20,88 @@ arare inspect INPUT [--json]
 arare verify INPUT --profile PROFILE [--companion PATH] [--json]
 ```
 
-| 配置 | 输入族 |
+## 布局配置与载荷存储
+
+| 配置名称 | 目标结构布局族 |
 | --- | --- |
-| `pe32` | PE32 x86/原生，以及适用的 x86/AnyCPU 托管映像 |
-| `pe64-classic` | 经典 EXE 式 PE32+ x64 EXE 与 DLL |
-| `pe64-modern` | 无标记 EXE 式 PE32+ x64 EXE 与 DLL |
-| `legacy-dll` | 专用的较旧 PE32+ x64 DLL 族 |
+| `pe32` | PE32 x86 原生映像，以及受支持的 x86/AnyCPU 托管程序集 |
+| `pe64-classic` | 带特征标记的经典 EXE 风格 PE32+ x64 EXE 与 DLL |
+| `pe64-modern` | 无特征标记的新式 EXE 风格 PE32+ x64 EXE 与 DLL |
+| `legacy-dll` | 旧式专用 PE32+ x64 DLL 布局（仅限内嵌存储） |
 
-选定的族会对照输入验证。它不对应公开的商用版本号。各族内的限制见 [支持范围](support.md)。
+配置名称对应二进制结构布局族，而非商业产品的版本号；输入约束详见 [支持范围](support.md)。
 
-伴生存储产出命名的 PE 及其匹配的 `<filename>._` 文件。两者须放在一起。覆盖已有输出需要 `--force`。省略种子时使用 Windows 密码学随机源，并在成功时打印。`--no-compression` 以原始形式存储应用程序块；必要的格式与生成的加载器阶段仍使用各自的表示。
+* **伴随文件存储（`--storage companion`）：** 同时写出 `OUTPUT`（4 KiB 头部与明文保留区存根）和 `<OUTPUT>._`（加密载荷，通过 `0x1000..0x1020` 处的 32 字节头部配对）。部署时需将两个文件放在同一文件夹中。
+* **随机种子与压缩：** 省略 `--seed` 时从 Windows CSPRNG 获取 32 字节随机数并打印十六进制种子。`--no-compression` 让应用程序各节数据块保持未压缩存储，加载器自身的阶段编码仍保持不变。
+* **静态校验（`verify`）：** 使用 Arare 独立的原生解码器静态解码受保护文件，不会执行目标程序。省略 `--companion` 时，若同目录下 `<INPUT>._` 的 32 字节头部匹配，`verify` 会自动将其配对。
 
-`verify` 用独立的原生解码器检查表示。它不启动程序。伴生验证会在 32 字节配对头匹配时自动尝试 `<INPUT>._`。该自动文件缺失时会给出提示。
+## 环境检查与失败响应
 
-## 环境检查
+受保护模块按三个启动阶段运行可配置的环境检查（阶段 1 在载入文件载荷前执行，阶段 2 在载入后执行，阶段 3 在可执行页设为 `PAGE_NOACCESS` 后执行）。可重复传入 `--check NAME=on|off` 覆盖默认值：
 
-受保护模块在启动期间运行可配置的环境检查。大多数检查在载荷重建前运行；可选的 E55/E91 设备检查在页密封后运行。检查失败时静默结束进程。启用日志时，调试日志会记录检查的阶段码。大多数阶段码遵循已观察到的 CrackProof 行为；`541` 是 Arare 自己的 Hyper-V 来宾策略。
-
-默认启用的检查如下：
-
-| 模块 | 检查 |
+| 模块类型 | 默认开启的检查项 |
 | --- | --- |
-| 原生 EXE | `antidebug`、`crc-loader`、`debug-port`、`os-version`、`boot-options`、`vm-registry`、`injected-dll`、`injected-thread`、`clean-code` |
-| 原生 DLL | `crc-loader`、`vm-registry`、`host-process` |
-| 托管 EXE | `crc-loader`、`vm-registry` |
-| 托管 DLL | `crc-loader`、`vm-registry`、`host-process` |
+| 原生 EXE | `antidebug`, `crc-loader`, `debug-port`, `os-version`, `boot-options`, `vm-registry`, `injected-dll`, `injected-thread`, `clean-code` |
+| 原生 DLL | `crc-loader`, `vm-registry`, `host-process` |
+| 托管 EXE | `crc-loader`, `vm-registry` |
+| 托管 DLL | `crc-loader`, `vm-registry`, `host-process` |
 
-其余检查默认关闭。因此两类 DLL 默认都需要兼容的受保护 EXE。`vm-backdoor`、`parent-process` 与 `hyperv-guest` 对所有模块类型都需要显式启用。
+由于两类 DLL 默认均开启 `host-process`，若要在未加壳的宿主进程内加载受保护 DLL，加壳时需指定 `--check host-process=off`。`vm-backdoor`、`parent-process` 与 `hyperv-guest` 在所有模块类型下均默认关闭。
 
-`--check NAME=on|off` 切换单项检查。重复该标志以组合覆盖。
+| CLI 检查名称 | 阶段码 | 行为说明 |
+| --- | --- | --- |
+| `antidebug` | `410` | 7 个子阶段：`IsDebuggerPresent`、`PEB.BeingDebugged`、`PEB.NtGlobalFlag & 0x70`、硬件调试寄存器 `DR0`..`DR3` / `DR7 & 0xFF`（`GetThreadContext`），以及 `NtQueryInformationProcess`（`ProcessDebugPort`、`ProcessDebugFlags == 0`、`ProcessDebugObjectHandle`） |
+| `crc-loader` | `510` | 加载器代码 CRC-32 自校验 |
+| `debug-port` | `520` | 内核调试端口查询 |
+| `kernel-debugger` | `52F` | `KdDebuggerEnabled` 与系统内核调试器检查 |
+| `vm-backdoor` | `540` | VMware `0x5658` I/O 端口探测（忽略通用 CPUID hypervisor 标志位，放行 Hyper-V/VBS） |
+| `hyperv-guest` | `541` | Arare 特有的 Hyper-V 客户机分区权限检查（`Hv#1` CPUID） |
+| `parent-process` | `A03` | 拒绝父进程不是 `explorer.exe` 或 `cmd.exe` 的启动 |
+| `os-version` | `C00` | 要求 Windows 10 build `10240` 或更高版本 |
+| `boot-options` | `C01` | 拒绝启用测试签名或调试引导标志的系统 |
+| `msc-log` | `BD0` | 检测到 `C:\Windows\msc.log.log` 存在时拒绝运行 |
+| `os-compat` | `B00` | 操作系统兼容性检查 |
+| `vm-registry` | `A09` | 检查系统硬件/BIOS 虚拟机注册表特征（当 `Hv#1` 识别为 Hyper-V/VBS 时放行通用的 `Virtual` / `VRTUAL` / `Microsoft Hyper-V`） |
+| `injected-dll` | `A0F` | 在跳转 OEP 前扫描已加载模块 |
+| `injected-thread` | `A07` / `A01` | 检测非预期的外部注入线程 |
+| `host-process` | `A11` | 要求宿主进程为兼容的 Arare EXE（带 `.arldr` 或 `.armclr` 标记） |
+| `host-stamp` | `A11` | 在 `host-process=on` 时可选开启的协作式运行时上下文标记校验 |
+| `clean-code` | `A08` | 通过干净的系统 DLL 代码副本转发加载器调用 |
+| `disk-integrity` | `A04` | 同时指定时也会取代 `clean-code`；额外比对内存中映射的系统 DLL 与磁盘上的系统映像 |
+| `legacy-debugger` | `BE0` | 旧式调试器设备对象探测 |
+| `openark-device` | `E55` | 代码页加密锁定后的 OpenArk 驱动设备检查 |
+| `cheat-engine-device` | `E91` | 代码页加密锁定后的 Cheat Engine 驱动设备检查 |
 
-| 名称 | 阶段 |
-| --- | --- |
-| `antidebug` | 410 |
-| `crc-loader` | 510 |
-| `debug-port` | 520 |
-| `kernel-debugger` | 52F |
-| `vm-backdoor` | 540 |
-| `hyperv-guest` | 541（Arare 专用） |
-| `parent-process` | A03 |
-| `os-version` | C00 |
-| `boot-options` | C01 |
-| `msc-log` | BD0 |
-| `os-compat` | B00 |
-| `vm-registry` | A09 |
-| `injected-dll` | A0F |
-| `injected-thread` | A07/A01 |
-| `host-process` | A11 |
-| `host-stamp` | 可选的 A11 运行时上下文校验 |
-| `clean-code` | A08 |
-| `disk-integrity` | A04 |
-| `legacy-debugger` | BE0 |
-| `openark-device` | E55 |
-| `cheat-engine-device` | E91 |
+{% hint style="warning" %}
+**如无明确需求，请勿开启 `hyperv-guest`。** `--check hyperv-guest=on` 会通过 `Hv#1` CPUID 分区权限识别并拦截客户机虚拟机，同时放行宿主机根分区及 VBS 环境。由于 Hypervisor 的 CPUID 叶可被屏蔽或伪造，应仅将 `hyperv-guest` 视为运行环境限制，而非防篡改手段。
+{% endhint %}
 
-`vm-backdoor` 仍需显式启用。`--check vm-backdoor=on` 探测 VMware 后门协议，并在收到匹配响应时拒绝运行。它允许 Hyper-V/VBS 环境；通用的 CPUID 虚拟机监控程序标志位不会触发拒绝。显式指定 `--check parent-process=on` 仍会拒绝除 `cmd.exe` 或 `explorer.exe` 以外的启动器。
+**失败响应（`--antidebug-av`）：** `--antidebug-av` 对 EXE 默认为 `on`，对 DLL 默认为 `off`（原生模块日志中分别记为 `-AV=ON` / `-AV=OFF`）。当开启 `--antidebug-av=on` 的原生模块检查未通过时，运行时会先关闭日志，依次调用 `RaiseException(0xC0000005)`（`EXCEPTION_ACCESS_VIOLATION`）并向空指针写入，使附加的调试器立即中断，最后调用 `TerminateProcess(0xE0A00000 | substage)`。设为 `--antidebug-av=off` 的原生模块与托管模块则直接调用 `TerminateProcess`。
 
-**强烈不建议启用：** `hyperv-guest` 是独立检查，对所有模块类型默认关闭。`--check hyperv-guest=on` 根据经校验的 `Hv#1` CPUID 分区权限拒绝报告为 Hyper-V 兼容来宾的环境。它允许主机/根分区（包括 VBS），也允许无法判断或信息不完整的环境。来宾检测依赖启发式判断，嵌套环境、信息屏蔽或伪造都可能绕过分类。这是兼容性限制，不能提供可靠保护。
+## 页面加密
 
-`vm-registry` 默认仍然启用。当 `Hv#1` 接口表明环境兼容 Hyper-V 时，该检查允许 `Virtual`、`VRTUAL` 与 `Microsoft Hyper-V` 这些通用注册表标记。其他虚拟机厂商的明确标记仍会触发拒绝。是否拒绝 Hyper-V 兼容来宾，由独立且需显式启用的 `hyperv-guest` 决定。
+`--page-encrypt` 对 EXE 默认为 `on`，对 DLL 默认为 `off`。节重建完成后，运行时会原地重加密应用程序可执行页，将其设为 `PAGE_NOACCESS`，并 hook `ntdll!KiUserExceptionDispatcher`，在页面首次触发执行异常时按需解密。开启页面加密时，若输入包含可写可执行（`RWX`）节或节对齐小于 `0x1000`，加壳阶段会直接拒绝。
 
-已有受保护文件保留生成时使用的检查实现。要应用修订后的检查与默认值，使用更新后的构建重新保护原始输入。GUI 或命令脚本中保存的显式 `on` 覆盖仍然有效；对于不需要的可选限制，清除覆盖或将其设为 `off`。
+`--scribble=on`（默认 `off`，需配合 `--page-encrypt=on`）会在两次页异常之间对已解密常驻页的部分字节施加掩码。
 
-`host-process` 接受兼容的原生与托管 Arare EXE，包括不同打包种子。用 `--check host-process=off` 可在普通主机中加载受保护 DLL。`host-stamp` 只为已启用 `host-process` 的 DLL 增加校验。可选戳记是协作式运行时兼容性检查，不是密码学认证。
+## 调试日志与 `ErrLog-Pec`
 
-启用 `disk-integrity` 会取代 `clean-code`，即使同时指定两者。两者都会把加载器调用路由到原始系统代码副本；`disk-integrity` 还会对照可信系统映像校验磁盘映像。
+`protect --json`（及标准终端输出）会给出该模块的 12 位十六进制 `log_folder` 名称。若 `%TEMP%\<log_folder>` 目录存在且创建时间不超过 48 小时，模块运行时会写入状态日志（EXE 文件名为 `HHMMSSmmmE-...`，DLL 为 `HHMMSSmmmD-...`），并在末尾输出 `AAA-BBB-CCC` 结束摘要码。
 
-`os-version`（C00）使用 Arare 的下限：Windows 10 内部版本 10240。一份已观察的商用样本使用 14251。
+{% hint style="info" %}
+**DLL 日志门控继承规则。** 当受保护 DLL 加载到受保护的 Arare EXE 进程内时，即使两者的种子不同，甚至显式设置了 `host-process=off`，DLL 也始终沿用宿主 EXE 的日志上下文。只要宿主 EXE 对应的 `%TEMP%` 目录不存在或已超过 48 小时，即使提前创建了 DLL 自身的备用 `log_folder`，DLL 也不会写出日志。
+{% endhint %}
 
-`legacy-debugger`、`openark-device` 与 `cheat-engine-device` 为可选，默认关闭。仅凭布局族名称不能确定商用构建的选项默认值。
+`--errlog=on`（默认 `off`）不受 `%TEMP%` 目录门控限制，会在结束时向邮件槽 `\\.\mailslot\ErrLog-Pec<suffix>`（`<suffix>` 为 `((key + 1) * 0x3039) % 0x8003` 生成的四位十六进制数）发送诊断数据包，内含时间戳、`AAA-BBB-CCC` 状态码及模块与系统信息。
 
-## 页加密
+## 输出写入与 JSON 报告
 
-`--page-encrypt=on` 时，加载器在重建后把可执行应用程序页就地重新加密，并设为 `PAGE_NOACCESS`。stub 模块的处理程序在首次触及时解密该页。页密文在运行时创建；文件载荷仍使用所选格式的编码。默认情况下主机 EXE 开启、DLL 关闭，与已观察到的配置一致。
+输出文件先在内存中完整编码，随后写入同目录临时文件、同步写入磁盘后执行原子重命名（覆盖已有文件需传入 `--force`）。指向输入文件本身的符号链接或规范化路径别名会被拒绝；替换指向同一文件的其他硬链接条目时，原输入文件字节不受影响。
 
-`--scribble=on` 在故障之间对驻留已解密页的选定字节做 XOR。它要求页加密，默认关闭。
+<details>
+<summary>JSON 输出字段（protect、inspect、verify）</summary>
 
-`--errlog=on` 尝试向 `\\.\mailslot\ErrLog-Pec<suffix>` 发送诊断报告，其中 `<suffix>` 是根据日志身份派生的四位十六进制数。报告包含时间戳、结束码 `AAA-BBB-CCC` 与模块路径；失败报告还可能包含已加载模块或 OS 详情。该通道独立于调试日志文件夹，默认关闭；只有匹配的邮件槽存在监听方时才能送达。
-
-含可写可执行节的输入需要 `--page-encrypt=off`。有效的默认开启与显式开启会在发布或替换任一输出之前拒绝它们。
-
-## 调试日志
-
-`protect --json` 返回 `log_folder`，即模块自身的 12 位大写十六进制日志身份。在 `%TEMP%` 下创建该文件夹即可启用其日志。创建时间须在 48 小时内。运行时不会创建缺失的门控目录。
-
-DLL 跨打包种子继承其受保护 EXE 的门控与文件夹。主机门控缺失、过期或无效时，即使 DLL 自己的门控是新的，也会抑制 DLL 日志。没有受保护主机上下文时，DLL 使用自己的门控。使用受保护主机时，应采用 EXE 报告的 `log_folder`；DLL 报告的值标识其后备文件夹。
-
-主机校验与日志相互独立：`host-process=off` 不会关闭继承。EXE 使用 `HHMMSSmmmE-...` 文件名，DLL 使用 `HHMMSSmmmD-...`。
-
-## 输出
-
-保护会在发布前解析并编码完整表示。输出文件先暂存、刷新，再重命名。目标目录必须已经存在。输入的规范路径或符号链接别名会被拒绝。替换不同硬链接上的输出会替换该目录项，并保留输入字节。
-
-固定种子会为相同输入、选项与已编译加载器复现输出。更换编译器、运行时源码或元数据写入器可能改变字节。
+* **`protect --json`：** `output`, `profile`, `storage`, `architecture`, `module`, `input_size`, `output_size`, `seed`, `normalizations`, `log_folder`, `companion`, `companion_size`。
+* **`inspect --json`：** `architecture`, `module`, `entry_point`, `image_base`, `image_size`, `file_size`, `sections`（含 `name`, `rva`, `virtual_size`, `raw_offset`, `raw_size`, `characteristics`）。
+* **`verify --json`：** `valid`, `profile`, `companion`, `image_size`, `recovered_file_size`, `entry_point`。
+</details>

@@ -1,58 +1,60 @@
 ---
-description: "How the 32-bit, older DLL, and newer marker-less loader layouts differ."
+description: "Structural differences across standard/compact PE32 shells, dedicated 64-bit DLLs, and marker-less 64-bit builds."
+icon: code-branch
 ---
 
 # PE32, DLL, and marker-less layouts
 
-## The 32-bit (PE32) flow
+{% tabs %}
+{% tab title="PE32 (Standard & Compact)" %}
+32-bit (`0x10B`) containers run an eight-stage chain (`SecondStage` through `EighthStage`) parameterized by a per-build stage-size delta `ss_shift`. Two `tbl` layouts appear in observed builds (and older compact shells may encrypt the full `info[5]` payload in `payload_xor_chain`):
 
-The 32-bit family shares the header/payload phases, then diverges completely: different anchors, an extra stage generation, and brute-forced parameters where the 64-bit flow uses fixed ones.
+| Structure / offset | Standard PE32 (`match - 0x88`) | Compact PE32 (`match - 0x78`) |
+| --- | --- | --- |
+| `info[6]` match inside `tbl` | `tbl + 0x88` | `tbl + 0x78` |
+| Header-checksum descriptor chain | `tbl + 0x58` | `tbl + 0x50` |
+| `SecondStage` `(offset, size)` | `tbl + 0x98` | `tbl + 0x88` |
+| `first_stage_cs` / `second_stage_cs` | `tbl + 0xA8` / `tbl + 0xB0` | `tbl + 0x98` / `tbl + 0xA0` |
+| Saved Import RVA | `tbl + 0xBC` | `tbl + 0xAC` |
+| Saved Resource `(RVA, size)` | `tbl + 0xC8` / `tbl + 0xCC` | `tbl + 0xB0` / `tbl + 0xB4` |
+| Per-build stage bias `ss_shift` | `ss_size - 0xBC0` | `ss_size - 0xAEC` |
+| `SevenStage` seed (`seven_key`) | `~u32@(cs1_addr + cs1_size - 0x10)` | `~u32@(cs1_addr + cs1_size - 0x0C)` |
 
-**The `tbl` anchor.** Located by scanning the shell region near `info[6]` for a dword equal to `info[6]` followed by a plausible shell size; the anchor is `0x88` bytes earlier. Import/resource directories are restored from `tbl + 0xBC/0xC8/0xCC`, and the **header checksum**, an XOR of `calculate_checksum` over the descriptor chain at `tbl + 0x58`, becomes a key component of every later stage. Note the consequence: stage keys depend on the *original pre-pack PE header's* checksum.
+Compact PE32 also shifts its `SecondStage`-internal pointers to `third_pair_off = 0xAB4 + ss_shift` and `forth_key_off / third_key_off / cs_base_off / dp_base_off = 0x94C / 0x950 / 0x954 / 0x9C4 + ss_shift`.
 
-**SecondStage.** The `(offset, size)` pair at `tbl + 0x98` is unwrapped with `ss_key = header_checksum ^ first_stage_cs ^ second_stage_key` (shift 21). The constant `ss_shift = ss_size − 0xBC0` then parameterizes *every* subsequent offset: a deliberate per-build permutation of the whole stage layout. Native DLLs carry a packer-added BaseReloc data directory that the original header lacked, so the header checksum only matches with that entry zeroed; both variants are tried and the one whose ThirdStage pointer validates wins.
+* **Header checksum & DLL `BaseReloc` trial:** `header_checksum` XORs `calculate_checksum` across the pre-pack PE header regions. Native PE32 DLLs carry a packer-populated `DD[5]` (`BaseReloc`) entry that was zero in the pre-pack header, so recovery tests both the as-is header and a copy with `DD[5]` zeroed, keeping whichever validates `ThirdStage`.
+* **`ThirdStage` shift brute-force:** tries `[19, 21, 17, 23, 15, 25, 13, 11]` until the info-table signature (`1`/`0x11` followed by `2` with an in-image address) appears; the four `key_offsets` sit `0x58` bytes earlier.
+* **Dynamic `advance_key` round counts (`Fourth` / `Fifth` / `Seventh` / `Eighth`):** instead of fixed round counts, PE32 counts leading active 16-byte helper descriptors (`size > 4`, stopping at the first empty slot) in the four-slot tables at `dp_base` and `dp_base + 0x80`.
+* **`EighthStage` key & cluster discovery:** gap heuristics and non-printable dword scans supply `EighthStage` seed candidates, validated by clean Huffman decompression. Inside `EighthStage`, the configuration cluster places imports at `+0x18`, `fileCS` at `+0x30`, section descriptors at `+0x40`, and zero-fill ranges at `+0x48` (anchored on stamp `0x00007679` when present, or on `fileCS` pointer shape immediately past `info[3]` on stampless builds). Bytecode stub 2 is verified by trial-decompressing the first compressed section block, and final output compacts the RVA buffer back to `0x200` file alignment.
+{% endtab %}
 
-**ThirdStage.** The rotate shift isn't recorded; it's brute-forced over `[19, 21, 17, 23, 15, 25, 13, 11]`, accepting the shift whose output contains the info-table signature (a `1`/`0x11` entry followed by a `2` entry with a plausible address). The four key offsets live `0x58` bytes before the info table, decrypted as in the 64-bit flow.
+{% tab title="Dedicated 64-bit DLL" %}
+Older dedicated 64-bit DLLs (`0x20B` only) omit anchor scanning and place the configuration block at fixed offset `anchor = info[6] + 5592` (`0x15D8`):
 
-**Fourth/Fifth/Seventh.** Unwrapped from quads at `dp_base + 0x40/0x50/0x70` with keys of the form `header_checksum ^ crc32(previous region) ^ advance_key(seed)`, where each seed comes from the stage decrypted just before. The `advance_key` round count isn't fixed. It's the number of leading active helpers in the stage's four-slot table of 16-byte descriptors at `dp_base`. A slot is active while its size dword at `+4` is greater than 4, and the first empty slot ends the count even if later slots are nonempty. The Seventh stage contains the first **bytecode stub** (located by backward-then-forward LFSR scan).
-
-**EighthStage and its key search.** The Eighth stage key isn't stored either. Candidates are collected from gap heuristics around the stub (end-of-region gaps `0xD0…0x100`, stub-relative gaps, and a linear scan for non-printable dwords). Each candidate is run through `advance_key` with the round count taken from the same active-helper rule on the table at `dp_base + 0x80`, and each is tried against the full stage-decrypt composite. The winner is the candidate whose result **decompresses cleanly and points inside the image**, a concrete success condition supplied by the Huffman decoder.
-
-**The configuration cluster.** The Eighth stage holds the final table cluster at fixed offsets from a base: import table `+0x18`, file checksum chain `+0x30`, section descriptors `+0x40`, and zero-fill list `+0x48`. Classic builds stamp the base with the dword `0x00007679` (a build-version value that recurs in driver names; see [Htsysm kernel components](../../runtime/kernel-components.md)) and keep the file-data **bytecode stub** at `+0x4B4`. Compact stages place the stub closer to the cluster, so the fixed `+0x4B4` slot overshoots them. Discovery therefore asks only that the configuration fields through `+0x4C` fit inside the stage. Builds with the stamp are matched on it. Builds without are located by the checksum-chain slot's shape (a pointer immediately past `info[3]` with a small 16-aligned size), and the stub itself is proven by trial, never assumed from its offset.
-
-**The file decryptor, proven.** The file-data bytecode stub isn't trusted to the nearest scan hit: each candidate is validated by replaying the first *compressed* block's full transform (copy → AES → translate → decompress) on a snapshot and requiring decompression to succeed. Coincidental LFSR-shaped blocks that decode to a wrong translate exist in real builds. One sits a few dozen bytes before the real stub in an observed 32-bit family, so trial-and-validate is the only safe selection.
-
-**Output.** The 32-bit flow ends with section-table fixups, the code-page scramble (formula chosen by the `0xCC` statistic), import rebuilding (with the `.kmiat` relocation for EXEs), TLS reconstruction, and a compaction pass that repacks the RVA-laid image into a file-aligned PE. Details in [PE reconstruction](../pe-reconstruction/README.md).
-
-## The dedicated DLL layout (older DLLs)
-
-The older protected-DLL layout runs the same primitives but pins the configuration block to a **fixed anchor** at `keys[6] + 5592`, with no scan. Every field is a fixed offset from it:
-
-| Anchor offset | Contents |
+| Offset from `anchor` | Contents |
 | --- | --- |
 | `+4` / `+8` | Import directory size / RVA |
-| `+20` | Main descriptor encryption key |
+| `+20` | Primary stage descriptor key |
 | `+40` / `+44` | Resource directory RVA / size |
-| `+48` / `+56` | Checksum descriptors (checksum2 / checksum1) |
-| `+120` | Main descriptor → primary stage table |
-| `+184` | XOR-accumulator checksum chain |
+| `+48` / `+56` | `checksum2` / `checksum1` descriptors |
+| `+120` | Primary stage descriptor (shift `21`) |
+| `+184` | `xor_acc` checksum descriptor list |
 
-The stage chain then runs: primary table (shift 21) → secondary table at `+3632` (shift 19, keyed by the dword at `+3444`) → two relocation blocks at `+9248` (kind `1`/`0x11`: in-place rotate-by-3 cipher over a descriptor; kind `2`: a `(src, size, dst, verify)` copy walk whose 16-byte entries are decrypted with the rotate-by-2 cipher) → four decompression parameters at `+9160` → code blocks 1–4 at `+3712/+3728/+3760/+3840`, each with checksum-chained keys (four- and three-round triangular accumulations included) → two bytecode stubs (at `addr4 + 3200` and `metadata + 88`) → the section descriptor walk at `addr5 + 11976`.
+From the primary table (`addr1`), the secondary table sits at `+3632` (shift `19`, key at `+3444`), relocation/copy blocks at `+9248`, the four `key_offsets` at `+9160`, code blocks 1..4 at `+3712 / +3728 / +3760 / +3840`, bytecode stub 1 at `addr4 + 3200`, `metadata` at `addr5 + 12312`, bytecode stub 2 at `metadata + 88` (`addr5 + 12400`), and the section-descriptor walk at `addr5 + 11976`.
 
-Two details are unique to this family:
+* **Section descriptors:** `{dest, size, src, decompressed_size}` with `section_image_base = 4095 - u32@0x1080`, decompressing when `size != decompressed_size`.
+* **656-byte header metadata (`info[3] + 16`):** decrypted with `byte_rotate2`; `EntryPoint` is at `+0x10` and the 128-byte data-directory array is at `+0x20` (copied to `pe + 40` and `pe + 136`).
+* **Managed DLL pre-fill:** before section blocks overwrite IL method bodies, managed builds in this family pre-fill the CLR-bearing section from the protected file and re-overlay the `COR20` header afterward.
+{% endtab %}
 
-- Section descriptors store `(dest, size, src, expected_crc)`; the on-disk base is `section_image_base = 4095 − u32@0x1080`, and blocks decompress only when `size != expected_crc`. (The field is reused as the decompressed size, not a CRC.)
-- The PE header metadata is delivered as a 656-byte blob at `keys[3] + 16`, decrypted with the position-keyed rotate-by-2 cipher (the same construction as [byte_rotate2](../../data-transforms/rolling-and-rotation.md#triple-byte-rotation-ciphers)): the entry point sits `0x10` into the blob and the full 128-byte data-directory array `0x20` into it; both are copied into the PE header (`pe + 40` and `pe + 136`).
+{% tab title="Marker-less 64-bit" %}
+Modern 64-bit EXE and DLL shells omit both `"pm\0\0cm\0\0"` and `0x40000000, 1` in Stage 5:
 
-Managed DLLs in this family additionally pre-fill the section containing the CLR header from the original file before section recovery, and recopy the COR20 region afterwards. The CLR structures are preserved, not encrypted.
+1. **1-byte-stepped LFSR scan:** collect every valid 96-byte bytecode stub across Stage 5, stepping by `+1` byte after each hit so a coincidental valid parse immediately preceding the real stub never causes the scan to step over it.
+2. **`fileCS` proximity ranking:** evaluate candidate stubs by checking `block - 0x58` (`fileCS`) for the smallest positive RVA distance past `info[3]`.
+3. **Descriptor-table probe:** scan pointer slots near the candidate stub with non-mutating `trial_byte_rotate2` until a target parses as a valid `{src, src_len, dst, plain_len}` section chain.
+4. **Compressed-block proof:** replay copy -> AES -> stub translate -> `decompress` on the first compressed section block before accepting the stub/table pair.
 
-## The marker-less layout (newer 64-bit builds)
-
-Newer builds drop both stage-5 markers, so the walk3/walk4/walk5 slots can't be derived from them. The layout is instead discovered structurally:
-
-1. **Collect every LFSR-wrapped bytecode block** in the final stage (trial-decode and parse each candidate, advancing by one byte after each hit. A false positive can sit immediately before the real stub, and fixed-stride skipping would jump over it).
-2. **Pick the file decryptor** as the block whose checksum-chain pointer (`block − 0x58`) yields the smallest positive distance past `info[3]`.
-3. **Find the section-descriptor table** by scanning pointer slots near the stub and trial-decrypting their targets with `trial_byte_rotate2` until one parses as a plausible `(src, src_len, dst, dest_len)` descriptor.
-4. **Prove the choice**: replay the first compressed block's full transform under the selected stub and require decompression to succeed.
-
-Other differences from the marker layout: the validation-only walk3 chain is absent; imports are rebuilt from the PE import directory rather than the walk5 pointer table; the entry-point/data-directory block uses "Layout B" placement; and managed metadata is restored *after* the code-page scramble, because the CLR structures sit inside `.text` but aren't scrambled code (see [Relocations, page transforms, and CLR data](../pe-reconstruction/relocations-managed.md#the-code-page-scramble-ordered-last)). These builds also keep their relocation tables and ASLR flags, so they're not `/FIXED`.
+Marker-less builds omit `walk3`, decrypt imports from `DD[1]` (`IMAGE_IMPORT_DESCRIPTOR`s) instead of `walk5` after `.text` page-scramble recovery, use Metadata Layout B for the transient EP/directory block, preserve ASLR flags and `DD[5]` relocations, and restore CLR metadata after `.text` `dd8` so plaintext CLR tables inside `.text` are not corrupted.
+{% endtab %}
+{% endtabs %}

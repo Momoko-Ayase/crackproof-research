@@ -1,10 +1,11 @@
 ---
-description: "逐构建的自定义字节变换：x86 桩解码器、解释器、翻译表与逆变换链。"
+description: "按构建生成的 AL x86 字节码解析器、解释器与 256 字节查找表。"
+icon: microchip
 ---
 
 # bytecode\_vm.py
 
-这是解码每个构建独有 x86 桩的字节码 VM，记载见 [按构建定制的字节变换](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/data-transforms/bytecode-transform)。
+解析并执行每个构建生成的 `AL` 字节码存根，可预计算 256 字节查找表与逆变换，详见[按构建生成的字节变换](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/data-transforms/bytecode-transform)。
 
 ```python
 """The per-build custom byte transform ("bytecode VM").

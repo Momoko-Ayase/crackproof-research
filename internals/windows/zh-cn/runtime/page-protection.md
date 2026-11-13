@@ -1,62 +1,50 @@
 ---
-description: 按需页解密、加载器代码变化、诱饵与自加载行为。
+description: "KiUserExceptionDispatcher 按需页解密、页面涂抹、多态花指令与自映射。"
+icon: lock
 ---
 
-# 页保护与加载器代码
+# 页面保护与加载器代码
 
-## 页级加密
+## 按需缺页加密保护（`640` -> `840`）
 
-最强的运行时层是可选的、按模块配置的。启用时（`640` 然后 `840`）：
+页面保护是按模块独立配置的运行期保护层（通常在宿主 EXE 上开启，在插件 DLL 上关闭）：
 
-1. 可执行节被批量解密（状态 `640`）。
-2. 随后**逐页重新加密**，每页置为 `PAGE_NOACCESS`（状态 `840`）。
-3. 执行到达受保护页时出错；异常处理器按需解密该页并恢复执行。
+1. 在阶段 `640`，可执行节先完成整块批量解密。
+2. 到阶段 `840`，可执行页面按 4 KiB 粒度逐页重新加密并设为 `PAGE_NOACCESS`，同时在 `ntdll!KiUserExceptionDispatcher` 头部写入 inline hook，跳转至 `HtdpStub2.dll`（详见 [手动映射辅助模块](mapped-modules.md)）。
+3. 当执行流进入 `PAGE_NOACCESS` 页面触发访问违例时，异常分发 hook 会在所有 SEH 链之前截获异常，按需解密当前 4 KiB 页面，将属性改为 `PAGE_EXECUTE_READ`，随后恢复原指令执行。
 
-异常处理的安装方式是**补丁 `ntdll!KiUserExceptionDispatcher`**，使其跳入保护器的处理器，处理完再链回正常 SEH。内核把每个用户态异常都递交给这唯一入口点，因此该处理器先于一切 SEH 注册运行——并且对遍历 SEH 链寻找钩子的工具不可见。
+由于未被执行到的页面始终保持 `PAGE_NOACCESS`（部分构建还会开启 **`scribble` 页面涂抹**，在两次缺页之间用异或掩码遮蔽驻留明文页中的部分字节），因此进入 OEP 后仅做单次内存转储，只能拿到已触发过缺页的工作集；若要恢复完整代码，必须主动遍历触发所有受保护页面并还原涂抹字节。
 
-对内存分析的一个推论：对页加密模块的朴素转储只能捕获自启动以来被触及的页（按需解密的工作集）；其余是密文或 `PAGE_NOACCESS` 填充。完整映像需要先强制每页缺页。某些构建还会**涂写**：已解密页驻留后，其选定字节被随机值 XOR 一次，因此原始转储需要反涂写。涂写是按构建的选项，并不总存在——有些页加密模块在每页都被触及后能干净转出。
-
-页错误处理器不在受保护模块的映像内。它随一个手动映射的支持模块 `HtdpStub2.dll`（见[手动映射辅助模块](mapped-modules.md)）分发，因此只转储主模块时找不到处理器签名。
-
-## 按需页密码
-
-一种已观察的处理器在缺页后走这条路径：
+## 按需页解密算法
 
 ```mermaid
 flowchart TD
-    A["Fault in a PAGE_NOACCESS page"] --> B["Hooked ntdll!KiUserExceptionDispatcher"]
-    B --> C["Match the address to a region and page descriptor"]
-    C --> D["MapViewOfFile the ciphertext page"]
-    D --> E["On-demand page cipher"]
-    E --> F["Optional second pass if page-flag bit 20 is set"]
-    F --> G["VirtualProtect 4 KiB to PAGE_EXECUTE_READ"]
-    G --> H["Resume at the fault address"]
+    A["执行进入 PAGE_NOACCESS 页触发异常"] --> B["被 hook 的 ntdll!KiUserExceptionDispatcher"]
+    B --> C["按异常 VA 匹配保护区与 16B 页描述符"]
+    C --> D["MapViewOfFile 映射 4 KiB 密文切片"]
+    D --> E["demand_page_decrypt（第 1 轮）"]
+    E --> F["flags 第 20 位置位时执行可选第 2 轮"]
+    F --> G["VirtualProtect 4 KiB -> PAGE_EXECUTE_READ"]
+    G --> H["返回触发异常的指令继续执行"]
 ```
 
-区域描述符表位于处理器模块内。处理器用基址和大小匹配故障地址。命中区域的页表是位于 `region_base + page_table_offset` 的 16 字节页描述符数组。页索引为 `(fault_address - region_base) >> 12`。
+在 `HtdpStub2.dll` 内部，每个受保护模块都会注册一个区域描述符，指向位于 `region_base + page_table_offset` 的 16 字节页描述符数组（按 `(fault_va - region_base) >> 12` 索引）：
 
-已观察的区域描述符字段：
+| 结构体 | 偏移 | 大小 | 实测含义 |
+| --- | --- | --- | --- |
+| 区域描述符 | `+0x08` | 8 | `region_base` 虚拟地址 |
+| 区域描述符 | `+0x10` | 4 | 保护区域字节大小 |
+| 区域描述符 | `+0x20` | 4 | 相对于 `region_base` 的 `page_table_offset` |
+| 区域描述符 | `+0x24` | 4 | 4 KiB 页面总数 |
+| 区域描述符 | `+0x28` | 8 | 传给 `MapViewOfFile` 的节对象句柄 |
+| 区域描述符 | `+0x34` | 4 | 已解密页面计数 |
+| 页描述符（`16B`） | `+0x00` | 4 | `flags`（`bit 20`，即位索引 `0x14` / 掩码 `0x00100000`，启用第 2 轮解密） |
+| 页描述符（`16B`） | `+0x04` | 4 | 单页密钥分量 `key_part` |
+| 页描述符（`16B`） | `+0x08` | 4 | 最近一次 `GetTickCount` 时间戳 |
+| 页描述符（`16B`） | `+0x0C` | 2 | 缺页触发计数 |
+| 页描述符（`16B`） | `+0x0E` | 2 | 含义待确认的 16 位字段 |
 
-| 偏移 | 大小 | 已观察用途 |
-| --- | --- | --- |
-| `+0x08` | 8 | 区域基址 |
-| `+0x10` | 4 | 区域大小 |
-| `+0x20` | 4 | 相对区域基址的页表偏移 |
-| `+0x24` | 4 | 页数 |
-| `+0x28` | 8 | 传给 `MapViewOfFile` 的映射句柄 |
-| `+0x34` | 4 | 解密计数 |
-
-已观察的页描述符字段（各 16 字节）：
-
-| 偏移 | 大小 | 已观察用途 |
-| --- | --- | --- |
-| `+0x00` | 4 | 标志。第 20 位（`0x14`）选择第二次变换 |
-| `+0x04` | 4 | 混入页密钥的材料 |
-| `+0x08` | 4 | 最近一次 `GetTickCount` |
-| `+0x0C` | 2 | 缺页次数 |
-| `+0x0E` | 2 | 16 位字段；作用未确认 |
-
-页密钥混合故障页地址、区域基址的低 32 位和逐页密钥材料。第一层变换是对 4 KiB 视图的 dword 密码：
+第 1 轮解密用 `page_va + region_base` 的低 32 位与 `key_part` 异或派生 32 位密钥，并对整页 4 KiB 数据执行滚动双字解密：
 
 ```python
 def demand_page_key(page_va, region_base, key_part):
@@ -74,28 +62,11 @@ def demand_page_decrypt(buf, key):
         prev = enc
 ```
 
-`get_u32`、`put_u32`、`rol32` 和 `MASK32` 是[数据变换](../data-transforms/data-transforms.md)中的辅助函数。可运行副本在 [primitives.py](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/primitives.py)。
+`get_u32`、`put_u32`、`rol32` 与 `MASK32` 的定义见 [滚动密钥与循环移位算法](../data-transforms/rolling-and-rotation.md)，可运行的测试向量见 [primitives.py](https://app.gitbook.com/s/L9bXLua8yrIPEUZOHO21/primitives.py)。当 `flags & 0x00100000` 非零时，在调用 `VirtualProtect` 将页面切换为 `PAGE_EXECUTE_READ` 之前还会执行与具体构建相关的第 2 轮变换。
 
-若页标志第 20 位被置位，同一 4 KiB 上再跑第二次变换。该函数尚未化成已发布的公式。处理器随后对这一页调用 `VirtualProtect(..., PAGE_EXECUTE_READ)` 并恢复执行。
+## 加载器多态变形、诱饵指令与磁盘自映射
 
-该密码是按模块配置的选项，对应 `640` 再接 `840` 的序列，不是某一构建独有的附加层。
-
-## 加载器自身的代码：多态与诱饵
-
-加载器保卫其代码的力度不亚于其数据。在最终阶段（stage 5）及其自举代码中观察到的技术：
-
-**多态发射。** 同一算法以许多置换副本出现——一个已观察映像携带同一密码序言的 16 个实例，仅在装饰性垃圾跳转的摆放上不同。反汇编器看到 16 个互不相干的函数；语义完全相同。
-
-**反反汇编。** 无条件跳转后的垃圾字节、跳进多字节指令中间的跳转，以及返回地址算术（例如 `call $+5` 后随两个常量的加/减，其差恰是到真实续点的距离，被修改的返回地址随即被丢弃）。线性扫描乃至递归下降反汇编都会失步；一个 12.9 KB 的 stage-5 blob 几乎整体反编译为 “control flows out of bounds”。
-
-**无操作诱饵 stub。** 自然的入口点是消耗分析者耐心的陷阱，而非真实代码。一个 stub 保存全部 16 个 GPR，执行 VMware 后门探测，比较结果，然后执行位移为 0 的 `jne $+2`（两个分支到达同一条指令），恢复每个寄存器并返回。它唯一的副作用是 `in` 指令的**计时**，在别处被消费。另一个诱饵把载荷藏在陷阱标志后：`pushfq; or [rsp], 0x100; popfq` 触发 `#DB`；正常执行下 SEH 重定向跳过其后的代码，只有当调试器（或朴素模拟器）吞下异常并继续时，“隐藏”路径才会运行——而那是一条没有用的路。
-
-**自修改元数据。** 阶段表用后即清零：预载映像中存在的标记在模块完成初始化时已被覆写，因此启动后的转储会缺静态文件中存在的结构。
-
-## 从磁盘自我加载
-
-最终阶段不做反射式内存加载。其 API 字符串表包含 `GetModuleFileNameW/A`、`CreateFileW`、`CreateFileMappingA`、`MapViewOfFile`、`UnmapViewOfFile`、`GetFileSize`、`GetFullPathNameW/A`、`CloseHandle`、`RtlGetVersion`、`SystemTimeToFileTime`、`Sleep`——文件 I/O 与模块路径 API，没有任何分配、保护或加载器 API。该阶段解析自身的磁盘路径，把受保护文件映射为内存视图，并从该视图读取加密 payload。（这也是静态分析能把同样的算法喂以原始文件字节、离线重放的原因。）
-
-运行时状态保存在一个由保留寄存器寻址的上下文结构中：固定槽位的函数指针、指向映像缓冲区的双重间接指针，以及由展开的 `lea`-加-store 序列构建的逐槽表。API 地址从模块自身经 OS 解析的导入表读出——整个阶段中没有任何 PEB 遍历，因此该模块依赖普通 Windows 加载器已绑定其导入，尽管它存储的 `AddressOfEntryPoint` 是垃圾、OS 从不调用其真实入口。
-
-同一阶段内含自己的 `.reloc` 遍历器：重定位由加载器施加（状态 `655`），而非 OS——与 [PE 重建](../loading-and-pe-repair/pe-reconstruction/README.md)中的 `/FIXED` 处理一致。
+* **多份多态序言副本：** Stage 5 会为同一套解密例程生成最多 16 份指令排布与花指令跳转各不相同的等价副本。
+* **反汇编失步跳转与返回地址计算：** 无条件跳转后紧跟垃圾字节、跳入指令中间的分支目标，以及基于 `call $+5` 的常量偏移修正，都会干扰线性反汇编和常规递归下降反汇编。
+* **计时与 `#DB` SEH 诱饵：** 一类诱饵先保存全部 16 个通用寄存器，执行 `0x5658` 端口的 `in eax, dx` 探测，再接一条 `jne $+2`（`disp = 0`，无论条件是否成立都落到下一条指令）后直接返回，专门用于拉大外部调试时的耗时；另一类诱饵置位 `TF`（`pushfq; or [rsp], 0x100; popfq`），使正常运行经由 SEH 转向真实路径，而吞掉 `#DB` 异常的调试器或模拟器则会落入死代码分支。
+* **启动后擦除表项与磁盘自映射：** Stage 5 通过系统已解析的导入函数调用 `GetModuleFileNameW` 获取自身路径，打开并映射磁盘原文件（`CreateFileW` / `CreateFileMappingA` / `MapViewOfFile`），在阶段 `655` 自行处理 `.reloc` 重定位项，并在进入 `280` 前将用完的阶段表与特征标记清零。

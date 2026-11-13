@@ -1,18 +1,15 @@
 ---
-description: "Executes Windows Markdown Python snippets in all three languages and checks their results."
+description: "Executes all 16 Python blocks across nine Windows pages in all five languages (80 blocks, 135 checks)."
+icon: list-check
 ---
 
 # verify\_docs.py
 
-This checker reads the documentation repository's Windows pages, executes every Python block in a separate namespace for each language, and compares selected results with `verification/vectors.txt`. It refuses an incomplete page coverage list. The configured inputs produce 27 comparisons per language across nine pages and 16 Python blocks.
-
-Run `python verification/verify_docs.py` from the documentation repository root. Expected final output: `all Windows doc snippets verified (3 languages, 48 Python blocks, 81 checks)`.
-
-The checker requires the documentation tree. It checks transcription and the configured vector cases; executing a function definition alone does not test every branch or establish runtime protection behavior.
+Extracts and executes all 16 Python blocks across the nine Windows transform pages in each of the five published languages (`en`, `zh-cn`, `zh-tw`, `ja`, `ko`), running 27 vector checks per language. Run `python verification/verify_docs.py` from the repository root (`all Windows doc snippets verified (5 languages, 80 Python blocks, 135 checks)`).
 
 ```python
 """Execute the Windows Markdown Python blocks and compare their results with
-the checked-in reference vectors for English and both Chinese variants.
+the checked-in reference vectors across all five published languages.
 
 Run from the repository root with: python verification/verify_docs.py
 """
@@ -22,7 +19,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LANGUAGES = ("en", "zh-cn", "zh-tw")
+LANGUAGES = ("en", "zh-cn", "zh-tw", "ja", "ko")
 PYTHON_BLOCK = re.compile(r"^```python[ \t]*\n(.*?)^```[ \t]*$", re.M | re.S)
 
 PAGES = [

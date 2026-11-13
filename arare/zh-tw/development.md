@@ -1,40 +1,55 @@
 ---
-description: "Arare 工作區的構建、測試與貢獻流程。"
+description: "建置原生與 Managed 工具鏈、執行測試與 Senbei 1.3.1 對照驗證並打包發行版。"
+icon: hammer
 ---
 
-# 開發
+# 開發指南
 
-## 構建
+## 建置專案
 
-安裝 Rust 1.98.1 或更新版本、面向 x86/x64 的 Visual Studio C++ 工具（含 MASM），以及 Windows SDK。開發使用 MSVC 14.51 與 SDK 10.0.26100。
+前置需求：Rust `1.98.1` 或更新版本、包含 MASM（`ml` / `ml64`）的 Visual Studio C++ x86/x64 建置工具，以及 Windows 10/11 SDK（已於 MSVC `14.51` 與 SDK `10.0.26100` 測試通過）。Managed 封裝與 WPF GUI 另需安裝 .NET 10 SDK 與 .NET Framework 4 參考組件。
+
+{% stepper %}
+{% step %}
+### 建置原生 CLI 與內嵌載入器
+
+`cargo build` 會從原始碼同時編譯 x86 與 x64 的 C/ASM 執行階段載入器：
 
 ```powershell
 rustup target add i686-pc-windows-msvc
 cargo build --release -p arare-cli
 ```
+{% endstep %}
 
-構建期間會從源碼編譯兩種原生加載器架構。託管打包另外需要 .NET 10 SDK/參考包與 .NET Framework 4 參考程序集：
+{% step %}
+### 建置 Managed 中繼資料工具（處理 CLR 輸入必備）
+
+`tools/managed/build.ps1` 無任何 NuGet 相依套件（若 `dotnet.exe` 不在預設路徑，可傳入 `-Dotnet <path>`），執行後會產出 `Arare.ManagedHost.dll`、`Arare.ManagedHost.runtimeconfig.json` 與 `Arare.Bootstrap.dll`：
 
 ```powershell
 & tools/managed/build.ps1
 $env:ARARE_MANAGED_TOOLS = (Resolve-Path target/managed-tools).Path
 ```
 
-開發運行時，`ARARE_MANAGED_TOOLS` 必須是包含 `Arare.ManagedHost.dll`、`Arare.ManagedHost.runtimeconfig.json` 與 `Arare.Bootstrap.dll` 的絕對目錄。分發包也可把這三個文件放入 `arare.exe` 旁的 `managed/` 目錄。工具發現使用這些顯式位置。
+每當 `runtime/` 或 `tools/managed/` 底下的檔案變更時，請重新執行 `tools/managed/build.ps1`。執行期間，除非透過 `ARARE_DOTNET` 指定 `dotnet.exe` 的絕對路徑，否則 `arare` 與 Python 測試腳本預設會在 `C:/Program Files/dotnet/dotnet.exe` 尋找 `dotnet.exe`。
+{% endstep %}
 
-託管寫入器沒有 NuGet 依賴。構建後可創建本地二進制包：
+{% step %}
+### 打包發行壓縮檔（選用）
+
+組裝獨立的 `arare-windows-x64` 或 `arare-windows-x86` 發行目錄（包含 `managed/`，並可選擇一併納入 `Arare.Gui.exe`）：
 
 ```powershell
 & tools/package.ps1 -Architecture x64 -IncludeGui
 ```
+{% endstep %}
+{% endstepper %}
 
-CI 會上傳同樣的 `arare-windows-x64` 與 `arare-windows-x86` 包。
+## 測試驗證
 
-運行打包後的圖形界面需要對應架構的 .NET 10 Desktop Runtime。託管打包需要 .NET 10 運行時；僅使用原生命令行不需要。
-
-## 測試
-
-普通工作區構建不會解析 Senbei。它們編譯獨立的運行時產物，並使用源碼生成的夾具：
+{% tabs %}
+{% tab title="Workspace 檢查" %}
+標準 workspace 測試使用動態產生的測試 fixture，無須準備 Senbei 原始碼：
 
 ```powershell
 cargo test --workspace
@@ -42,45 +57,33 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 cargo test --workspace --target i686-pc-windows-msvc
 ```
+{% endtab %}
 
-把 `SENBEI_SOURCE` 設為未改動的 Senbei 源碼檢出所在的絕對路徑，然後使用 oracle 運行腳本：
-
-完整 oracle 執行還需要選定的 32 位 Mono 運行時。在啟動運行腳本前，把 `ARARE_MONO_X86` 設為已存在的運行時可執行文件的絕對路徑。運行 Mono 案例時才檢查此前提；未選擇或選擇無效會使該案例失敗，不會靜默跳過。
+{% tab title="Senbei 1.3.1 對照驗證" %}
+`verification/run_oracle.py` 會以**未修改的 Senbei `1.3.1` 原始碼目錄**（限定 `version = "=1.3.1"`；若將 `SENBEI_SOURCE` 指向較新版本的 Senbei 會被版本檢查拒絕）驗證每一種封裝設定檔，並實際執行原始檔、受保護檔與解包還原檔。執行前請先將 `ARARE_MONO_X86` 設為 32 位元 `mono.exe` 的絕對路徑；由於 x64 與 x86 測試共用產物路徑，請依序執行兩個目標架構：
 
 ```powershell
 python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release
 python verification/run_oracle.py --senbei-source $env:SENBEI_SOURCE --release --target i686-pc-windows-msvc
 ```
+{% endtab %}
 
-運行腳本解析選定源碼；如果尚未設置 `ARARE_MANAGED_TOOLS`，則在調用 Cargo 前補充該變量。兩個 oracle 目標必須依次運行，因為測試工具共享生成的產物位置。更改運行時 C 或 C# 之後重建託管工具。
-
-託管解析器與工具發現的專項檢查：
+{% tab title="Managed 與 GUI 測試套件" %}
+執行 ECMA-335 解析器／改寫器測試、Managed 工具探索單元測試，以及 WPF 冒煙測試套件：
 
 ```powershell
 python verification/managed/parser_tests.py
 cargo test -p arare-engine --lib managed::tool_discovery_tests
-```
-
-解析器檢查需要 .NET 10 SDK/參考包，並把生成的產物寫到 `target/managed-parser-tests/`。在從源碼目錄啟動託管執行或其 Cargo 測試前，應提供 `ARARE_MANAGED_TOOLS`。僅構建或保護原生文件不需要這些文件。
-
-託管夾具編譯會在配置的 `ARARE_DOTNET` 安裝中選擇最新且完整的正式版 .NET 10 SDK，按版本數字排序，並檢查 Roslyn 是否存在。如果該安裝中沒有合適的編譯器，會報告前提條件錯誤。
-
-圖形界面冒煙測試：
-
-```powershell
 dotnet build gui/ArareGui.slnx -c Release
 dotnet run --project gui/Arare.Gui.SmokeTests -c Release --no-build
 ```
+{% endtab %}
+{% endtabs %}
 
-私有解碼器往返成功並不足夠。格式集成必須通過未改動的 Senbei，運行時聲明需要真實執行或 DLL 加載。不得為掩蓋差異而從比較中排除整節。
+## 開發規範
 
-## 約定
-
-- 主機工具為 AGPL-3.0-only。`arare-codec`、`arare-pe` 與獨立編寫的嵌入運行時為 MIT。不要把 AGPL 實現代碼引入嵌入運行時。
-- 把 Senbei 當作參考。不要把商用供體可執行文件、抽出的 stub、不透明配置或受保護應用程序導入倉庫。
-- 公開測試使用生成的夾具。倉庫外的現有樣本目錄由用戶自行管理。
-- PE 文件偏移與 RVA 不同。讀取、複製、分配或寫入前須同時校驗兩者。
-- 當前實現不包括 Android 與 IL2CPP 元數據混淆。
-- 不要在提交中加入署名尾註。
-
-現行約定在 `docs/design/`。註明日期的評審與實現計劃在 `docs/notes/`。面向操作者的文檔就是本 GitBook 欄目。
+* 確保 `arare-pe`、`arare-codec` 與所有內嵌執行階段程式碼（`arare-runtime`、`runtime/`）維持純淨的 `MIT` 授權；嚴禁將 `AGPL-3.0-only` 程式碼移入內嵌執行階段。
+* 嚴禁將商業樣本檔案、擷取出的外部 stub 或真實受保護樣本匯入儲存庫；所有測試一律使用動態產生的 fixture。
+* 將檔案偏移與 RVA 視為不同的座標空間，並在切片讀取或寫入前同時驗證兩者的邊界。
+* 任何格式變更皆須同時通過未修改版 Senbei 的靜態還原與真實作業系統行程／DLL 執行驗證，不得僅依賴內建解碼器的往返測試或排除特定區段。
+* 架構規格置於 `docs/design/`，附日期的研究證據與計畫置於 `docs/notes/`，使用者說明文件則維護於本 GitBook 專區。提交 commit 時請勿加上任何署名尾註（attribution trailers）。

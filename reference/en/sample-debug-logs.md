@@ -1,22 +1,31 @@
 ---
-description: "Desensitized debug logs from protected host, native DLL, and managed DLL samples."
+description: "Anonymized runtime debug logs captured from a page-encrypted host EXE, a native plugin DLL, and a managed DLL."
+icon: file-lines
 ---
 
 # Sample debug logs
 
-These are genuine CrackProof debug logs, captured by creating the per-executable 12-hex-character folder under `%temp%` and launching a protected title (see [Debug logging](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#debug-logging)). Paths and product names are replaced with generic placeholders; everything else (option flags, status codes, addresses, hook lists) is verbatim.
+Real CrackProof runtime logs captured by creating each binary's 12-hex-character folder under `%temp%` before launch (see [Debug logging](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#debug-logging)). File paths and product names are replaced with generic placeholders; option flags, status codes, addresses, and hooked-API lists are verbatim.
 
-## Reading a log
+## Log structure
 
-* **Line 1:** the protected module's path.
-* **Line 2:** the protection option flags the build was packed with (each `-XX` token is one packer option).
-* **Line 3/4:** timestamp and the module's load base.
-* **Following lines:** 12-bit [status codes](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#the-boot-sequence-and-status-codes), one per stage; indented `000`–`00N` lines carry stage-specific detail (addresses, counts, hooked functions).
-* **Final lines:** completion timestamp and the 9-digit error code (`000-000-000` = success).
+* **Line 1:** full path of the protected EXE or DLL.
+* **Line 2:** packer option tokens (`-CF`, `-CP`, `-PP`, etc.) compiled into that module.
+* **Lines 3 and 4:** start timestamp and hexadecimal module load base.
+* **Body lines:** 12-bit [status codes](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/startup-status#the-boot-sequence-and-status-codes), with indented `000`..`00D` detail lines carrying stage parameters, driver names, and hooked function addresses.
+* **Closing lines:** end timestamp and `AAA-BBB-CCC` result (`000-000-000` on clean startup).
 
-## Host EXE, page-encrypted
+## Captured transcripts
 
-```
+{% tabs %}
+{% tab title="Host EXE (page-encrypted)" %}
+Key observations in this trace:
+
+* **`C00` (`01A065F4 01A037AB`):** each dword is `0x01A00000 + build`, recording host Windows build `26100` (`0x65F4`) against minimum accepted build `14251` (`0x37AB`).
+* **`C03` & `C04`:** initializes Generation-2 driver `Htsysm7679` (see [Htsysm kernel components](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/kernel-components)) and hooks 15 `kernel32` / `kernelbase` / `ntdll` APIs to toggle Protected Process state around incompatible system calls.
+* **`610 -> 640 -> 655 -> 6E1 -> 800..840 -> 660 -> 280`:** bulk-decrypts executable sections (`640`), applies relocations (`655`), hooks `KiUserExceptionDispatcher` and seals pages `PAGE_NOACCESS` (`840`), runs post-seal handoff `660`, and jumps to OEP (`280`).
+
+```text
 E:\Package\app.exe
  -CF -CP -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -EUT64 -DE -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NDEP1 -NDC -NPD
 2026/05/15 04:55:07.178
@@ -93,18 +102,15 @@ A06
 2026/05/15 04:55:07.278
 000-000-000
 ```
+{% endtab %}
 
-Points of interest:
+{% tab title="Native plugin DLL (bulk-decrypted)" %}
+Key observations in this trace:
 
-* `C03` names the driver generation: `Htsysm7679`, the second-generation Htsysm (see [Htsysm kernel components](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/kernel-components)).
-* `C04` lists every API hooked for the Protected-Process toggle (`NtCreateSection`, `NtAlpcSendWaitReceivePort`, `NtDuplicateObject`, `NtConnectPort`, `NtOpenProcess`, `NtOpenThread`, …) plus loader-interception hooks (`CreateProcessInternal*`, `CreateRemoteThread*`, `LdrLoadDll`, `CreateActCtxW`).
-* `640 … 840`: this module is **page-encrypted**. Bulk decrypt, then re-encrypt with the exception-handler hook installed. The `002` line after `840` carries three addresses (the re-encrypted range and handler data).
-* `570` and `A06` hook additional APIs late in the boot (`user32!SetFocus`, `CreateWindowExA/W`, `uxtheme!ThemeInitApiHook`).
-* `660` is a stage that isn't in the public status table. It's present here between `840` and the final `280` (jump to OEP).
+* **`A11` -> `5D0` -> `A15`:** `A11` verifies that the host EXE carries CrackProof host markers; `A15` is emitted after `5D0` as a pure DLL sequencer marker confirming host verification passed.
+* **No `640` / `840` (`-NCP`):** sections decrypt once at `610`, relocate at `655`, and step through `800 -> 830 -> 280` with all code pages left resident in memory.
 
-## Native plugin DLL, bulk-decrypted only
-
-```
+```text
 E:\Package\app_Data\Plugins\native_plugin.dll
  -CF -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -DE -NCP -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NEUT64 -NDEP1 -NDC -NPD
 2026/05/15 04:55:14.518
@@ -133,17 +139,14 @@ A15
 2026/05/15 04:55:14.619
 000-000-000
 ```
+{% endtab %}
 
-Points of interest:
+{% tab title="Managed DLL" %}
+Key observations in this trace:
 
-* `A11`: the DLL host-process check, present only for protected DLLs.
-* `A15` follows the host-process check. It is a pure marker with no check body of its own: the host verification passed and the boot moved on to the decrypt prelude.
-* **No `640`/`840`:** this build is bulk-decrypted once (`610`) and never page-encrypted; compare the host EXE above. Page encryption is a per-module option.
-* `800` carries a single address: the freshly populated image region.
+* Runs the minimal CLR DLL sequence: `510` loader CRC, `A09` VM registry check, `A11` host-EXE check, decrypt prelude `5D0..5A0`, section/method-body decryption at `610`, and immediate handoff at `280` (no driver init, relocations, or page sealing).
 
-## Managed DLL, minimal sequence
-
-```
+```text
 E:\Package\app_Data\Managed\Assembly-CSharp.dll
  -CF -CP -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -EUT64 -DE -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NDEP1 -NDC -NPD
 2026/05/15 04:55:09.342
@@ -163,5 +166,5 @@ A11
 2026/05/15 04:55:09.368
 000-000-000
 ```
-
-The managed build runs the shortest pipeline: environment checks, section decryption (`610`), then straight to the OEP (`280`), with no driver init, no page encryption, and no relocation stage.
+{% endtab %}
+{% endtabs %}

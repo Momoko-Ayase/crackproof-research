@@ -1,29 +1,30 @@
 ---
-description: "加載時已觀察的 Android 環境、完整性與轉儲相關檢查。"
+description: "Android 使用者空間的反分析、NativeBridge、ptrace、記憶體與 APK 簽章檢查。"
+icon: user-shield
 ---
 
 # 環境與完整性檢查
 
-Windows 構建把用戶態探測與可選的內核支持疊在一起。Android 家族留在用戶態。本頁的檢查來自第一階段、第二階段，以及[運行時模塊](modules.md)列出的模塊。它們在這些嵌套流仍在落地時運行，而不是在已恢復的 ELF 就位之後。
+不同於 Windows 產品線，Android 上的 CrackProof 完全在使用者空間運作，不依賴核心驅動程式。各類偵測邏輯分散在 Stage 1、Stage 2 與 [執行階段模組](modules.md) 所列的工作模組中，在巢狀串流解開的同時一併執行。
 
-## 進程與翻譯環境
+## 行程與 ABI 轉譯檢查
 
-第一階段已經遍歷 `/proc/self/maps` 以找到自己的文件。第二階段保留 maps 上下文，並查看 `/proc/self/environ`。一種已觀察探測通過查找 `/system/lib/libhoudini.so` 與 `/system/lib64/arm64/nb/` 下的路徑，測試是否存在 x86-on-ARM 翻譯層。正在翻譯 ARM 代碼、而不是原生跑 AArch64 的宿主，因此與加載器所期望的環境不同。
+* **自身映射與環境變數：** Stage 1 會解析 `/proc/self/maps` 以定位底層 ELF 檔案；Stage 2 則會保留映射資訊並檢查 `/proc/self/environ`。
+* **ARM-on-x86 二進位轉譯（NativeBridge）：** 偵測常式會檢查 `/system/lib/libhoudini.so` 與 `/system/lib64/arm64/nb/` 是否存在，藉此判斷環境是否透過 ARM-on-x86 轉譯層執行而非原生 AArch64。
+* **檔案系統與 libc 檢查：** 模組 `0x8F` 會檢查 `/proc/self/cmdline`、`uid`/`gid`/`tid` 以及檔案擁有者與權限；模組 `0x60` 會掃描系統程式庫資料夾與執行期路徑；模組 `0x20` 則驗證目標 ELF 標頭、`/proc/self/maps` 以及目前生效的 `libc` 映射。
 
-模塊 `0x8F` 讀 `/proc/self/cmdline`，查詢 uid/gid/tid，並檢查某路徑的屬主與模式。模塊 `0x60` 掃描系統庫目錄、進程環境與運行時路徑。模塊 `0x20` 校驗目標路徑、ELF 頭、`/proc/self/maps` 以及 libc 映射。
+## 輔助行程與 `PTRACE_SEIZE`
 
-## 第二進程與 ptrace
+在已觀測的 IL2CPP 組建中，應用程式會在 ART 與虛擬機器程式庫初始化完成後、`dlopen` 載入受保護 `.so` 之前，先 `fork` 出一個輔助行程。子行程會以 `PTRACE_SEIZE | PTRACE_O_EXITKILL` 附加至父行程，占住核心的 `ptrace` 附加槽位，且只要任一方行程結束就會一併終止應用程式。由於 `fork` 發生在受保護 `.so` 載入之前，該程式庫不會出現在 `/proc/<child>/maps` 中。
 
-已觀察的 IL2CPP 庫在 ART 啟動且 VM 模塊映射之後、受保護庫本身加載之前，fork 一個輔助進程。子進程用 `PTRACE_SEIZE` 與 `PTRACE_O_EXITKILL` 抓住父進程。這佔住 ptrace 槽位，並把兩個進程的壽命綁在一起。因此子進程的 maps 裡不會出現受保護庫。
+## `/proc/<pid>/mem` 監控與頁面權限
 
-## 內存可見性
+在已觀測的組建上，開啟並讀取 `/proc/<pid>/mem` 會在數秒內導致行程終止；但讀取 `/proc/<pid>/maps`、`cmdline` 或 `status`，或是透過 `process_vm_readv` 讀取記憶體，在這些組建上都不會觸發終止。當 `0x9B` 完成程式區段還原後，可執行頁面會維持可讀狀態（`PROT_READ | PROT_EXEC`）；Android 組建並未安裝基於 `PAGE_NOACCESS` 缺頁例外（demand-fault）的單頁即時解密機制。
 
-打開並讀取 `/proc/<pid>/mem` 已被觀察到會在數秒內殺死進程。讀 `maps`、`cmdline` 與 `status` 則不會。同一批構建上 `process_vm_readv` 沒有引起這種反應。恢復完成後，可執行頁保持可讀。沒有 Windows 那種對按需出錯代碼做 `PAGE_NOACCESS` 再加密。
+## APK 簽章與網路時間
 
-## 包與時間
+模組 `0x40` 會由高至低依序驗證 `base.apk` 與 split APK 的簽章格式：先檢查 APK Signature Scheme v3.1，接著為 v3、v2，最後為 JAR 簽章（v1）。模組 `0x02` 會透過 UDP 連接埠 123 向 NTP 伺服器查詢時間，並比對回傳時間戳記是否落在設定範圍內。模組 `0x69` 則會建立短暫存在的偵測用子行程，並檢查 `wait` 回傳的結束狀態。
 
-模塊 `0x40` 檢查 `base.apk` 與同級拆分 APK。已觀察的簽名順序是 v3.1，然後 v3，然後 v2，然後 JAR/v1。模塊 `0x02` 發送 UDP 123 端口時間查詢，並把答覆與配置閾值比較。模塊 `0x69` fork 一個子探測並等待其退出狀態。
+## 不留存於連結器模組清單
 
-## 缺席的部分
-
-這條路徑上沒有 Htsysm 一類內核驅動。第二階段模塊是普通用戶態映像，常常落在私有 RWX 區域，運行後可以擦掉或改寫自己。它們不出現在動態鏈接器的模塊列表裡，與 Windows 上[手動映射的輔助模塊](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/mapped-modules)造成的缺口同類。
+Stage 2 各層直譯器與工作模組皆位於匿名 `mmap` 記憶體區域（初始化期間常為 `RWX`），且在回呼函式執行完畢後可將自身清零或覆寫。如同 Windows 上的 [手動映射輔助 DLL](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/runtime/mapped-modules)，這些模組都不會出現在 Bionic 的 `dl_iterate_phdr` 或 `soinfo` 串列中。

@@ -1,15 +1,10 @@
 ---
-description: "What the Windows loader checks and changes at runtime before and after the original program starts."
+description: "Runtime boot sequence, status codes, anti-analysis checks, demand-fault page protection, helpers, and Htsysm drivers."
+icon: play
 ---
 
 # Runtime behavior
 
-The runtime combines ordinary usermode loading work with environment checks, optional kernel support, and page-level code protection.
+At runtime, a protected Windows binary runs CrackProof's bootstrap loader before jumping to the original entry point (`280`). The loader opens optional debug logs, maps helper DLLs in memory, checks the OS, VM, debugger, and process environment, optionally initializes an `Htsysm` kernel driver, reconstructs sections and imports, and optionally re-encrypts executable pages behind a `KiUserExceptionDispatcher` hook.
 
-| Area | Detail |
-|---|---|
-| Startup | [Boot order, status values, and debug logging](startup-status.md) |
-| Environment | [Usermode and kernel-assisted checks](environment-checks.md) |
-| Code pages | [On-demand page changes and loader-code variation](page-protection.md) |
-| Embedded components | [Manually mapped helper modules](mapped-modules.md) |
-| Kernel | [Htsysm generations and responsibilities](kernel-components.md) |
+<table data-view="cards"><thead><tr><th width="48"></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><i class="fa-list-ol"></i></td><td><strong>Startup sequence and status reporting</strong></td><td>12-bit boot status codes, <code>%temp%</code> 12-hex log gates, <code>ErrLog-Pec</code> mailslots, and <code>AAA-BBB-CCC</code> failure codes.</td><td><a href="startup-status.md">Startup sequence and status reporting</a></td></tr><tr><td><i class="fa-user-shield"></i></td><td><strong>Environment and anti-analysis checks</strong></td><td>Debugger, VM, boot-option, injected-DLL/thread, <code>A11</code>/<code>A15</code> host-trust, and system-DLL unhooking checks.</td><td><a href="environment-checks.md">Environment and anti-analysis checks</a></td></tr><tr><td><i class="fa-lock"></i></td><td><strong>Page protection and loader code</strong></td><td><code>KiUserExceptionDispatcher</code> demand-page decryption, scribble, polymorphism, decoys, and disk self-mapping.</td><td><a href="page-protection.md">Page protection and loader code</a></td></tr><tr><td><i class="fa-layer-group"></i></td><td><strong>Manually mapped helper modules</strong></td><td>Embedded helper roles (<code>it</code>, <code>dt</code>, <code>cm</code>, <code>dm</code>, <code>sk</code>, <code>pm</code>) and why they omit PEB module entries.</td><td><a href="mapped-modules.md">Manually mapped helper modules</a></td></tr><tr><td><i class="fa-gears"></i></td><td><strong>Htsysm kernel components</strong></td><td>Generations 1 through 3 (<code>Htsysm</code>, <code>Htsysm7679</code>, <code>0xAA02</code> <code>ObRegisterCallbacks</code> drivers including <code>Htsysm1B4001</code>).</td><td><a href="kernel-components.md">Htsysm kernel components</a></td></tr></tbody></table>

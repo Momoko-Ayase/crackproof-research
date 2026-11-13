@@ -1,109 +1,113 @@
 ---
-description: 通用阶段解密模式与基于标记的 64 位加载序列。
+description: "复合阶段解密流程与 64 位有标记布局的九阶段节还原序列。"
+icon: link
 ---
 
-# 阶段链与标记布局
+# 阶段链与有标记布局
 
-由[滚动 XOR 链](../../data-transforms/rolling-and-rotation.md#滚动密钥家族)解出的 payload 主体并不是程序。它是加载器的配置表、加密的阶段代码，以及最终用来恢复程序节的描述符。加载器是**自解密的**：其代码被拆分为多个阶段，每个阶段都用在上一阶段正确解密后才存在的内容派生的密钥加密。无论是运行时还是静态分析，都必须按序穿过各阶段；没有直达最终阶段表的捷径。
+`payload_xor_chain` 解开的是外层加载器工作区，应用自身的节数据仍封装在内层阶段中。工作区内，Stage 1 至 Stage 5 按顺序逐级解密：每一阶段的密钥由头部校验和、前一已解密阶段的 CRC-32 以及经 `advance_key` 步进的内容种子共同派生。
 
 ```mermaid
 flowchart LR
-    H["info header"] --> P["payload body"] --> S1["stage 1"] --> S2["stage 2"]
-    S2 --> S3["stage 3"] --> S3b["stage 3b"] --> S4["stage 4"] --> S5["stage 5"]
-    S5 --> SEC["section descriptors"] --> IMG["original image sections"]
-    C1["crc32 + accumulator keys"] -.-> S1
-    C2["crc32 + seed keys"] -.-> S3
-    C3["bytecode stub 1"] -.-> S5
-    C4["bytecode stub 2"] -.-> SEC
+    H["info[0..7]"] --> P["载荷异或链"] --> S1["Stage 1"] --> S2["Stage 2"]
+    S2 --> S3["Stage 3"] --> S3b["Stage 3b"] --> S4["Stage 4"] --> S5["Stage 5"]
+    S5 --> SEC["walk4 描述符块"] --> IMG["还原后的节数据"]
+    C1["xor_acc + CRC32"] -.-> S1
+    C2["CRC32 + advance_key"] -.-> S3
+    C3["字节码存根 1"] -.-> S5
+    C4["字节码存根 2"] -.-> SEC
 ```
 
-## 阶段解密的统一形式
+## 复合阶段解码流程（Stage 3..5）
 
-stage 2 之后的每个阶段都用同一复合操作解密，由缓冲区内一个 `(src, src_len, dest, dest_len)` 四元组定义：
+Stage 2 之后的每个阶段均由 16 字节四元组 `{src, src_len, dest, dest_len}` 描述，按以下四步解码：
 
-1. 用阶段 AES 调度表（`key_offsets[3]`）对 `src..src+src_len` 做 **AES-CBC 解密**。
-2. 用阶段密钥对描述符做 [XOR + 循环右移](../../data-transforms/rolling-and-rotation.md#xor--循环右移-dword-密码)（移位 19）。
-3. 若适用按构建定制的字节码 stub，则逐字节翻译。
-4. 若 `src_len != dest_len`，用阶段 Huffman 表（`key_offsets[1]`）把 `src → dest` 做 **Huffman/LZ 解压**。
+1. **AES-CBC 解密：** 使用阶段轮密钥表 `key_offsets[3]` 对 `d[src .. src + src_len]` 原地解密。
+2. **异或 + 循环右移：** 使用派生出的阶段密钥对 `{src, src_len}` 执行 `xor_ror_dwords`（移位量 `19`）。
+3. **字节码置换**（仅限 Stage 5）：通过字节码存根 1 逐字节映射 `src .. src + src_len`。
+4. **Huffman/LZ 解压：** 当 `src_len != dest_len` 时，使用阶段 Huffman 表 `key_offsets[1]` 将 `src` 解压展开至 `dest`。
 
-stage 3–5 不过是把这个复合操作应用到计算出的偏移处的四元组上，密钥来自校验和链。
+## 64 位有标记布局的九阶段流水线
 
-## 64 位 EXE 流程（标记布局）
+{% stepper %}
+{% step %}
+### 阶段 1 与阶段 2：`info` 头部与载荷前缀
 
-这是参考流程；其他家族都是它的变体。共分九个编号阶段。
+用 `header_kdf` 解密 `0x1000` 处的 `info[0..7]` 并校验 `info[1] == 0x4E4E4F4B`（`KONN`），分配清零的 `SizeOfImage` 工作缓冲区；随后对文件偏移 `info[4] + 4096` 起的前 `decrypt_size = info[6] - info[3] + 8192` 字节执行 `payload_xor_chain` 解密写入映像 `info[3]`，将剩余 `info[5] - decrypt_size` 尾部字节紧随其后原样拷入，在 `info[3]` 处写入 `0x1000`，最后把文件 `[0, 0x1000)` 区间拷贝到映像起始位置。
+{% endstep %}
 
-### 阶段 1–2：头部与 payload
+{% step %}
+### 阶段 3：配置锚点与 Stage 1
 
-用 [KDF](../../file-structure/container-layout.md#info-头及其密钥派生) 派生 `info`，校验 magic，按 `SizeOfImage` 分配全零映像缓冲，对 `decrypt_size = info[6] - info[3] + 8192` 字节跑 [payload XOR 链](../../data-transforms/rolling-and-rotation.md#滚动密钥家族)，把剩余 `info[5] - decrypt_size` 字节原样拷入，再覆盖回前 4096 头字节。
+在 `[info[6] + 1000, info[6] + 8000)` 区间内扫描 `anchor`，要求 `u32@anchor == info[3]`，且 `u32@(anchor + 8)` 小于 `info[6]`（差值不超过 `0x1000`）并按 `0x200` 对齐。接着对 `anchor + 120 + extra` 处的 Stage 1 `{base, length}` 描述符测试 `extra in (0, 8)`（要求 `base >= info[3]`、`length >= 16` 且未越出映像边界）。
 
-### 阶段 3：配置锚点
+从 `anchor + 8` 和 `anchor + 4` 恢复 `DD[1]`（导入表目录）的 `(RVA, size)`，遍历 `anchor + 184 + extra` 处的 `(offset, length)` 描述符序列累积 `xor_acc`，计算 `chk1 = calculate_checksum(d, anchor + 56 + extra)` 并读取 `v = u32@(anchor + 20)`，最后调用 `xor_ror_dwords(d, anchor + 120 + extra, xor_acc ^ chk1 ^ v, 21)` 解开 Stage 1。
+{% endstep %}
 
-配置块的位置随构建浮动，因此靠扫描定位：在 `[info[6] + 1000, info[6] + 8000)` 内找**锚点**——一个等于 `info[3]` 的 dword，其 `+8` 处的值略小于 `info[6]`（差值 ≤ `0x1000` 且为 `0x200` 的倍数）。自偏移 40 起的字段再按 `anchor_extra ∈ {0, 8}` 平移。
+{% step %}
+### 阶段 4：Stage 2 与四项 `key_offsets`
 
-可靠的判别是 `anchor + 120 + extra` 处的 stage-1 描述符本身：其 `(base, length)` 须满足 `base ≥ info[3]`、`length ≥ 16`，且 `base + length` 落在映像内。先试 `extra = 0` 再试 `extra = 8`，取第一对通过校验的。附近常有一个版本风格的 dword（多在 `anchor + 104` 或 `anchor + 112`，高半字节为 `0x4`），在旧家族里常见，但并非所有构建都稳定，只能当辅助信号。
+在 Stage 1 内扫描唯一的 16 字节 Stage 2 四元组（`stage2_off`），满足 `d0 == d2` 且落在载荷范围内、`d1 > 0x10000` 以及 `0 < d3 < d1`。向前回溯找到 `chk_src_start`（连续四组合法的 `(src, len)` 对），从 `chk_src_start - 20` 读取 Stage 2 密钥，并以移位量 `19` 解开 Stage 2。
 
-从锚点：
+在 Stage 2 内定位 `(1, 0, info[3], 0)`（记为 `table_start`），处理 `table_start + 32` 处的两个 `head` 表项（类型 `1`/`0x11` 执行 `byte_rotate3`；类型 `2` 按 `(src, len, dst, chk)` 列表拷贝），再用 `byte_rotate3` 解密 `head - 88` 处的四个 `walk2` 槽位：
 
-* 导入目录 `(RVA, size)` 从 `anchor + 8` / `anchor + 4` 写回 PE 头。
-* 遍历 `anchor + 184 (+extra)` 处的 `(offset, length)` 描述符表累积 `xor_acc`——各区域 `crc32 ^ length` 校验和的异或。
-* **stage 1** 以 `xor_ror_dwords(anchor + 120 (+extra), xor_acc ^ chk1 ^ v, 21)` 解出，其中 `chk1` 是 `anchor + 56 (+extra)` 处描述符所指区域的校验和，`v` 是 `anchor + 20` 处的 dword。
+| 槽位 | 表用途 |
+| --- | --- |
+| `key_offsets[0]` | 用于**节数据**解压的 Huffman 表 |
+| `key_offsets[1]` | 用于**阶段代码**解压的 Huffman 表 |
+| `key_offsets[2]` | 用于**节数据**解密的 AES 轮密钥表 |
+| `key_offsets[3]` | 用于**阶段代码**解密的 AES 轮密钥表 |
+{% endstep %}
 
-### 阶段 4：stage 2
+{% step %}
+### 阶段 5：Stage 3、3b、4 与 5
 
-在 stage 1 内，stage-2 四元组是唯一满足 `d0 == d2`、`d0` 落在 payload 区间、`d1 > 0x10000` 且 `0 < d3 < d1` 的 16 字节项——记其偏移为 `stage2_off`。从它向前回溯，`chk_src_start` 是首个连续 4 个 `(src, len)` 都合理的位置。stage-2 密钥是 `chk_src_start - 20` 处的 dword，stage 2 以移位 19 解出。
+按相对 `stage2_off` 的偏移依次解码四个阶段四元组：
 
-在 stage 2 内，16 字节项 `(1, 0, info[3], 0)` 标记 `table_start`；**head** 表在 `table_start + 32`，**walk2** 在 `head - 88`。两个 head 条目按 kind dword 分派：kind `1`（或 `0x11`——高半字节是构建戳）对描述符跑 `byte_rotate3`；kind `2` 遍历 `(src, len, dst, chk)` 拷贝列表，把已解密区域搬到工作位置。walk2 条目随后给出四个**密钥偏移**（各经 `byte_rotate3` 解密）：
+| 阶段 | 四元组偏移 | 密钥公式 |
+| --- | --- | --- |
+| Stage 3 | `stage2_off + 88` | `xor_acc ^ chk2 ^ advance_key(u32@(chk_src_start - 16), rounds)`（默认 `rounds = 4`；若解压或 `v4` 查找失败则遍历重试 `0..=8`） |
+| Stage 3b | `stage2_off + 104` | `xor_acc ^ chk3 ^ v4`，其中 `v4` 为 Stage 3 内 `C3 CC CC CC` 之后的最后一个非零双字 |
+| Stage 4 | `stage2_off + 136` | `xor_acc ^ chk4 ^ ~v5`，其中 `v5 = u32@(Stage 3b 内首个 "Virtual..." 字符串偏移 - 8)` |
+| Stage 5 | `stage2_off + 216` | `xor_acc ^ chk4 ^ chk5 ^ advance_key(accum2, rounds)`（默认 `rounds = 3`；解压失败时遍历重试 `0..=8`），并经**字节码存根 1** 置换 |
 
-| 槽位               | 用途                  |
-| ---------------- | ------------------- |
-| `key_offsets[0]` | **节数据**块的 Huffman 表 |
-| `key_offsets[1]` | **阶段**解压的 Huffman 表 |
-| `key_offsets[2]` | **节数据**块的 AES 密钥调度  |
-| `key_offsets[3]` | **阶段**解密的 AES 密钥调度  |
+在 Stage 4 中，于反调试 API 字符串（`IsDebuggerPresent`、`CheckRemoteDebuggerPresent`）附近执行 LFSR 扫描定位字节码存根 1，并在最后一处 `48 EB 01 B9` 字节序列之后（跳过任何 `0xCC` 填充）读取 `accum2`。
+{% endstep %}
 
-### 阶段 5：stage 3、3b、4、5
+{% step %}
+### 阶段 6：Stage 5 标记偏移布局与字节码存根 2
 
-每个阶段的四元组位于 `stage2_off` 之后的固定偏移，每个密钥都混合运行中的 `xor_acc`、一个新校验和，以及从刚解密的前一阶段恢复的种子：
+在 Stage 5 内定位 `"pm\0\0cm\0\0"`（`70 6D 00 00 63 6D 00 00`）与类型标记 `0x40000000, 1`（`00 00 00 40 01 00 00 00`）：
 
-| 阶段       | 四元组偏移              | 密钥组成                                                                                                             |
-| -------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| stage 3  | `stage2_off + 88`  | `xor_acc ^ chk2 ^ accum`——`accum` 取自 `chk_src_start - 16`，经四轮[三角数调度](../../data-transforms/checksums.md#三角数密钥调度) |
-| stage 3b | `stage2_off + 104` | `xor_acc ^ chk3 ^ v4`——`v4` 是 stage 3 尾部最后一个非零 dword，以其前的 `C3 CC CC CC`（函数尾声 + `int3` 填充）锚定                      |
-| stage 4  | `stage2_off + 136` | `xor_acc ^ chk4 ^ ~v5`——`v5` 是 stage 3b 中首个 `"Virtual..."` API 名字符串前 8 字节处的 dword                                |
-| stage 5  | `stage2_off + 216` | `xor_acc ^ chk4 ^ chk5 ^ accum2`，外加字节码 stub 1                                                                    |
-
-stage 4 是首个内嵌**字节码 stub** 出现的地方。它的邻居是反调试 API 名字符串（`IsDebuggerPresent`、`CheckRemoteDebuggerPresent`）；stub 本身靠[试 LFSR 解码并解析](../../data-transforms/bytecode-transform.md#按构建定制的字节码置换)定位，而非固定偏移。`accum2` 种子位于 `48 EB 01 B9` 字节模式最后一次出现（加上任意 `CC` 填充）之后，经三轮三角数推进。stage 5 是唯一经过字节码 stub 解密的阶段——stub 1 被烘进它的变换里。
-
-### 阶段 6：stage-5 表
-
-stage 5 持有恢复程序节的各张表。标记布局中，它们挂在两个字节标记上：
-
-* `70 6D 00 00 63 6D 00 00`（`"pm\0\0cm\0\0"`）——即 `pm`/`cm` 子模块代码。
-* `00 00 00 40 01 00 00 00`——“kind 标记”（dword 对 `0x40000000, 1`）。
-
-相对 kind 标记：**walk4**（节加载描述符表指针）在 `−0x20`，**walk3**（校验链）在 `−0x18`，**walk5**（导入名指针表）在 `+8`。第二个**字节码 stub** 位于一个经发现得到的偏移（最旧构建为标记 `+960`；其余靠试解定位），**文件校验链**指针在它之前 `0x58` 字节处。
-
-* **walk3** *只用于校验*：其 16 字节条目被临时解密、喂给对原始文件字节的链式 CRC-32，然后**复原为加密形态**——这条链存在的意义是检测篡改，而非产生输出。
-* **文件校验链**被原地**永久**解密（16 字节 `byte_rotate2` 条目，直到长度为零）。
-* stub 2 经 LFSR 解密并解析成 op 列表，应用于每个节块。
-
-### 阶段 7：节恢复
-
-walk4 表是位置串联的 16 字节描述符链，每个就地 `byte_rotate2` 解密，形如 `(src, len, dst, plain_len)`，以 `len` 为零终止。每块：
-
-```
-copy file[src + section_data_file_base .. +len] → image[dst]
-aes_decrypt(dst, len, key_offsets[2])
-translate dst..dst+len through bytecode stub 2
-if len != plain_len: huffman_decompress(dst → dst, key_offsets[0], len, plain_len)
+```mermaid
+flowchart LR
+    W4["kind_marker - 0x20:\nwalk4（节描述符链）"] --- W3["kind_marker - 0x18:\nwalk3（临时文件 CRC 链）"]
+    W3 --- KM["kind_marker:\n0x40000000, 1"]
+    KM --- W5["kind_marker + 0x08:\nwalk5（导入名表）"]
+    KM -. "扫描" .-> FCS["stub2 - 0x58:\nfileCS 指针"]
+    FCS --- STUB2["stub2:\n96B LFSR 字节码存根 2"]
 ```
 
-`section_data_file_base` 即[文件格式页](../../file-structure/companion-layout.md#在文件中定位节数据)给出的补码编码基址。随后第二条 walk4 链列出要清零的区域（`.bss` 等价物）。由于各块写入互不相交的映像区间、只读不可变的文件字节，这一阶段天然可并行——这是格式的性质，与任何工具无关。
+* **`walk3`** 仅临时解密以校验加壳文件各区间的分段递推 CRC-32，校验完毕即恢复为密文字节。
+* **`fileCS`**（`stub2 - 0x58`）原地解密并保留明文（对 16 字节表项逐一执行 `byte_rotate2`，直至 `len == 0`）。
+* **存根 2** 经 LFSR 解密后预计算为 256 字节查找表。
+{% endstep %}
 
-### 阶段 8：导入名解密
+{% step %}
+### 阶段 7：可并行化的节数据还原（`walk4`）
 
-walk5 条目（每个 20 字节）指向加密的 DLL 名（`+12`）与 thunk 链（`+0` 或 `+16`）。每个名字用[字符串密码](../../data-transforms/lfsr-strings-pages.md#导入名字符串密码)解密并转小写；每个按名 thunk（PE32+ 上 bit 63 清零）的 hint/name 字符串被解密、hint 字段清零。序数导入（bit 63 置位）原样保留。walk5 指针为 null 表示没有表可走：托管程序集把该槽留空，因为它们的导入只是 CLR 引导 stub。
+`walk4` 串联一系列 16 字节 `{src, len, dst, plain_len}` 描述符（按各自所在 RVA 经 `byte_rotate2` 解密），以 `len == 0` 终止。处理每个块时，将 `file[src + section_data_file_base .. +len]` 拷贝至 `image[dst]`，执行 `aes_decrypt`（`key_offsets[2]`），经存根 2 查表置换，并在 `len != plain_len` 时调用 `decompress`（`key_offsets[0]`）解压。随后由第二组 `walk4` 描述符序列将 `.bss` 区间清零。由于各块的目标写入区间互不重叠，顺序执行与并行执行的还原结果完全一致。
+{% endstep %}
 
-### 阶段 9：PE 重建
+{% step %}
+### 阶段 8：`walk5` 导入名解密
 
-最后阶段重建 PE 头：节表转换、加密的入口点/数据目录块、TLS 处理、`/FIXED` 策略、代码页扰动与托管元数据处理。这些是格式变换而非加载器阶段，见 [PE 重建](../pe-reconstruction/README.md)。
+当 `walk5` 非空时（原生模块），每个 20 字节表项指向一处加密 DLL 名称（偏移 `+12`，以 `name_rva & 0xFF` 为初始密钥执行 `string_cipher` 解密并转为小写）及 thunk 数组（偏移 `+0` 或 `+16`）。每个按名称导入的 thunk（第 63 位为 0）以 `hint_name_rva & 0xFF` 为初始密钥解密 `hint_name_rva + 2` 处的符号名（保留符号原始大小写），并将 2 字节 `Hint` 清零。托管模块的 `walk5` 指针为空。
+{% endstep %}
+
+{% step %}
+### 阶段 9：PE 头部、页面混淆与数据目录收尾
+
+将节表中的文件偏移（`PointerToRawData`）对齐为 RVA 布局，执行 `.text` 页面混淆还原（`dd8`），临时解密并写回入口点与数据目录，最后完成 TLS、基址重定位与 CLR 元数据的修补与回填（详见[PE 重建](../pe-reconstruction/README.md)）。
+{% endstep %}
+{% endstepper %}

@@ -1,71 +1,57 @@
 ---
-description: "The module table, record streams, and nested interpreters from 0xE2 to 0xE8."
+description: "The 256-slot runtime module table, 0x5C descriptor layout, and nested 0xE2..0xE8 interpreter chain."
+icon: microchip
 ---
 
 # Stage 2 interpreter
 
-Stage 2 starts at stream identifier `0xE2`. It allocates a module table, registers itself and the file tail, then interprets a nested record stream. Each interpreter materializes modules, data objects, and the next interpreter.
+Stage 2 (`0xE2`) allocates a 256-slot module table, registers itself (`0xE2`) and the `SHT_LOUSER` tail mapping (`0xD0`), and walks the root record stream in `(X4, X5)`. Each interpreter level loads worker modules, decodes the next interpreter module `0xE(n+1)`, slices direct stream `0xF(n+1)`, and hands `0xF(n+1)` to `0xE(n+1)`:
 
 ```mermaid
 flowchart LR
-    E2["Interpreter 0xE2"] --> F3["Data 0xF3"]
-    F3 --> E3["Interpreter 0xE3"]
-    E3 --> F4["Data 0xF4"]
-    F4 --> E4["Interpreter 0xE4"]
-    E4 --> F5["Data 0xF5"]
-    F5 --> E5["Interpreter 0xE5"]
-    E5 --> F6["Data 0xF6"]
-    F6 --> E6["Interpreter 0xE6"]
-    E6 --> F7["Data 0xF7"]
-    F7 --> E7["Interpreter 0xE7"]
-    E7 --> F8["Data 0xF8"]
-    F8 --> E8["Interpreter 0xE8"]
-    E8 --> M98["Module 0x98"]
+    E2["0xE2"] --> E3["0xE3\n(fed 0xF3)"]
+    E3 --> E4["0xE4\n(fed 0xF4)"]
+    E4 --> E5["0xE5\n(fed 0xF5)"]
+    E5 --> E6["0xE6\n(fed 0xF6)"]
+    E6 --> E7["0xE7\n(fed 0xF7)"]
+    E7 --> REST["0x9B / 0x9D / 0x9E\n(+ 0x0C, 0xB9 on IL2CPP)"]
+    E7 --> E8["0xE8\n(fed 0xF8)"]
+    E8 --> M98["0x98\n(.init_array handoff)"]
 ```
 
-A direct record with flag `2` isn't a compressed container. Its child stream identifier is `command_id - 0x10`, so `0xF3` feeds interpreter `0xE3`, and the same rule holds through `0xF8` / `0xE8`. That's the same relationship described in [Stage 2 streams](../file-format/stage2-streams.md).
+## Module table (`0x1800` bytes)
 
-## Module table
-
-Stage 2 maps `0x1800` bytes of anonymous writable memory. Each entry is 24 (`0x18`) bytes, so the table holds 256 slots:
+Stage 2 maps `0x1800` bytes of anonymous RW memory holding 256 entries of `0x18` (24) bytes each:
 
 | Offset | Size | Field |
 | --- | --- | --- |
-| `+0x00` | 4 | Command identifier |
+| `+0x00` | 4 | `command_id` |
 | `+0x04` | 4 | State flags |
-| `+0x08` | 8 | Base |
-| `+0x10` | 4 | Size |
+| `+0x08` | 8 | Mapped base pointer |
+| `+0x10` | 4 | Mapped size |
 | `+0x14` | 4 | Reserved |
 
-The first two registrations are:
+Slot registration starts with `0xE2` (`X2`, `X3`) and `0xD0` (`X6`, `X7`), followed by each record's `command_id` as streams execute.
 
-- `0xE2`: the stage 2 image itself (`X2`, `X3` from stage 1)
-- `0xD0`: the file-tail mapping (`X6`, `X7` from stage 1)
+## `0x5C` record descriptor layout
 
-Later records call the same registration helper with the command identifier from the decrypted descriptor.
+After the 8-byte stream header (`dw0` = descriptor count, `G` = descriptor seed; see [Word, stream, and record ciphers](../data-transforms/word-and-record.md)), descriptors occupy `8 + N * 0x5C` bytes up to the first payload offset. Each 23-dword (`0x5C`-byte) descriptor has the binary layout:
 
-## Record descriptor
+| Offset | Dword | Field | Role |
+| --- | --- | --- | --- |
+| `+0x00` | `words[0]` | `command_id` | Module or stream-slice identifier (`0x00`..`0xFF`) |
+| `+0x04` | `words[1]` | `flags` | `0x2` = direct slice; `0x100` = skip `init` and `entry` callbacks |
+| `+0x08` | `words[2]` | `image_offset` | Payload offset inside the current stream |
+| `+0x0C` | `words[3]` | `image_size` | Decoded container size (`flags & 2 == 0`) or raw slice length (`flags & 2 != 0`) |
+| `+0x10` | `words[4]` | `metadata_offset` | Protector module load/reloc/import metadata offset (`0` if none) |
+| `+0x14` | `words[5]` | `metadata_size` | Decoded or raw module-metadata size |
+| `+0x18` | `words[6]` | `id_copy` | Must equal `command_id` |
+| `+0x1C` | `words[7]` | `entry_offset` | Module entry callback offset relative to mapped base |
+| `+0x20` | `words[8]` | `init_offset` | Module init callback offset relative to mapped base |
+| `+0x24..+0x5C` | `words[9..22]` | Trailing words | Reserved / module-specific parameters |
 
-Each record is `0x5C` bytes (23 little-endian dwords) after an 8-byte stream header. Observed fields:
+For each descriptor, the interpreter prepares the payload (unpacking a container with its own `Module9bConfig` when `flags & 2 == 0`, or pointing directly to the stream slice when `flags & 2 != 0`), applies any module relocations and imports from the record's `metadata` blob, registers the slot, and calls `init_offset` followed by `entry_offset` unless `flags & 0x100` is set.
 
-| Field | Role |
-| --- | --- |
-| `command_id` | Identifier written into the module table |
-| `flags` | How the payload is materialized and whether callbacks run |
-| `image_offset` / `image_size` | Payload relative to the current interpreter input |
-| `metadata_offset` / `metadata_size` | Companion load, reloc, or import metadata |
-| `id_copy` | Redundant copy of the identifier |
-| `init_offset` | Init function relative to the materialized base |
-| `entry_offset` | Entry function relative to the materialized base |
+## Layering differences
 
-`flags & 0x2` borrows a subrange of the parent stream instead of decoding a container. `flags & 0x100` skips init and entry. Other flag bits have been seen; their meaning isn't known.
-
-The interpreter decrypts the stream header, then decrypts descriptors in index order. After each object is registered it calls init (if any) and then entry (if any), unless `0x100` is set. A zero record ends the table.
-
-Stream-header and descriptor ciphers use a per-stream identifier, an 8-byte header, and a GF(2³²) word mix. The constants differ across families; the two observed sets and the shared descriptor walk are on [Word, stream, and record ciphers](../data-transforms/word-and-record.md). Structural checks in [Stage 2 streams](../file-format/stage2-streams.md) stay in force regardless of the constants.
-
-## Layering
-
-One interpreter consumes one input block. That block can hold several records, so one interpreter can produce several objects: executable modules, ordinary data, the next interpreter's code, or a `0xF3`–`0xF8` data object that becomes the next input.
-
-IL2CPP libraries add module `0x0C` and a data-bearing `0xB9` under interpreter `0xE7`. Ordinary native libraries in the same family omit `0x0C` and may carry `0xB9` as an empty record. Module `0x98`, produced by `0xE8`, is the handoff that invokes the restored `.init_array`.
+Interpreter `0xE7` loads the core ELF restoration modules (`0x9B`, `0x9D`, `0x9E`). On Unity IL2CPP builds, `0xE7` also loads module `0x0C` (the `mmap` hook for `global-metadata.dat`) alongside a populated `0xB9` data record; non-IL2CPP native libraries omit `0x0C` and either omit `0xB9` or carry an empty `0xB9` record. Interpreter `0xE8` then loads module `0x98`, which invokes the target library's `.init_array` constructors once image restoration finishes.

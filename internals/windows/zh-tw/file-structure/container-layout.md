@@ -1,37 +1,36 @@
 ---
-description: Windows 容器佈局、加密 info 頭及其派生值。
+description: "0x1000 容器切分、8 個 dword 的 info 標頭 KDF 與負載搬移規則。"
+icon: box-archive
 ---
 
-# 容器與加密頭
+# 容器結構與加密標頭
 
-受保護文件仍是 PE 文件，但原始映像已被加密容器替換。容器在文件前部保留原始 PE 頭（基本可讀），在固定偏移處以密鑰派生函數隱藏一個小參數塊，其餘一切（程序的節與加載器自身的代碼）都以加密且通常壓縮的 payload 形式存儲。
+受保護的 PE 會以加密容器取代原有的區段結構。前 4,096 位元組（`0x0000..0x0FFF`）保留明文的外層 PE 標頭，位移 `0x1000` 存放 32 位元組的加密參數區塊，檔案其餘部分則存放加密的載入器資料表、各階段存根與壓縮後的應用程式區段。
 
 ## 容器佈局
 
 ```mermaid
 flowchart TB
-    subgraph FILE["Protected file on disk"]
+    subgraph FILE["磁碟上的受保護 PE"]
         direction TB
-        H["0x0000–0x0FFF — original PE headers<br/>DOS + PE + section table, mostly plaintext;<br/>selected fields blanked (entry point, data directories)"]
-        I["0x1000 — encrypted info header (32 bytes = 8 dwords)"]
-        P["payload — encrypted + compressed sections,<br/>loader configuration, encrypted stage code"]
+        H["0x0000..0x0FFF：外層 PE 標頭<br/>明文 DOS + PE + 區段標頭；<br/>OEP、特定資料目錄與 PointerToRawData 已清零或替換"]
+        I["0x1000..0x101F：加密 info 標頭（32 位元組 = 8 個 dword）"]
+        P["info[4] + 0x1000..：加密負載<br/>載入器設定、各階段存根與壓縮區段區塊"]
     end
     H --> I --> P
 ```
 
-有三個區域需要關注：
+| 區域 | 檔案位移 | 內容 |
+| --- | --- | --- |
+| 外層 PE 標頭 | `0x0000..0x0FFF` | DOS/PE 簽章、COFF 標頭、可選標頭與區段表。原始進入點（OEP）、特定資料目錄與各區段的 `PointerToRawData` 已清零或改指向載入器。 |
+| `info` 標頭 | `0x1000..0x101F` | 由 `header_kdf` 解出的 8 個小端序 dword，提供整個容器的魔術數字、RVA 映射位置與負載範圍。 |
+| 加密負載 | 自 `info[4] + 0x1000` 起 | 加密的載入器資料表、各階段程式碼與壓縮區段資料。 |
 
-| 區域      | 文件偏移              | 內容                                                                |
-| ------- | ----------------- | ----------------------------------------------------------------- |
-| 頭區      | `0x0000`–`0x0FFF` | 原始 PE 頭。DOS/PE 簽名、COFF 頭、可選頭與節表以明文倖存，但入口點、若干數據目錄與節原始數據指針被抹除或改作他用。 |
-| info 頭  | `0x1000`          | 32 字節：八個 dword，以下面的密鑰派生函數加密。這是整個容器的主參數塊。                          |
-| payload | info 頭之後        | 加密（通常再經 Huffman 壓縮）的節數據、加載器表與分階段加載器代碼。滾動 XOR 鏈的起點是 `info[4] + 4096`，可以晚於 `0x1020`。 |
+目前觀察到的所有 Windows 組建皆以 `0x1000` 為界切分標頭與容器本體；[外部伴生檔案版型](companion-layout.md)亦同，只是將 `0x1000` 起算的容器位元組移至獨立的 `._` 檔案。
 
-恰好在 4096 字節（`0x1000`）處的分界在所有已觀察構建中恆定——包括[外置伴生體佈局](companion-layout.md)，它正是在這個精確邊界上把 stub 與 payload 拆開。
+## `info` 標頭與金鑰衍生
 
-## info 頭及其密鑰派生
-
-偏移 `0x1000` 處的八個 dword 用一個滾動密鑰 KDF 解密。`info[0]` 直接存儲；後續每個單元都與一個滾動密鑰異或，該密鑰混入單元值與索引平方向前滾動：
+位移 `0x1000` 處的 `info[0]` 以明文存放；`info[1..7]` 則透過混入原始密文 dword 與 `i * i` 的滾動金鑰解密：
 
 ```python
 def header_kdf(file_data, offset=4096):
@@ -45,25 +44,24 @@ def header_kdf(file_data, offset=4096):
     return info
 ```
 
-同一 KDF 適用於所有構建家族（EXE 與 DLL、32 位與 64 位），因此一條代碼路徑即可識別所有受保護文件。解密後的字段驅動整個解包過程：
+無論是 PE32 或 PE32+、EXE 或 DLL、單一檔案或伴生檔案組建，皆共用同一套 32 位元組 KDF：
 
-| 字段        | 含義                                         |
-| --------- | ------------------------------------------ |
-| `info[0]` | 種子密鑰（明文存儲；同時餵給 payload 密碼）                 |
-| `info[1]` | **格式 magic**，標識保護構建（見[格式 magic](#格式-magic)） |
-| `info[2]` | 保留/變體                                      |
-| `info[3]` | 重建映像中放置 payload 的基址 RVA                    |
-| `info[4]` | payload 源偏移：payload 起於文件內 `info[4] + 4096` |
-| `info[5]` | payload 總大小（拷入映像 `info[3]` 處的字節數）          |
-| `info[6]` | 解密區結束標記；加載器配置塊相對它定位                        |
-| `info[7]` | 保留/變體                                      |
+| 欄位 | 意義 |
+| --- | --- |
+| `info[0]` | 明文種子金鑰；同時作為 `payload_xor_chain` 的初始種子 |
+| `info[1]` | 格式魔術數字（小端序 `0x4E4E4F4B`，對應 ASCII `KONN`） |
+| `info[2]` | 保留欄位／組建變體欄位 |
+| `info[3]` | 負載映射至工作映像緩衝區時的目標基底 RVA |
+| `info[4]` | 相對 `0x1000` 的檔案位移：負載位元組自檔案位移 `info[4] + 4096` 開始 |
+| `info[5]` | 複製至映像範圍 `[info[3], info[3] + info[5])` 的負載總位元組長度 |
+| `info[6]` | 加密載入器前綴與錨點搜尋的結束 RVA 標記 |
+| `info[7]` | 保留欄位／組建變體欄位 |
 
-因此 payload 的搬運為：文件區間 `[info[4] + 4096, info[4] + 4096 + info[5])` → 映像區間 `[info[3], info[3] + info[5])`。前 `decrypt_size = info[6] - info[3] + 8192` 字節以滾動 XOR 鏈解密（見[滾動密鑰與旋轉密碼](../data-transforms/rolling-and-rotation.md)）；其餘原樣拷貝。重建映像隨後在 `info[3]` 處寫入 `4096`，再把文件前 4096 字節覆蓋回映像作為其頭部。
+## 負載搬移與 `decrypt_size`
 
-### 格式 magic
+檔案位元組 `[info[4] + 4096, info[4] + 4096 + info[5])` 會映射至工作映像 RVA `[info[3], info[3] + info[5])`：
 
-`info[1]` 是構建的戳記，即格式 magic：
+* **標準前綴解密：** 在 64 位元組建與標準型 PE32 組建中，前 `decrypt_size = info[6] - info[3] + 8192` 位元組以 `payload_xor_chain` 解密（詳見[滾動金鑰與旋轉加密](../data-transforms/rolling-and-rotation.md)），`info[5]` 剩餘尾端則原樣複製。
+* **全負載加密 PE32 變體：** 較早期的精簡型 PE32 組建會加密整段負載（`decrypt_size = info[5]`，這同時會改變初始 XOR 種子 `info[0] + ~decrypt_size`）。在 PE32 靜態還原時，若前綴解密後找不到任何能通過 `SecondStage` 驗證的 `tbl` 候選項，即改用 `decrypt_size = info[5]` 重試。
 
-| magic（LE 字節） | 值            |
-| ------------ | ------------ |
-| `KONN`       | `0x4E4E4F4B` |
+負載搬移完成後，會在映像 RVA `info[3]` 處寫入 dword `4096`（`0x1000`），並將檔案前 `4096` 位元組複製到 `[0, 0x1000)` 作為工作 PE 標頭。

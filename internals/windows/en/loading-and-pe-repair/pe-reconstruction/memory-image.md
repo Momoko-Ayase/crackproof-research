@@ -1,34 +1,37 @@
 ---
-description: "How protected section headers describe a memory image and which PE fields are restored."
+description: "RVA-aligned section headers, 32-bit file compaction, transient EP/directory decryption, and .bss zero-fill chains."
+icon: memory
 ---
 
 # Headers, sections, and zero-fill ranges
 
-Encryption of the section content is only half of what the packer does. The PE structure itself is dismantled: fields the Windows loader needs are removed or encrypted, and the runtime loader re-creates them after unpacking. This page catalogues each transformation and its runtime counterpart. It matters for two audiences: anyone analyzing a protected file statically (the structures aren't where PE tooling expects them), and anyone validating a reconstructed image (each transformation has a corresponding restoration step that must have happened).
+In addition to encrypting section bytes, CrackProof clears or redirects PE header fields (`AddressOfEntryPoint`, selected `IMAGE_DATA_DIRECTORY` entries, and section raw pointers) and restores them in memory during startup.
 
-## Section headers become a memory layout
+## RVA-mapped section headers and 32-bit compaction
 
-A normal PE maps file offsets to RVAs through the section table. A protected image instead stores the layout the loader produces in memory: each section's `SizeOfRawData` is set to its `VirtualSize`, and `PointerToRawData` to its `VirtualAddress`. Section content is then addressed uniformly by RVA, on disk and in memory alike.
+On 64-bit outputs (and during working-buffer recovery on 32-bit), section headers are normalized to memory layout so file offsets equal RVAs:
 
-The 32-bit family adds the inverse transformation as its last step: the RVA-laid image is compacted back into a file-aligned PE. Headers sit at `0x400`, sections are packed consecutively at `0x200` file alignment, trailing zero runs are trimmed from each section's raw data, and `FileAlignment`/`SizeOfHeaders` are rewritten.
+* `SizeOfRawData = VirtualSize`
+* `PointerToRawData = VirtualAddress`
 
-## The entry point and data directories are encrypted
+On 32-bit (`PE32`) outputs, a final compaction pass converts that RVA buffer back into a compact disk-aligned PE: headers end at `0x400`, sections pack sequentially on `0x200` (`FileAlignment`) boundaries with trailing zero padding trimmed from `SizeOfRawData`, and `SizeOfHeaders` / `FileAlignment` are updated accordingly.
 
-`AddressOfEntryPoint` and all sixteen `IMAGE_DATA_DIRECTORY` entries are stored encrypted near the image base (`info[3]`), wrapped in the [position-keyed byte cipher](../../data-transforms/rolling-and-rotation.md#triple-byte-rotation-ciphers). Two placements exist per bitness:
+## Transient entry-point and data-directory block
 
-| Family | Block start | Entry point | Directories | Encrypted size |
+`AddressOfEntryPoint` and the 16 `IMAGE_DATA_DIRECTORY` entries (128 bytes) live near `info[3]` encrypted with `byte_rotate2`:
+
+| Family & variant | Block start | Entry point offset | Directories offset | Encrypted length |
 | --- | --- | --- | --- | --- |
-| 64-bit, "Layout A" (marker layout) | `info[3] + 0x40` | `+0x40` | `+0x50` | 144 bytes |
-| 64-bit, "Layout B" (marker-less) | `info[3] + 0x20` | `+0x20` | `+0x30` | 144 bytes |
-| 32-bit, "Layout A" | `info[3] + 0x40` | `+0x40` | `+0x50` | 144 bytes |
-| 32-bit, "Layout B" | `info[3] + 0x10` | `+0x20` | `+0x30` | 0x290 bytes |
+| 64-bit Layout A (marker) | `info[3] + 0x40` | `+0x40` | `+0x50` | `144` (`0x90`) bytes |
+| 64-bit Layout B (marker-less) | `info[3] + 0x20` | `+0x20` | `+0x30` | `144` (`0x90`) bytes |
+| 32-bit Layout A | `info[3] + 0x40` | `+0x40` | `+0x50` | `144` (`0x90`) bytes |
+| 32-bit Layout B (standard shell) | `info[3] + 0x10` | `+0x20` | `+0x30` | `0x290` bytes |
+| 32-bit Layout B (compact shell) | `info[3] + 0x10` | `+0x30` | `+0x40` | `0x290` bytes |
 
-On 64-bit marker builds the placement is probed: trial-decrypt the dword after the candidate entry point and check whether it matches the image base. On 32-bit the selector is the dword at `info[3] + 0x10` (greater than `0x10000` → Layout B). The block is decrypted **transiently** (entry point to `pe + 40`, the 128 directory bytes to `pe + 136` (64-bit) or `pe + 0x78` (32-bit)) and the encrypted bytes are then restored: the protected file keeps this region encrypted even after everything else is unpacked, so a correct reconstruction still shows ciphertext at `info[3] + ep_off`.
+* **Variant detection:** 64-bit marker builds probe whether the decrypted dword right after the candidate entry point equals `ImageBase`; 32-bit builds select Layout B when decrypted `u32@(info[3] + 0x10) > 0x10000` (using `+0x30` / `+0x40` on compact `tbl` shells). Dedicated 64-bit DLLs instead read a 656-byte `byte_rotate2` blob at `info[3] + 16` (`EntryPoint` at `+0x10`, directories at `+0x20`).
+* **Transient decryption:** the block is decrypted to copy `AddressOfEntryPoint` to `pe + 40` and the 128 directory bytes to `pe + 136` (PE32+) or `pe + 0x78` (PE32), then **restored to its encrypted bytes at `info[3]`** so the loader workspace retains its original bytes.
+* **Zero entry points on managed images:** managed assemblies store `0` as `AddressOfEntryPoint` in this block. On 64-bit marker and 32-bit builds, reconstruction keeps the outer PE header's `_CorExeMain` / `_CorDllMain` stub entry point whenever the decrypted value is `0`; marker-less 64-bit and dedicated 64-bit DLL builds write `0` directly (valid for pure-IL managed DLLs).
 
-The PE header fields the runtime loader doesn't use directly stay blanked in the on-disk header until this restoration runs, which is why PE tooling shows a garbage entry point (a common small value like `0x1B5C`) on a protected file.
+## `.bss` zero-fill chains
 
-Managed images store 0 as the entry point in this block. The real entry is a property of the CLR header, not the PE. Reconstruction keeps the protected header's entry point when the decrypted value is 0; writing 0 would point the image at the DOS header.
-
-## The zero-fill lists
-
-Not every region of the original image is stored: `.bss`-style regions are delivered as zero-fill lists. Walk4's second chain on 64-bit, the zero-list cluster slot on 32-bit, and a trailing zero-fill chain in the dedicated DLL layout. Each entry is a `(dst, size)` pair, decrypted with the same 16-byte positional chain as the section descriptors, and zeroed after (32-bit: before) decompression.
+Uninitialized ranges omitted from compressed section blocks are supplied by a separate 16-byte `byte_rotate2`-encrypted `{dst, size}` chain (the second `walk4` chain on 64-bit, cluster `+0x48` on 32-bit, and the trailing chain on dedicated 64-bit DLLs). Ranges are zeroed after section decompression on 64-bit builds and before decompression on 32-bit builds.

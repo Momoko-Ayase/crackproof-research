@@ -1,15 +1,16 @@
 ---
-description: "AES-CBC 层及其存放在缓冲区内的扩展密钥表。"
+description: "使用映像内嵌扩展轮密钥表与 T 表逆轮函数的零 IV AES-CBC 解密。"
+icon: key
 ---
 
-# AES-CBC 层
+# AES-CBC 解密层
 
-## 分组密码：内嵌密钥调度的 AES-CBC
+## 基于缓冲区内嵌轮密钥表的 AES-CBC
 
-大块内容（阶段与节数据块）以 CBC 模式的 AES 解密保护。两个设计选择值得注意：
+Stage 3 至 Stage 5 以及压缩节数据块均通过零 IV 的 AES-CBC 解密，其扩展轮密钥表直接存放在工作映像缓冲区内部：
 
-- **密钥调度表就存在数据缓冲区内部。** `key_offset` 处有一个小头部存放轮数（`key_offset + 2` 处的小端 u16），其后是 `(rounds + 1)` 个 16 字节轮密钥。没有独立密钥材料可提取；调度表随其他一切一并解出。
-- **这些表是标准的 AES 解密 T 表**（InvSubBytes 融合 InvMixColumns），下面由 GF(2⁸) 运算生成——公开的 AES 常量，并非专有数据。状态字按大端读写。
+* **缓冲区内嵌轮密钥表：** `key_offset` 起始处为 4 字节头部，其中 `key_offset + 2` 处的小端序 `u16` 给出轮数（`10`、`12` 或 `14`），紧随其后的 `key_offset + 4` 处存放 `(rounds + 1)` 组 16 字节解密轮密钥。
+* **标准 GF(2⁸) 逆 T 表：** 中间轮将 `InvSubBytes`、`InvShiftRows` 与 `InvMixColumns`（约化多项式 `0x1B`，系数 `0x0B`、`0x0D`、`0x09`、`0x0E`）合并为四张 256 项 `u32` 查找表；末轮执行 `InvSubBytes` 并按 `InvShiftRows` 重排字节位置（首字取 `n0 | n3 | n2 | n1` 对应字节，其余三字依次循环轮换）。状态字均按大端序加载和写回。
 
 ```python
 def _gf_mul(a, b):
@@ -113,5 +114,4 @@ def aes_decrypt(d, pos, size, key_offset):
         prev = cur
 ```
 
-每个分组经 `_aes_round` 解密（初始密钥异或、`rounds − 1` 轮 T 表轮变换、以及仅含 SubBytes/ShiftRows 的末轮——教科书式 AES 逆结构），再与前一组密文异或（零 IV）。
-
+每个 16 字节分组依次执行初始轮密钥异或、`rounds - 1` 轮等价逆密码（Equivalent Inverse Cipher）T 表查表与末轮 `InvSubBytes`/`InvShiftRows` 变换，最后与上一组密文块（`prev`，初始为 16 个零字节）按字节异或。

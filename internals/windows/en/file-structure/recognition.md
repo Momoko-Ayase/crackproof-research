@@ -1,33 +1,32 @@
 ---
-description: "Structural checks that distinguish protected PE files and the layouts observed across build families."
+description: "Content-based KONN detection, native vs managed PE32/PE32+ classification, and observed layout families."
+icon: fingerprint
 ---
 
 # Recognition and build families
 
-## Recognition and classification
+## Content-based recognition and classification
 
-A protected file is recognized by content, never by name or extension. The initial filter is:
+A file matches the outer container signature when:
 
-1. It is at least 4128 bytes long and has a valid `PE\0\0` signature at `e_lfanew` (`u32@0x3C`).
-2. The KDF over offset 4096 yields `info[1] == KONN`.
+1. File length is at least `4128` bytes (`0x1020`) and `e_lfanew` (`u32@0x3C`) points to a valid `PE\0\0` signature.
+2. `header_kdf` at offset `4096` produces `info[1] == 0x4E4E4F4B` (`KONN`).
 
-These two checks identify a candidate. Before accepting its layout, every `info` range must also fit the file, stage and section records must have valid bounds, and at least one downstream checksum or decode must succeed. `KONN` alone isn't enough to trust all derived offsets.
+Passing both checks identifies a candidate container; full validation requires in-range `info` slices, valid stage descriptors, and passing stage checksums or trial decompression.
 
-Classification then uses ordinary PE fields. Both fields apply to every candidate; EXE versus DLL and native versus managed are independent:
+Once recognized, standard PE header fields classify the target into four module kinds:
 
-- `IMAGE_FILE_HEADER.Characteristics & 0x2000` (`IMAGE_FILE_DLL`) distinguishes DLL from EXE.
-- The COM descriptor (CLR) data directory (entry 14, at optional-header `+96` on PE32 or `+112` on PE32+) distinguishes managed (.NET) from native.
+* `IMAGE_FILE_HEADER.Characteristics & 0x2000` (`IMAGE_FILE_DLL`) separates DLLs from EXEs.
+* Data directory `14` (`IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR`, starting at optional-header `+96` on PE32 or `+112` on PE32+) separates managed (.NET) assemblies from native binaries.
 
-The four combinations are:
-
-| `IMAGE_FILE_DLL` | CLR RVA | Kind |
+| `IMAGE_FILE_DLL` | CLR RVA (`DD[14]`) | Module kind |
 | --- | --- | --- |
-| clear | 0 | native EXE |
-| clear | nonzero | managed EXE |
-| set | 0 | native DLL |
-| set | nonzero | managed DLL |
+| `0` | `0` | `native-exe` |
+| `0` | nonzero | `managed-exe` |
+| nonzero | `0` | `native-dll` |
+| nonzero | nonzero | `managed-dll` |
 
-A managed EXE uses the same EXE-style container as a native EXE. The CLR directory is the only PE-header difference that classification needs. It isn't a fifth layout family.
+Managed EXEs use the same EXE-style container as native EXEs.
 
 ```python
 MAGIC_KONN = 0x4E4E4F4B  # the shell stamp
@@ -61,23 +60,18 @@ def detect(file_data):
 ```
 
 {% hint style="info" %}
-Using the wrong data-directory base (96 vs 112) reads the wrong dword and can misclassify a 32-bit native image as managed. The optional-header magic must be read first. Skipping the CLR check on EXEs folds managed EXEs into native EXEs.
+Always read the optional-header magic (`0x10B` vs `0x20B`) before indexing data directories: `DD[14]` sits at `pe + 0xE8` on PE32 and `pe + 0xF8` on PE32+. Reading the wrong offset can misclassify a 32-bit native binary as managed.
 {% endhint %}
 
-## Build families
+## Observed layout dimensions
 
-Protected files observed in the wild vary along four axes. The axes are independent; every combination needs handling.
+Protected Windows files vary across four structural dimensions (only certain combinations occur: the dedicated DLL container is 64-bit marker-only, and external companions use PE32+ EXE-style shells):
 
-**Bitness.** PE32+ (optional-header magic `0x20B`, 64-bit) and PE32 (`0x10B`, 32-bit) containers share the header/payload layer but use entirely different configuration layouts, stage structures, and final PE fixups.
-
-**Object kind.** Native EXE, managed EXE, native DLL, and managed DLL (see [Recognition and classification](#recognition-and-classification)). Some managed layouts preserve the COR20 header and BSJB metadata stream verbatim in the protected file. This doesn't make the managed method bodies plaintext; they still belong to sections handled by the normal recovery path.
-
-**Configuration layout.** Two generations of the 64-bit loader configuration:
-
-- The **marker layout** (older builds) embeds the byte markers `70 6D 00 00 63 6D 00 00` (`"pm\0\0cm\0\0"`, the loader's two-letter submodule codes) and `00 00 00 40 01 00 00 00` (a `0x40000000, 1` dword pair) in the final loader stage. Every important table is at a fixed offset from these markers.
-- The **marker-less layout** (newer builds, including EXE-style shells wrapped around DLLs) omits both markers. Tables are found from their record shape, embedded transform programs, pointer ranges, and a trial decode of a compressed record.
-
-**DLL packaging.** Two ways DLLs are protected:
-
-- The **dedicated DLL layout** (older): a DLL-specific container whose configuration block sits at a fixed offset (`keys[6] + 5592`) rather than a scanned anchor.
-- The **EXE-style shell** (newer): DLLs are wrapped in the same shell layout as EXEs. The [external-companion split](companion-layout.md) is an instance of this family.
+* **Bitness:** PE32+ (`0x20B`, 64-bit) and PE32 (`0x10B`, 32-bit) share `header_kdf` and the core ciphers, while using distinct configuration tables, stage counts, and import/header reconstruction rules (including standard and compact PE32 shell variants).
+* **Module kind:** `native-exe`, `managed-exe`, `native-dll`, and `managed-dll`. Even when a managed build leaves the `COR20` header and `BSJB` metadata root readable on disk, its IL method bodies live inside encrypted/compressed section payloads.
+* **64-bit configuration discovery:**
+  * **Marker layout (classic):** Stage 5 contains literal markers `70 6D 00 00 63 6D 00 00` (`"pm\0\0cm\0\0"`) and `00 00 00 40 01 00 00 00` (`0x40000000, 1`), placing descriptor walks at fixed relative offsets.
+  * **Marker-less layout (modern):** omits both markers; Stage 5 slots and bytecode stubs are located through LFSR scans, `trial_byte_rotate2` range checks, `fileCS` distance scoring, and trial decompression.
+* **DLL container style:**
+  * **Dedicated DLL layout:** a 64-bit DLL-only container (`0x20B`) whose configuration table starts at fixed offset `info[6] + 5592` (`0x15D8`).
+  * **EXE-style shell:** wraps 32-bit or 64-bit DLLs in the same staged shell used for EXEs, including optional [external-companion (`._`)](companion-layout.md) splitting.

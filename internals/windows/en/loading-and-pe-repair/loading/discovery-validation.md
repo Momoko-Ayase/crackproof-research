@@ -1,22 +1,19 @@
 ---
-description: "Why loader structures are discovered by shape and how false candidates are rejected."
+description: "Candidate offset validation, trial decompression checks, and .text page-scramble selection."
+icon: magnifying-glass
 ---
 
 # Structural discovery and validation
 
-## Structural discovery and false-candidate rejection
+Because stage sizes shift per build (`ss_shift` on PE32, `anchor_extra` on 64-bit) and modern 64-bit builds omit fixed Stage 5 markers, static recovery validates every candidate offset, shift, and seed before mutating the working image:
 
-A recurring design fact is that few container objects remain at one offset across builds. Table placement changes, PE32 layouts apply `ss_shift`, newer builds omit markers, and unrelated bytes can resemble pointers or transform programs. The loader knows the layout compiled into its own build; a static analysis has to recover that layout from the file.
+* **Anchor and table invariants:** require `u32@anchor == info[3]`, `(1, 0, info[3], 0)` at Stage 2 `table_start`, and in-image `{offset, size}` bounds before unwrapping any stage descriptor.
+* **Strict bytecode VM grammar:** parse candidate 96-byte LFSR slots all the way to `0xC3` (`RET`), rejecting any non-`AL` `ModR/M` encoding (`mod != 3`, `rm != 0`, or `reg > 1`) and advancing scans by 1 byte where false positives can precede the real stub.
+* **Non-destructive descriptor lookahead:** inspect candidate pointer targets with `trial_byte_rotate2` and verify that both `src + section_data_file_base` and `dst + plain_len` fit inside the file and `SizeOfImage`.
+* **First-compressed-block proof:** never accept a bytecode stub or `EighthStage` seed from raw-copy blocks alone; replay AES + bytecode translation + `decompress` on the first compressed block and require `written == plain_len` with valid Huffman tree walks.
+* **Three-tier `.text` page-scramble (`dd8`) selection:**
+  1. On 64-bit images, check the 18-byte CRT entry stub (`48 83 EC ib / E8 rel32 / 48 83 C4 ib / E9 rel32`) across `unchanged`, `shift 0`, and `shift 15`, picking the unique mode whose `call` and `jmp` targets both stay inside `.text`.
+  2. Otherwise on 64-bit images, score interior `.text` pages by total run length of `0xC3` (`RET`) followed by `>= 4` `0xCC` padding bytes, requiring a positive delta `>= 8` over the unchanged baseline.
+  3. Only when all `RET + int3` scores are `0` on 64-bit (and always on 32-bit across `page + 1` vs `0x8000 * (page + 1)`), fall back to counting mutated positions that become `0xCC`, requiring both `>= 2x` baseline and `>= 8` hits before modifying `.text`.
 
-Don't accept the first match. Use several independent checks:
-
-- Check table shapes such as an anchor dword equal to `info[3]`, the `(1, 0, info[3], 0)` entry, and bounded `(offset, size)` pairs.
-- Parse a candidate transform program to its actual `RET`; reject invalid opcodes, invalid ModR/M fields, and streams that only contain a coincidental `0xC3` operand byte.
-- Require pointers to identify ranges inside the current image or protected file. Don't use pointer plausibility as the only check.
-- Trial-decrypt candidate descriptors without committing the change, then require source and destination ranges to fit.
-- Replay the first compressed section record and require decompression to finish at the declared output size. A candidate that only works for raw-copy records hasn't yet been validated.
-- Verify the checksum chain where the layout supplies it.
-
-The sparse page transform needs a separate decision. A recognizable CRT entry stub (`48 83 EC ib / E8 / 48 83 C4 ib / E9`, matching stack immediates) is strong evidence when it's the only candidate, including “no transform”, whose decoded `call` and `jmp` targets both remain inside `.text`. Otherwise, compare how much each candidate restores expected `0xCC` padding across several pages and require both a margin over the unchanged baseline and an absolute floor. Small gains are the noise of XORing 255 positions per page and must not trigger a transform. 32-bit images use the same padding test to choose `page+1` versus `0x8000*(page+1)`, or to skip the pass on already-plaintext `.text`.
-
-If no candidate passes its content check, stop at that stage. Returning a plausible but silently damaged PE makes later observations unreliable.
+If all candidates fail validation at any stage, recovery terminates with an explicit error rather than emitting a partially decoded PE.

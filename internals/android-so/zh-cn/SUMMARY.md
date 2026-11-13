@@ -6,13 +6,13 @@
 
 * [概览](file-format/file-format.md)
 * [受保护 ELF](file-format/protected-elf.md)
-* [第一阶段首部](file-format/stage1.md)
+* [第一阶段头部](file-format/stage1.md)
 * [第二阶段记录流](file-format/stage2-streams.md)
 
 ## 数据变换 <a href="#data-transforms" id="data-transforms"></a>
 
 * [概览](data-transforms/data-transforms.md)
-* [词、流与记录密码](data-transforms/word-and-record.md)
+* [字、流与记录加解密](data-transforms/word-and-record.md)
 * [模块配置](data-transforms/module-config.md)
 * [容器变换](data-transforms/container.md)
 * [Huffman 与 LZ 压缩](data-transforms/compression.md)
@@ -20,7 +20,7 @@
 ## 恢复 <a href="#restoration" id="restoration"></a>
 
 * [概览](restoration/restoration.md)
-* [模块记录流](restoration/module-streams.md)
+* [模块流](restoration/module-streams.md)
 * [动态链接](restoration/dynamic-linking.md)
 * [ELF 输出](restoration/elf-output.md)
 
@@ -41,5 +41,5 @@
 ## 分析 <a href="#analysis" id="analysis"></a>
 
 * [概览](analysis/analysis.md)
-* [校验清单](analysis/validation.md)
+* [验证清单](analysis/validation.md)
 * [常量](analysis/constants.md)

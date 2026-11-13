@@ -1,10 +1,11 @@
 ---
-description: "AES decryption in CBC mode with an in-buffer key schedule; T-tables generated from GF(2^8) arithmetic."
+description: "Zero-IV AES-CBC decryption with an in-buffer key schedule and GF(2^8) inverse T-tables."
+icon: key
 ---
 
 # aes\_impl.py
 
-The block cipher: AES-CBC decryption with the key schedule embedded in the data buffer, as documented in [AES-CBC layer](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/aes).
+Zero-IV AES-CBC decryption using an in-buffer expanded key schedule, matching [AES-CBC layer](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/aes).
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.

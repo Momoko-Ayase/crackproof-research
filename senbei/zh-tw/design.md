@@ -1,81 +1,52 @@
 ---
-description: "工作區佈局以及 Windows 與 Android 恢復流水線。"
+description: "九個 crate 的 workspace 架構、profile 與追蹤、觀察者介面與雙平台還原管線。"
+icon: diagram-project
 ---
 
-# 設計
+# 架構設計
 
-本頁介紹 Senbei 的工作區佈局，以及 Windows 與 Android 恢復流水線。
+## Workspace 架構
 
-## crate 佈局
+Cargo workspace 包含九個成員 crate，而 `senbei-wasm`（瀏覽器綁定層）與 `fuzz`（`libFuzzer` 測試框架）則作為獨立 crate 排除於 workspace 之外：
 
-工作區由七個 crate 組成；瀏覽器綁定 `senbei-wasm` 是工作區之外的獨立 crate。
-
-* `senbei-cli` 是命令行入口。
-* `senbei-io` 負責文件系統編排。
-* `senbei-pe` 提供基礎格式解析。
-* `senbei-elf` 提供基礎格式解析。
-* `senbei-crypto` 提供共享原語。
-* `senbei-metadata` 恢復元數據。
-* `senbei-engine` 負責保護方案專屬的流水線。
-
-單一平臺的源碼直接放在 `src/` 下。多平臺 crate 把平臺代碼放在 `src/windows/` 與 `src/android/` 下，共享代碼直接放在 `src/` 下。
-
-```text
-senbei-cli/src/main.rs
-senbei-crypto/src/
-senbei-crypto/src/android/
-senbei-crypto/src/windows/
-senbei-elf/src/
-senbei-engine/src/windows/
-senbei-engine/src/android/
-senbei-io/src/
-senbei-io/src/android/
-senbei-io/src/windows/
-senbei-metadata/src/
-senbei-metadata/src/windows/
-senbei-metadata/src/android/
-senbei-pe/src/
-senbei-wasm/src/
+```mermaid
+flowchart TD
+    CLI["senbei-cli\n(CLI 與 JSON 輸出)"] --> IO["senbei-io\n(掃描、附屬檔、APK、記錄檔)"]
+    GUI["senbei-gui\n(egui/wgpu 桌面工作台)"] --> IO
+    CLI --> I18N["senbei-i18n\n(五語訊息目錄)"]
+    GUI --> I18N
+    IO --> I18N
+    WASM["senbei-wasm\n(WebAssembly API)"] --> IO
+    IO --> ENG["senbei-engine\n(Windows 與 Android 還原管線)"]
+    ENG --> I18N
+    ENG --> PE["senbei-pe"]
+    ENG --> ELF["senbei-elf"]
+    ENG --> CRY["senbei-crypto"]
+    ENG --> META["senbei-metadata"]
 ```
 
-`senbei-pe` 與 `senbei-elf` 負責經過驗證的格式模型、地址映射與 ELF 動態哈希輔助。它們不依賴解包引擎、文件系統代碼或平臺保護邏輯。
+| Crate | 職責 |
+| --- | --- |
+| `senbei-cli` | 命令列解析器、終端機色彩與語系輸出、JSON 輸出器，以及整合測試套件 |
+| `senbei-gui` | 原生 `eframe`/`wgpu` 桌面工作台（`Workbench` UI 不存取檔案系統，由 `native.rs` 執行背景工作） |
+| `senbei-i18n` | 不含 `unsafe` 的五語目錄（`Msg`、`Step`、`Term`、`Cli`、`Message`）；為 `--json` 與 `.log` 維持固定英文輸出字串 |
+| `senbei-io` | 資料夾掃描、Windows `._` 附屬檔拼接、Android `.apk`/`.apks`/`.xapk` 串流處理、`RunObserver` 與 `CancelToken` |
+| `senbei-engine` | Windows PE 與 Android ELF 靜態還原管線、`profile.rs` 報告模型，以及設有容量上限的分析追蹤收集器 |
+| `senbei-pe` / `senbei-elf` | 純格式解析器、RVA／偏移映射，以及 ELF SysV/GNU 雜湊與版面配置輔助函式（零檔案系統 I/O） |
+| `senbei-crypto` | Windows（`src/windows/`）與 Android（`src/android/`）加密演算法、AES 金鑰排程、bytecode VM 與 Huffman/LZ 解壓縮 |
+| `senbei-metadata` | 版面定義（`layout.rs`）、共用結構化 `v31` 重新映射，以及 Android 種子衍生 `v24.1`/`v29`/`v31`/`v39` 與精簡型 `v24` 還原 |
+| `senbei-wasm` | 獨立的 `wasm32-unknown-unknown` 綁定層，在單次使用的 Web Worker 內驅動 `senbei-io` 的記憶體位元組 API |
 
-## 保護 profile
+跨平台 crate 將平台專屬程式碼隔離於 `src/windows/` 與 `src/android/` 底下，共用模型則直接置於 `src/`。
 
-開發樹中的共享模型 `senbei-engine/src/profile.rs` 記錄觀察到的格式、保護證據、候選嘗試、選中流程、恢復狀態與最終靜態驗證狀態。其 `format_version` 表示報告格式版本，不是保護器構建版本。檢測不會替代試解再驗證，也不會根據未經驗證的指紋指定 CrackProof 版本。
+## 保護 Profile、結構追蹤與觀察者介面
 
-輕量檢測讓恢復與驗證保持未嘗試狀態。面向研究的 `inspect` 命令會繼續分析：它結合解析出的輸入結構、有邊界的局部探測與實際靜態恢復跟蹤，然後丟棄恢復字節。作用域內有容量上限的跟蹤收集器記錄流水線真正使用的參數與選擇；普通解包不收集這些跟蹤。各項事實區分源文件偏移、解碼後載荷偏移與工作映像 RVA。
+* **`senbei-engine/src/profile.rs`：** 記錄輸入格式、辨識證據、每條嘗試過的候選路徑與排除錯誤、最終採用的路徑、還原狀態，以及靜態驗證結果（`format_version` 代表報告 schema 版本，而非 CrackProof 保護版本）。
+* **設有上限的分析追蹤（`inspect`）：** `inspect` 會結合解析後的輸入結構、限制範圍的標頭／階段探測，以及完整靜態還原期間發出的追蹤事件，在捨棄暫存輸出前為每個偏移標註所屬座標空間（`file`、`spliced`、`payload` 或 `rva`）。
+* **觀察者與協作式取消：** `senbei-engine::progress` 會將各階段轉換事件依序傳遞至 `senbei-io::observe::RunObserver`（`scanned`、`input_started`、`progress`、`produced`、`input_finished`）。`produced` 會在 `Inspect` 或 `DryRun` 清理暫存工作區之前觸發，讓 `senbei-gui` 能在設定的 MiB 上限內保留已還原映像；`CancelToken` 則會在兩個輸入項之間安全停止批次作業。
 
-恢復報告保留被拒絕候選及其錯誤，即使後續流程成功也不會丟棄。伴生文件準備可以在候選運行前阻止恢復；覆蓋恢復後的驗證描述實際返回的映像，而不是早先的候選。條件允許時，研究檢查同時報告受保護與恢復後的結構，但不會把形似有效的表或成功的局部探測當作完整恢復的結論。靜態驗證不表示 Windows 或 Android 鏈接器已成功加載該映像。
+## Windows、Android 與中繼資料管線
 
-元數據佈局定義位於 `senbei-metadata/src/layout.rs`，與恢復算法分離。頭部識別報告原始版本與已實現的能力。`known` 表示存在佈局定義，不表示輸入的表已經通過驗證。版本 24 仍需要所屬應用的模塊 `0x0C` 與佈局驗證；僅憑原始版本不能識別 v24.1。帶種子方法令牌恢復支持現有的 v29、v31 與緊湊 v39 流程，結構化恢復仍僅支持 v31。未知版本保留數值標記，但不聲稱支持恢復。
-
-## Windows 引擎
-
-`senbei-engine/src/windows/` 包含 PE 檢測、佈局發現、EXE 與 DLL 恢復、確定性塊並行以及結構完整性檢查。候選佈局先經過試解再驗證，然後才會被接受為輸出。
-
-外置伴生輸入重建為 `stub[..4096]` 後接匹配的 `._` 載荷。stub 的導出、TLS 與聲明的 CLR 區域在解包後覆蓋回去，因為這些區域不存在於加密的伴生文件中。託管恢復沿 COR20 目錄以及被引用的元數據、資源、vtable 修復表，按各文件的 RVA 映射進行，保留解密出的方法體。
-
-## Android 引擎
-
-`senbei-engine/src/android/extract/` 解密 stage-1 頭部與 stage-2 記錄流，並寫出臨時模塊工作區。`senbei-engine/src/android/restore/` 把解碼後的映像與修復容器應用到被掏空的 ELF 上，並重建動態鏈接器表。兩個階段在寫輸出前都驗證邊界與表放置。
-
-Windows 保護原語在 `senbei-crypto/src/windows/`，Android 保護原語在 `senbei-crypto/src/android/`。Android 帶種子元數據恢復在 `senbei-metadata/src/android/`；結構化的 MethodDef 變換共享在 metadata crate 根部，因為兩個平臺路徑都使用它。
-
-Android ELF 動態表根據輸入節表及其實際文件範圍定位。原始間隙太小時，恢復會在現有加載映像之後新增一個經過驗證的只讀 `PT_LOAD` 並更新動態標記；它絕不覆蓋相鄰節，也不發出不完整映像。
-
-## 掃描與包
-
-文件夾掃描使用平臺目標名來避免打開批量資產：Windows 候選名為 `.exe`、`.dll` 與 `global-metadata.dat`；Android 候選名為 `.so` 與 `global-metadata.dat`。共享遍歷器在 `senbei-io/src/scan.rs`；平臺名稱過濾與 PE 伴生字節適配在 `senbei-io/src/windows/`，Android 包適配在 `senbei-io/src/android/`。Windows 的 `.exe._`、`.dll._` 伴生文件是其同級 stub 的輔助輸入，不計入跳過數。
-
-APK、APKS、XAPK 文件是容器。Senbei 先讀取它們的 ZIP 清單，必要時跟進嵌套 APK 條目，只提取 `.so` 與精確匹配 `global-metadata.dat` 的條目。提取直接流式寫到臨時文件，壓縮副本與解壓副本不會同時駐留內存。
-
-## 驗證
-
-每個啟發式佈局都使用試解再驗證。未通過結構檢查、校驗和或表邊界的候選會被拒絕，然後嘗試下一個候選。恢復失敗會報告為錯誤，而不是發出靜默損壞的二進制文件。
-
-PE 完整性檢查驗證頭部、節範圍、入口點映射、導入名、重定位需求與託管元數據簽名。Android 恢復驗證 ELF 範圍、解碼後的容器大小、修復表邊界與重建的動態表。
-
-## WebAssembly
-
-瀏覽器綁定通過 I/O 字節 API 依賴 `senbei-engine`。原生文件系統與 Android 包編排不在瀏覽器版工作流內。每次瀏覽器版解包都在一次性 worker 中運行，因為 WebAssembly 無法像原生代碼那樣從捕獲的 panic 中恢復。
+* **Windows（`senbei-engine/src/windows/`）：** 針對 PE32（標準與精簡版面）、64 位元含標記版、64 位元無標記版、64 位元專用 DLL，以及 `stub[..4096] ++ companion`（`._`）輸入，逐一試解密並驗證候選定位點、位移量、種子與 bytecode stub，接著執行確定性的平行區段解壓縮，以及還原後的 PE／CLR／資料目錄完整性檢查。
+* **Android（`senbei-engine/src/android/`）：** `extract/` 會在 `ResourceLimits` 配額內將 Stage 1 與巢狀 Stage 2 資料流解碼至暫存工作區；`restore/` 套用主要 `PT_LOAD` 寫入器與輔助重定位容器（`0x9B`、`0x9D`、`0x9E`，並還原選用的 `0x96` 符號排列與解譯 `0x98` AArch64 建構函式），將重建後的動態表原地放回或寫入附加於尾端的 `PF_R` `PT_LOAD` 區段，最後清除 `e_entry`。
+* **資料夾掃描與套件處理（`senbei-io/`）：** 資料夾掃描僅篩選超過 `4,128` 位元組門檻的 `.exe`、`.dll`、`.so`、`global-metadata.dat`、`.apk`、`.apks` 與 `.xapk` 檔案，避免開啟大量遊戲素材檔。ZIP 套件處理會先讀取 ZIP 中央目錄，僅將 `.so` 與 `global-metadata.dat` 條目串流寫入暫存檔。

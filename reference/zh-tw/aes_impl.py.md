@@ -1,10 +1,11 @@
 ---
-description: "CBC 模式的 AES 解密，密鑰調度內置於數據緩衝區；T 表由 GF(2^8) 運算生成。"
+description: "含緩衝區內建金鑰排程的零 IV AES-CBC 解密實作。"
+icon: key
 ---
 
 # aes\_impl.py
 
-這是分組密碼：帶緩衝區內置密鑰調度的 AES-CBC 解密，記載見 [AES-CBC 層](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/aes)。
+使用緩衝區內建展開金鑰排程的零 IV AES-CBC 解密實作，對應 [AES-CBC 層](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/aes)。
 
 ```python
 """The block cipher: AES decryption in CBC mode with an in-buffer key schedule.

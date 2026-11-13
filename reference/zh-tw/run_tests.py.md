@@ -1,10 +1,11 @@
 ---
-description: "對照固定向量與已知答案，比對 Windows Python 參考實現。"
+description: "針對 Windows Python 參考實作執行 31 項測試向量比對的腳本。"
+icon: circle-check
 ---
 
 # run\_tests.py
 
-比對工具使用參考移植的 LCG 序列重新生成輸入，對照 `vectors.txt` 與已知答案運行 31 項比對。把參考 Python 文件與向量放在一起，然後運行 `python run_tests.py`；在文檔倉庫根目錄使用 `python verification/run_tests.py`。腳本從自身所在目錄定位向量文件。預期結束輸出：`all vectors match`。
+以固定 LCG 輸入對參考實作執行 31 項 `vectors.txt` 與已知結果比對。於儲存庫根目錄執行 `python verification/run_tests.py`（預期輸出：`all vectors match`）。
 
 ```python
 """Compare the Windows Python reference implementations with the checked-in

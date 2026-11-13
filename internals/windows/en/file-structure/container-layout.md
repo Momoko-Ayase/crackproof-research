@@ -1,37 +1,36 @@
 ---
-description: "The Windows container layout, encrypted info header, and the values derived from it."
+description: "The Windows container split at 0x1000, the eight-dword info header KDF, and payload transfer rules."
+icon: box-archive
 ---
 
 # Container and encrypted header
 
-A protected file is a PE file whose original image has been replaced by an encrypted container. The container keeps the original PE headers (mostly readable) at the front, hides a small parameter block behind a key-derivation function at a fixed offset, and stores everything else (the program's sections and the loader's own code) as encrypted and usually compressed payload.
+A protected PE replaces the original section layout with an encrypted container. The first 4,096 bytes (`0x0000..0x0FFF`) keep readable outer PE headers, offset `0x1000` holds an encrypted 32-byte parameter block, and the remainder of the file stores encrypted loader tables, stage stubs, and compressed application sections.
 
 ## Container layout
 
 ```mermaid
 flowchart TB
-    subgraph FILE["Protected file on disk"]
+    subgraph FILE["Protected PE on disk"]
         direction TB
-        H["0x0000–0x0FFF — original PE headers<br/>DOS + PE + section table, mostly plaintext;<br/>selected fields blanked (entry point, data directories)"]
-        I["0x1000 — encrypted info header (32 bytes = 8 dwords)"]
-        P["payload — encrypted + compressed sections,<br/>loader configuration, encrypted stage code"]
+        H["0x0000..0x0FFF: Outer PE headers<br/>DOS + PE + section headers in plaintext;<br/>original EP, selected directories, and raw pointers cleared or replaced"]
+        I["0x1000..0x101F: Encrypted info header (32 bytes = 8 dwords)"]
+        P["info[4] + 0x1000..: Encrypted payload<br/>loader configuration, staged stubs, and compressed section blocks"]
     end
     H --> I --> P
 ```
 
-Three regions matter:
-
 | Region | File offset | Contents |
 | --- | --- | --- |
-| Header region | `0x0000`–`0x0FFF` | The original PE headers. The DOS/PE signatures, COFF header, optional header, and section table survive in plaintext, but the entry point, several data directories, and the section raw-data pointers are blanked or repurposed. |
-| Info header | `0x1000` | 32 bytes: eight dwords encrypted with the key-derivation function in [The info header and its key derivation](#the-info-header-and-its-key-derivation). This is the master parameter block for the whole container. |
-| Payload | After the info header | Encrypted (and usually Huffman-compressed) section data, loader tables, and staged loader code. The rolling XOR chain starts at `info[4] + 4096`, which may be later than `0x1020`. |
+| Outer PE headers | `0x0000..0x0FFF` | DOS/PE signatures, COFF header, optional header, and section table. Original entry point, selected data directories, and section raw pointers are blanked or redirected to the loader. |
+| `info` header | `0x1000..0x101F` | Eight little-endian dwords decrypted by `header_kdf`. Supplies the magic, RVA placement, and payload bounds for the entire container. |
+| Payload | From `info[4] + 0x1000` | Encrypted loader tables, stage code, and compressed section data. |
 
-The split at exactly 4096 bytes (`0x1000`) is constant across every observed build, including the [external-companion layout](companion-layout.md), which separates the stub from its payload at this exact boundary.
+Every observed Windows build splits headers from container state at `0x1000`, including the [external-companion layout](companion-layout.md), which moves container bytes from `0x1000` onward into a separate `._` file.
 
-## The info header and its key derivation
+## The `info` header and key derivation
 
-The eight dwords at offset `0x1000` are decrypted with a rolling-key KDF. `info[0]` is stored directly; every later cell is XORed with a key that rolls forward by mixing in the cell value and the square of the index:
+`info[0]` is stored in plaintext at `0x1000`; words `info[1..7]` are decrypted with a rolling key that mixes the raw ciphertext word and `i * i`:
 
 ```python
 def header_kdf(file_data, offset=4096):
@@ -45,25 +44,24 @@ def header_kdf(file_data, offset=4096):
     return info
 ```
 
-The same KDF is used for every build family, EXE and DLL, 32-bit and 64-bit, so one code path recognizes every protected file. The decrypted fields drive the entire unpack:
+The same 32-byte KDF applies across PE32 and PE32+, EXEs and DLLs, and single-file and companion builds:
 
 | Field | Meaning |
 | --- | --- |
-| `info[0]` | Seed key (stored in plaintext; also feeds the payload cipher) |
-| `info[1]` | **Format magic**, identifies the protection build (see [Format magics](#format-magics)) |
-| `info[2]` | Reserved/variant |
-| `info[3]` | Base RVA in the reconstructed image where the payload is placed |
-| `info[4]` | Payload source offset: the payload begins at `info[4] + 4096` in the file |
-| `info[5]` | Total payload size (bytes copied into the image at `info[3]`) |
-| `info[6]` | End marker of the decrypted region; the loader's configuration block is located relative to it |
-| `info[7]` | Reserved/variant |
+| `info[0]` | Plaintext seed key; also seeds `payload_xor_chain` |
+| `info[1]` | Format magic (`0x4E4E4F4B` = ASCII `KONN` in little-endian) |
+| `info[2]` | Reserved / build-variant field |
+| `info[3]` | Target base RVA in the working image buffer where the payload is mapped |
+| `info[4]` | File offset bias: payload bytes start at file offset `info[4] + 4096` |
+| `info[5]` | Total payload byte length copied to image range `[info[3], info[3] + info[5])` |
+| `info[6]` | End RVA marker for the encrypted loader prefix and anchor search |
+| `info[7]` | Reserved / build-variant field |
 
-The payload transfer is therefore: file range `[info[4] + 4096, info[4] + 4096 + info[5])` → image range `[info[3], info[3] + info[5])`. The first `decrypt_size = info[6] - info[3] + 8192` bytes are decrypted with a rolling XOR chain (see [Rolling-key and rotation ciphers](../data-transforms/rolling-and-rotation.md)); the remainder is copied through verbatim. The reconstructed image then has `4096` written at `info[3]`, and the first 4096 file bytes are overlaid back onto the image as its headers.
+## Payload transfer and `decrypt_size`
 
-### Format magics
+File bytes `[info[4] + 4096, info[4] + 4096 + info[5])` map into working-image RVAs `[info[3], info[3] + info[5])`:
 
-`info[1]` stamps the build with the format magic:
+* **Standard prefix decryption:** on 64-bit builds and standard PE32 builds, the first `decrypt_size = info[6] - info[3] + 8192` bytes are decrypted with `payload_xor_chain` (see [Rolling-key and rotation ciphers](../data-transforms/rolling-and-rotation.md)), and the remaining tail of `info[5]` is copied verbatim.
+* **Full-payload PE32 variant:** older compact PE32 builds encrypt the entire payload (`decrypt_size = info[5]`, which also changes the initial XOR seed `info[0] + ~decrypt_size`). Static recovery falls back to `decrypt_size = info[5]` on PE32 when prefix decryption yields no `tbl` candidate whose `SecondStage` validates.
 
-| Magic (LE bytes) | Value |
-| --- | --- |
-| `KONN` | `0x4E4E4F4B` |
+After payload transfer, `4096` (`0x1000`) is written as a dword at image RVA `info[3]`, and the first `4096` bytes of the file are copied to `[0, 0x1000)` as the working PE header.

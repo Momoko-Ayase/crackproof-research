@@ -1,29 +1,30 @@
 ---
-description: "Observed Android environment, integrity, and dump-related checks at load time."
+description: "Usermode anti-analysis, native-bridge, ptrace, memory-read, and APK signature checks on Android."
+icon: user-shield
 ---
 
 # Environment and integrity checks
 
-Windows builds combine usermode probes with optional kernel support. The Android family stays in usermode. The checks on this page are taken from stage 1, stage 2, and the modules listed on [Runtime modules](modules.md). They run while these nested streams are still materializing, not after a restored ELF is already in place.
+Unlike the Windows family, CrackProof on Android runs entirely in usermode without a kernel driver. Its probes execute across Stage 1, Stage 2, and the worker modules cataloged in [Runtime modules](modules.md) while nested streams unpack.
 
-## Process and translation environment
+## Process and ABI translation checks
 
-Stage 1 already walks `/proc/self/maps` to find its own file. Stage 2 keeps a maps context and also looks at `/proc/self/environ`. One observed probe tests for an x86-on-ARM translation layer by looking for paths under `/system/lib/libhoudini.so` and `/system/lib64/arm64/nb/`. A host that's translating ARM code, rather than running AArch64 natively, is therefore a distinct environment from the one the loader expects.
+* **Self-mapping and environment:** Stage 1 parses `/proc/self/maps` to locate its backing ELF; Stage 2 retains a maps context and inspects `/proc/self/environ`.
+* **ARM-on-x86 binary translation (NativeBridge):** probes check for `/system/lib/libhoudini.so` and `/system/lib64/arm64/nb/` to detect ARM-on-x86 translation layers rather than native AArch64 execution.
+* **Filesystem and libc checks:** module `0x8F` inspects `/proc/self/cmdline`, `uid`/`gid`/`tid`, and file ownership/permissions; module `0x60` scans system library directories and runtime paths; module `0x20` validates target ELF headers, `/proc/self/maps`, and the active `libc` mapping.
 
-Module `0x8F` reads `/proc/self/cmdline`, queries uid/gid/tid, and checks the owner and mode of a path. Module `0x60` scans system library directories, the process environment, and runtime paths. Module `0x20` validates a target path, an ELF header, `/proc/self/maps`, and a libc mapping.
+## Helper process and `PTRACE_SEIZE`
 
-## Second process and ptrace
+Observed IL2CPP builds `fork` a companion process after ART and VM libraries are initialized but before `dlopen` loads the protected `.so`. The child attaches to the parent with `PTRACE_SEIZE | PTRACE_O_EXITKILL`, occupying the kernel `ptrace` attachment slot and terminating the app if either process exits. Because the `fork` happens before the protected `.so` is loaded, the library never appears in `/proc/<child>/maps`.
 
-Observed IL2CPP libraries fork a helper process after ART has started and the VM modules are mapped, but before the protected library itself is loaded. The child seizes the parent with `PTRACE_SEIZE` and `PTRACE_O_EXITKILL`. That occupies the ptrace slot and ties the two process lifetimes together. The child's maps therefore never contain the protected library.
+## `/proc/<pid>/mem` monitoring vs page permissions
 
-## Memory visibility
+Opening and reading `/proc/<pid>/mem` on observed builds terminates the process within seconds; reading `/proc/<pid>/maps`, `cmdline`, or `status`, or reading memory via `process_vm_readv`, did not trigger termination on those builds. Once `0x9B` finishes restoring segments, executable pages remain readable (`PROT_READ | PROT_EXEC`); Android builds do not install a `PAGE_NOACCESS` demand-fault page cipher.
 
-Opening and reading `/proc/<pid>/mem` has been observed to kill the process within a few seconds. Reads of `maps`, `cmdline`, and `status` don't. `process_vm_readv` produced no such reaction on the same builds. Once restoration has finished, executable pages stay readable. There's no Windows-style `PAGE_NOACCESS` re-encryption of demand-faulted code.
+## APK signatures and network time
 
-## Package and time
+Module `0x40` verifies `base.apk` and split APKs in descending scheme order: APK Signature Scheme v3.1, then v3, then v2, then JAR signing (v1). Module `0x02` queries an NTP server over UDP port 123 and compares the returned timestamp against a configured bound. Module `0x69` spawns a short-lived child probe and checks its wait status.
 
-Module `0x40` checks `base.apk` and sibling split APKs. The observed signature order is v3.1, then v3, then v2, then JAR/v1. Module `0x02` sends a UDP port-123 time query and compares the reply with a configured threshold. Module `0x69` forks a child probe and waits for its exit status.
+## Absence from linker module lists
 
-## What is absent
-
-No Htsysm-class kernel driver appears on this path. Stage 2 modules are ordinary usermode images, often in private RWX regions, and they can wipe or rewrite themselves after they run. Their absence from the dynamic linker's module list is the same kind of gap that [manually mapped helpers](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/mapped-modules) create on Windows.
+Stage 2 interpreters and worker modules live in anonymous `mmap` regions (frequently `RWX` during setup) and can zero or overwrite themselves after completing their callbacks. Like [manually mapped helper DLLs](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/runtime/mapped-modules) on Windows, none of these modules appear in Bionic's `dl_iterate_phdr` or `soinfo` lists.

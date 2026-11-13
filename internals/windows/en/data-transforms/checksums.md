@@ -1,12 +1,13 @@
 ---
-description: "CRC-32, triangular key progression, and the checksum chain that links protected records."
+description: "Reflected CRC-32 checksums, triangular key progression, and the stage-to-stage key chain."
+icon: hashtag
 ---
 
 # Checksums and key progression
 
-## CRC-32 checksums
+## Reflected CRC-32 checksums
 
-Checksums use the standard reflected CRC-32 (polynomial `0xEDB88320`, the zlib/Ethernet CRC; `crc32(b"123456789") == 0xCBF43926`). Two descriptor forms appear:
+Stage verification and key derivation use standard reflected CRC-32 (polynomial `0xEDB88320`, matching zlib/IEEE 802.3; `crc32(b"123456789") == 0xCBF43926`). Descriptors supply `(offset, length)` pairs, and `calculate_checksum` XORs the region's CRC-32 with `length`:
 
 ```python
 def _build_crc_table():
@@ -36,11 +37,11 @@ def calculate_checksum(d, pos):
     return crc32(d[offset:offset + length]) ^ length
 ```
 
-A second form chains over the **original file bytes** with a running initial value (`crc32_append` with the previous result as `initial`), used by the validation-only walk described in [Loading and section recovery](../loading-and-pe-repair/loading/README.md).
+A chained variant feeds the previous output into `crc32_append(initial, data)` across original file slices during the validation-only `walk3` check in [Stage chain and marker layout](../loading-and-pe-repair/loading/stage-chain.md).
 
-## The triangular key schedule
+## Triangular key progression
 
-Several stage keys are "advanced" by adding structured integer series. Each iteration adds every integer from 1 to `(m+1) * 100`:
+Before mixing into a stage key, seed dwords extracted from the preceding stage are stepped through `iterations` triangular sums (`1 + 2 + ... + (m + 1) * 100` per round `m`):
 
 ```python
 def advance_key(key, iterations):
@@ -51,18 +52,19 @@ def advance_key(key, iterations):
     return key
 ```
 
-The seed is content read from the previously decrypted stage, so the advanced key only comes out right when everything before it decrypted correctly. That is one half of the tamper-evidence design; the other half is [The checksum chain](#the-checksum-chain).
+## Stage-key composition
 
-## The checksum chain
-
-The last primitive isn't a cipher but the way keys are composed. A stage's decryption key is typically:
-
+```mermaid
+flowchart LR
+    ACC["xor_acc\n(XOR of header/stage\ncalculate_checksum regions)"] --> KEY["stage_key =\nxor_acc ^ stage_crc ^ advanced_seed"]
+    CRC["stage_crc\n(calculate_checksum over\npreceding decrypted stage)"] --> KEY
+    SEED["content seed\n-> advance_key(seed, rounds)"] --> KEY
 ```
-stage_key = xor_accumulator ^ crc32_checksum_of_earlier_content ^ content_derived_seed
-```
 
-- The **xor accumulator** is built by walking a table of `(offset, length)` region descriptors and XORing their `calculate_checksum` values.
-- The **checksums** are CRC-32 over bytes that only exist in plaintext after the preceding stages decrypted correctly.
-- The **seed** is a dword read from freshly decrypted content, usually advanced with `advance_key`.
+Each downstream stage key XORs three inputs:
 
-The consequence: stages can't be decrypted out of order, and any byte modified anywhere upstream corrupts every key derived from it downstream. The chain is the container's tamper-evidence mechanism. Inverted, it also shows whether a reconstructed image is consistent: one wrong choice anywhere leaves later stages undecryptable rather than subtly wrong. [Stage chain and marker layout](../loading-and-pe-repair/loading/stage-chain.md) shows how each build family composes these ingredients.
+* **`xor_acc`:** accumulated XOR of `calculate_checksum` over a descriptor list in the anchor or header table.
+* **Upstream CRC-32 (`stage_crc`):** `calculate_checksum` over plaintext bytes produced by earlier stages.
+* **Content-derived seed:** a dword read from the just-decrypted stage and stepped with `advance_key`.
+
+Because every stage key depends on both upstream plaintext bytes and header checksums, stages must be decoded strictly in order, and any wrong offset, shift, or corrupted byte causes downstream stage decryption and Huffman decompression to fail immediately.

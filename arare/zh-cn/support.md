@@ -1,46 +1,50 @@
 ---
-description: "已测试的族、主机与明确拒绝的输入。"
+description: "支持的 PE 与 CLR 输入矩阵、加壳期拒收条件、结构上限与运行时加载规则。"
+icon: circle-check
 ---
 
 # 支持范围
 
-目标是 Windows 10/11。当前执行证据是 Windows 11 内部版本 26100，使用源码构建的 x86/WOW64 与 x64 程序。尚未单独在 Windows 10 上运行。
+Arare 面向 Windows 10 与 Windows 11 构建，已在 Windows 11 build 26100 上使用源码编译的 x86/WOW64 与 x64 原生及托管程序完成实际运行验证（尚未单独在 Windows 10 环境下运行完整测试套件）。托管程序运行验证覆盖 .NET Framework 4.8（x86/x64）、CoreCLR 10.0.12（x64）与 Mono 6.13（x86）。
 
-可选内核提供程序有独立的构建与验证边界。它是实验性的，没有 `protect` 选项，也不构成商用驱动兼容或已验证内核强制的声明。
+## 支持的输入矩阵
 
-| 输入 | 内嵌族 | 伴生族 |
+| 输入类型 | 内嵌存储配置 | 伴随文件（`._`）配置 |
 | --- | --- | --- |
-| 原生 x86 EXE/DLL | PE32 | PE32 |
-| 原生 x64 EXE/DLL | 经典/现代 PE32+ | 经典/现代 PE32+ |
-| 原生 x64 DLL | 遗留 DLL | 不适用 |
-| 仅 IL 的 x86/AnyCPU DLL | PE32 | PE32 |
-| 已识别的仅 IL x86/AnyCPU C# EXE | PE32 | PE32 |
-| 仅 IL 的 x64 DLL | 遗留/经典/现代 PE32+ | 经典/现代 PE32+ |
-| 仅 IL 的 x64 EXE | 经典/现代 PE32+ | 经典/现代 PE32+ |
-| 清除 `ILONLY` 的纯 IL x86/AnyCPU/x64 DLL | 与同架构仅 IL 行相同 | 与同架构仅 IL 行相同 |
+| 原生 x86 EXE 或 DLL | `pe32` | `pe32` |
+| 原生 x64 EXE 或 DLL | `pe64-classic`, `pe64-modern` | `pe64-classic`（DLL 要求非零入口点）, `pe64-modern` |
+| 原生 x64 DLL（专用布局） | `legacy-dll` | 不支持 |
+| 纯 IL x86 或 AnyCPU DLL | `pe32` | `pe32` |
+| 受支持的纯 IL x86 或 AnyCPU C# EXE | `pe32` | `pe32` |
+| 纯 IL x64 DLL | `legacy-dll`, `pe64-classic`, `pe64-modern` | `pe64-classic`, `pe64-modern` |
+| 纯 IL x64 EXE | `pe64-classic`, `pe64-modern` | `pe64-classic`, `pe64-modern` |
+| 清除了 `COR20` `ILONLY` 标志的纯 IL DLL | 与对应位宽的纯 IL DLL 相同 | 与对应位宽的纯 IL DLL 相同 |
 
-原生 IL2CPP PE 使用原生行。独立的 `global-metadata.dat` 混淆不在本实现范围内。
+原生 IL2CPP 二进制文件（`GameAssembly.dll` 与宿主 EXE）按普通原生 PE 加壳；独立的 `global-metadata.dat` 混淆不在 Arare 的处理范围内。
 
-托管执行覆盖适用主机上的 Framework 4.8 x86/x64、CoreCLR 10.0.12 x64 与 Mono 6.13 x86。纯 IL、仅清除 COR20 `ILONLY` 位的程序集在满足下列限制时会被接受。
+## 加壳期拒收条件
 
-## 明确拒绝
+输入文件若命中以下任一情况，`arare protect` 会在加壳时直接拒绝：
 
-- 需要靠节名或权限规范化才能让 Senbei 可执行导入恢复成功的原生 PE32 EXE。
-- 带代码导出且启用 `IMAGE_GUARD_XFG_ENABLED` 的原生输入。
-- 故意放在可执行节中的导出数据。
-- 未使用的 RVA 页 `[0x1000,0x2000)` 已被占用的现代托管零导入布局。
-- 页加密实际开启时含可写可执行节的输入。
+### 原生与通用 PE 限制
 
-托管打包还会拒绝：
+* **零入口点的经典伴随 DLL：** `AddressOfEntryPoint` 为 0 的 `pe64-classic` 伴随模式 DLL（无入口点 DLL 请改用内嵌存储或 `pe64-modern`）。
+* **伴随模式 TLS 区间重叠：** x64 伴随模式下，TLS 条目区间与加载器保留的物理数据区发生重叠。
+* **页面加密对齐与权限冲突：** 启用页面加密时存在可写可执行（`RWX`）节、`SectionAlignment < 0x1000`，或可执行节的 `VirtualAddress` 未按 `0x1000` 对齐。
+* **纯绑定导入：** 原生导入描述符的 `OriginalFirstThunk == 0`，且映像内不含 hint/name RVA 或 VA。
+* **PE32 EXE 导入表改写限制：** 需要改写节名或节权限才能让静态脱壳工具还原导入表的原生 PE32 EXE。
+* **启用 XFG 的代码导出：** 同时带有代码导出与 `IMAGE_GUARD_XFG_ENABLED` 标志的原生模块。
+* **映像与头部体积上限：** 计入新增 Arare 节后的总映像大小超过 `1 GiB`、节数量超过 `96`，或节表头部超过 `0x1000` 字节（`pe64-*` / `legacy-dll`）或 `0x400` 字节（`pe32`）。
 
-- 真正的 C++/CLI 混合模式、原生 CLR 入口点或修补记录、ReadyToRun/AOT，以及非 IL 方法实现。
-- 带强名称或延迟签名的程序集、多模块程序集，以及链接或导出的模块内容。
-- 原生导出、原生异常/启动表、TLS、加载配置表或延迟导入。
-- `VirtualSize` 大于 `SizeOfRawData` 的节、已有指针或 Edit-and-Continue 元数据表，以及实现了 CLI vararg 的方法。
-- 位于保留命名空间 `Arare.Managed` 中的输入类型。
+### 托管程序集限制
 
-这些是输入限制，不是上述 CLR 主机之间的差异。关闭环境检查不会让不受支持的程序集布局变得可用。
+* 真正的 C++/CLI 混合模式代码、原生 CLR 入口点或 vtable 修正表、ReadyToRun/AOT 映像，或非 IL 方法体。
+* 强名称签名或延迟签名程序集、多模块程序集、链接/导出模块表、内嵌 Portable PDB，或编号 `>= 45` 的 CLI 元数据表（例如 `/debug:embedded`）。
+* 清除了 `ILONLY` 标志的 x86 托管 EXE、置位了 `32BITREQUIRED` 或 `32BITPREFERRED` 的 PE32+ 托管输入、RVA 页面 `[0x1000, 0x2000)` 已被占用的 `pe64-modern` 零导入程序集，或导入目录非零但首项导入描述符为空的 `pe64-modern` 托管输入。
+* 原生导出表、原生异常/展开目录或 TLS 目录、加载配置表（Load Config）、延迟导入、`VirtualSize > SizeOfRawData` 的节、Edit-and-Continue 或指针元数据表、CLI `vararg` 可变参数方法，或位于保留命名空间 `Arare.Managed` 内的类型。
+* 元数据扩展新增的泛型填充 `TypeDef` 行数超过 `524,288`，或签名返回类型的嵌套层数超过 `128`、类型元素总数超过 `65,536`。
 
-托管准备还会把用于泛型填充而新增的 TypeDef 限制在 524,288 个以内。签名解析允许 128 层类型，每个解析的返回类型最多包含 65,536 个类型元素。超过这些工作量限制的输入会被拒绝；这些限制不是进程内存的硬性预算。
+## 布局与运行时加载说明
 
-配置描述的是已观察的结构族，不是商用云版本。剩余的商用保真缺口包括主机目录准入、未识别的 E 系列对象、已加载模块完整性节奏、已验证的商用默认矩阵，以及 Windows 10 执行。
+* **位于可执行节内的数据导出：** PE 导出表本身不区分代码导出与数据导出，因此指向可执行节的非转发器导出项会被重定向到代码导出保护 thunk，而不会在加壳期拒收。导出的纯数据符号请放在不可执行的数据节中。
+* **字节数组加载与磁盘加载：** 采用伴随文件模式加壳的托管程序集必须从磁盘文件加载，不支持 `Assembly.Load(byte[])`。清除了 `ILONLY` 标志的纯 IL DLL 遵循标准 CLR 混合模式加载规则：在 .NET Framework 与 CoreCLR 上需由位宽匹配的进程从磁盘加载，Mono 则同时支持磁盘加载和字节数组加载。

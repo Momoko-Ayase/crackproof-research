@@ -1,21 +1,41 @@
 ---
-description: "User-mode and kernel-assisted checks performed before control reaches the original program."
+description: "Debugger, VM, system-integrity, injected-module/thread, A11/A15 host, and anti-hooking checks at runtime."
+icon: user-shield
 ---
 
 # Environment and anti-analysis checks
 
-The checks run before (and partly interleaved with) decryption. Grouped by what they target:
+CrackProof's startup checks span Phase 1 (before staging the payload), the `C`/`B`/`A` sequencer passes, and optional `E`-series post-seal checks:
 
-**Debuggers.** Usermode checks start at `410` and include `IsDebuggerPresent` and `NtQueryInformationProcess` (`520`). A kernel-debugger check (`52F`), a SoftICE/Syser-era check (`BE0`), and the timing-sensitive decoys in [Page protection and loader code](page-protection.md#the-loaders-own-code-polymorphism-and-decoys) also run. The VMware backdoor probe (`540`) doubles as an emulator check: the `in eax, dx` backdoor instruction faults on real hardware and in most emulators but returns a magic value under VMware. The OS-version check (`C00`) reads the real version; replacing the PEB OS-version fields with a lower value fails `C00`.
+{% tabs %}
+{% tab title="Debuggers" %}
+* **`410` (usermode anti-debug):** checks `IsDebuggerPresent` (live captures show no SEH-based sub-stages inside commercial `410`; trap-flag `#DB` SEH decoys live separately in Stage 5 loader code).
+* **`520` & `52F`:** queries `NtQueryInformationProcess` debug classes (`520`) and kernel-debugger state (`52F`).
+* **`BE0`:** checks legacy SoftICE / Syser driver device names.
+* **Timing & `#DB` decoys:** Stage 5 interleaves `in eax, dx` timing reads and `pushfq; or [rsp], 0x100; popfq` single-step traps whose SEH handler skips dead decoy paths (see [Page protection and loader code](page-protection.md)).
+{% endtab %}
 
-**Virtual machines.** Registry string checks (`A09`) against three values (`HKLM\Hardware\Description\System\SystemBiosVersion`, `HKLM\SYSTEM\CurrentControlSet\Control\SystemInformation\SystemProductName`, and `HKLM\Hardware\Description\System\BIOS\SystemProductName`), matched at their beginnings against: `Virtual`, `VMware`, `Bochs`, `VBOX`, `VRTUAL`, `Microsoft Hyper-V`, `Parallels`. CPU feature flags are sometimes checked at the same stage (requiring hardware virtualization to be exposed to the guest).
+{% tab title="Virtual machines" %}
+* **`540` (VMware backdoor):** executes the `0x5658` I/O-port probe (`in eax, dx`), which raises `#GP` on bare metal and non-VMware hypervisors while returning magic data under VMware.
+* **`A09` (hardware registry prefixes):** checks `HKLM\Hardware\Description\System\SystemBiosVersion`, `HKLM\SYSTEM\CurrentControlSet\Control\SystemInformation\SystemProductName`, and `HKLM\Hardware\Description\System\BIOS\SystemProductName` for leading prefixes `Virtual`, `VMware`, `Bochs`, `VBOX`, `VRTUAL`, `Microsoft Hyper-V`, and `Parallels` (some builds also inspect CPU virtualization feature bits here).
+{% endtab %}
 
-**System integrity.** OS minimum/compatible version checks (`C00`/`B00`), a boot-options check for `testsigning` or `disableintegritychecks` (`C01`, which blocks the usual unsigned-driver analysis setups), and a check that `C:\Windows\msc.log.log` doesn't exist (`BD0`). Some `1B40`-family builds also compare running driver device names against a short list (`E55`, `E91`).
+{% tab title="System integrity" %}
+* **`C00` & `B00`:** checks the real OS build (`0x01A00000 + build`) against a configured Windows 10+ floor (`C00`, defeating naive PEB version spoofing that lowers the reported build) and checks OS compatibility (`B00`).
+* **`C01`:** rejects machines booted with `testsigning` or `disableintegritychecks` enabled.
+* **`BD0`:** aborts if `C:\Windows\msc.log.log` is present.
+* **`E55` & `E91`:** on `1B40`-family builds, probes symbolic device links associated with analysis drivers (such as OpenArk and Cheat Engine).
+{% endtab %}
 
-**Process integrity.** An injected-DLL sweep (`A0F`) that has been observed to look at `AppInit_DLLs`, `user32.dll`, `apphelp.dll`, and `ShimEng.dll`; an injected-thread sweep that first kills (`A07`) and then aborts if any remain (`A01`); a parent-process policy (`A03`); and, for protected DLLs, a host-process check (`A11`). Some host executables also reject unexpected DLLs in their own directory. The `A07` sweep is why in-process analysis helpers must either run before it or sleep past it.
+{% tab title="Process & host (A11 / A15)" %}
+* **`A03`:** restricts parent process names (typically `explorer.exe` or `cmd.exe`).
+* **`A0F`:** scans loaded modules (including `AppInit_DLLs`, `user32.dll`, `apphelp.dll`, and `ShimEng.dll`) and, on some host builds, rejects unexpected DLLs in the application directory.
+* **`A07` & `A01`:** terminates unexpected foreign threads (`A07`) and aborts if any survive (`A01`).
+* **`A11` (DLL host verification):** inspects the host EXE mapped in the current process and accepts either a section named `peC` or an import descriptor referencing exact-case `KeRnEl32.dLl` (Windows resolves the DLL case-insensitively while the mixed-case string marks a CrackProof host). A second `A11` variant checks an additional flag parameter.
+* **`A15` (DLL sequencer marker):** carries no check body; emitted after `5D0` on protected DLL passes once `A09`/`A11` have succeeded. Host EXEs never log `A15` (logging `552`/`570` in that slot instead).
+{% endtab %}
 
-`A11` reads the host executable's mapped image (the protected DLL shares its process) and looks for the protector's own markers: the section table is scanned for a section named `peC`, and the import directory for a module imported under the exact-case name `KeRnEl32.dLl` (the odd casing is the mark — a legitimate import resolves case-insensitively, so the packer can spell it however it likes). Either marker is accepted. A second variant of the check takes an additional flag argument. A DLL whose host shows neither marker fails the boot before ever logging `A15`.
-
-`A15` is a marker, not a check: it has no code body of its own. The check sequencer emits it on the protected-DLL pass, after `5D0`, when the build's option bits select it. In the log it sits right behind the host-process verification (`A09`, `A11`), so its presence means the DLL accepted its host and boot continued into the decrypt prelude. Host executables never log `A15`; the same slot in a host log is occupied by `552`/`570`.
-
-**Anti-hooking.** At `A08`/`A04` the loader copies the *code* of ntdll/kernel32 from the pristine system DLLs on disk into memory and prefers that copy, defeating usermode inline hooks on those modules; `A04` aborts if the on-disk image is itself patched.
+{% tab title="Anti-hooking" %}
+* **`A08` & `A04`:** maps clean on-disk copies of `ntdll.dll` and `kernel32.dll` from `System32` and copies pristine `.text` bytes to bypass usermode inline hooks; `A04` additionally aborts if the on-disk system DLL itself has been modified.
+{% endtab %}
+{% endtabs %}

@@ -1,27 +1,17 @@
 ---
-description: "Weaknesses and failure modes observed in specific protection mechanisms and build families."
+description: "Documented architectural limitations across VM checks, debug logging, demand paging, drivers, and CRC chains."
+icon: triangle-exclamation
 ---
 
 # Observed limitations
 
-## Observed weaknesses
+Static analysis and live testing across Windows build families show eight reproducible architectural limitations:
 
-For completeness and future research, the mechanisms that demonstrably fall short:
-
-**The VM checks are bypassable by configuration alone.** The registry check matches vendor strings only at the *start* of the BIOS/product values, while at least one major hypervisor places its marker at the *end* of its BIOS version. Setting `SMBIOS.reflectHost = "TRUE"` hides it entirely. The VMware backdoor probe is neutralized by `monitor_control.restrict_backdoor = "TRUE"` (and by not installing guest tools), and other hypervisors allow overriding SMBIOS strings directly.
-
-**The debug log is a self-documenting loader.** The status-code design that helps the vendor's support also hands the analyst a stage-by-stage execution trace and a 2-byte search pattern per stage. The mailslot channel is encrypted, but the file log isn't.
-
-**Page encryption yields to in-process readers.** The demand-decrypt handler services faults from any thread in the same process, so a helper inside the process can touch every page and copy the decrypted bytes. The anti-dump scribble is reversible, and on builds where it's disabled the pages are clean.
-
-**The kernel drivers weaken the host.** Generation 1 exposes unauthenticated kernel shellcode execution to any process. Generation 2's PID-encryption "authentication" grants its `EPROCESS`-write primitive to any program that reproduces it (a signed BYOVD), and the Protected Process flag it sets can be toggled off with kernel-level access or absorbed by injecting before it's set. Only generation 3 avoids granting attackers new powers.
-
-**The tamper-evidence chain is fully recomputable.** Every transform in the container is reversible (XOR chains, rotations, a permutation bytecode, CBC-mode AES with an embedded schedule) and every checksum is a standard CRC-32 over knowable bytes. Nothing in the design requires a secret held outside the file. Consequently the checksum chain detects naive patching but can't prevent it: an analyst who modifies the payload can recompute every chained key and re-embed the result, and the loader will accept it. The chain raises the cost of modification; it doesn't bound it.
-
-**Process-policy checks are coarse.** The parent-process policy (`A03`) is satisfied by launching from an approved parent, and the DLL host check (`A11`) keys on artifacts (a `peC` section, mixed-case `KeRnEl32.dLl` imports) that identify only unmodified hosts.
-
-**Host-module stamps are short.** Some builds add an extra check that the host process still carries a small in-memory CrackProof marker after load. The marker is a few bytes, not a checksum over the reconstructed image, so changing those bytes is enough for the check to accept an otherwise foreign host.
-
-**Usermode anti-debug is a short list.** The `410`/`520` path has been observed to use `IsDebuggerPresent` and `NtQueryInformationProcess`. The injected-DLL sweep (`A0F`) keys on a short list of well-known injection points and doesn't cover every common forwarded-export name.
-
-None of these make the protection trivial. The layered design still costs real effort to analyze end-to-end, but each is a documented, reproducible gap rather than a theoretical one.
+* **Prefix-only VM registry matching (`A09` & `540`):** `A09` checks vendor strings only as leading prefixes of the three BIOS/system registry values (missing hypervisors whose identifier sits at the end of `SystemBiosVersion`, or setups with `SMBIOS.reflectHost = "TRUE"`), while `540` is disabled by `monitor_control.restrict_backdoor = "TRUE"`.
+* **Plaintext `%temp%` trace facility:** creating the 12-hex folder under `%temp%` causes the commercial loader itself to emit stage numbers, module addresses, missing imports, hooked APIs, and `AAA-BBB-CCC` failure coordinates in plaintext.
+* **In-process demand-page servicing:** `HtdpStub2.dll`'s `KiUserExceptionDispatcher` hook decrypts faulting pages for any thread inside the process; forcing pages to fault in (and reversing optional `scribble` masks) recovers the full executable section.
+* **Legacy kernel-driver attack surface:** Generation 1 (`HtsysmNT`) exposes unauthenticated ring-0 shellcode execution, and Generation 2 (`Htsysm7679`) gates its `offset < 0x1000` `EPROCESS` masked-write IOCTLs behind a reversible PID cipher (making signed builds usable as BYOVD primitives). Only Generation 3 (`0xAA02` `ObRegisterCallbacks`) avoids granting elevation primitives to usermode callers.
+* **Keyless / self-contained checksum chain:** every cipher schedule, Huffman table, and bytecode stub travels inside the container, and every stage key derives from standard CRC-32 and deterministic arithmetic without external asymmetric keys, so modified payloads can have their downstream stage keys recomputed.
+* **Spoofable `A03` and `A11` process markers:** `A03` checks parent executable names (`explorer.exe` / `cmd.exe`), and `A11` identifies a CrackProof host EXE via a `peC` section name or exact-case `KeRnEl32.dLl` import string rather than cryptographic host authentication.
+* **Short in-memory host stamps:** builds that check an additional post-load byte marker in the host image inspect a fixed handful of bytes rather than hashing the host code.
+* **Narrow usermode anti-debug surface:** live captures show commercial `410`/`520` relying on `IsDebuggerPresent` and `NtQueryInformationProcess` (with no SEH anti-debug substages inside `410`), and `A0F` scanning a fixed list of common injection DLL names.

@@ -1,49 +1,50 @@
 ---
-description: "The observed Htsysm generations, their kernel responsibilities, and their version stamp."
+description: "The three Htsysm kernel driver generations: shellcode execution, bounded EPROCESS edits, and ObRegisterCallbacks."
+icon: gears
 ---
 
 # Htsysm kernel components
 
-## Htsysm generation 1: unauthenticated kernel shellcode (HtsysmNT)
+CrackProof's optional kernel layer (`Htsysm`) has evolved across three distinct driver architectures:
 
-The oldest driver's headline feature is an **unauthenticated IOCTL that lets any process execute kernel-mode shellcode**. CrackProof uses it to manually map kernel-mode DLLs (`HtsyskNT.dll`, then `HtpecmNT.dll`) and to call their `_FarEntry@0` export, which implements the rest of its kernel functionality, including, per the module notes, watching for and terminating analysis processes.
+{% tabs %}
+{% tab title="Gen 1: HtsysmNT" %}
+### Unauthenticated kernel shellcode execution
 
-The security posture is as bad as it sounds: any process on the system can ask the driver to run arbitrary code in ring 0.
+Generation 1 exposes an unauthenticated IOCTL that executes caller-supplied ring-0 shellcode. CrackProof's usermode `cm` helper uses that primitive to manually map two kernel-mode DLLs (`HtsyskNT.dll` at status `B21` and `HtpecmNT.dll` at status `BB0`) and invoke their `_FarEntry@0` exports for kernel memory access and process termination. Because any local usermode process can issue the same IOCTL, installing the driver grants arbitrary ring-0 code execution to the entire machine.
+{% endtab %}
 
-## Htsysm generation 2: EPROCESS editing (Htsysm7679)
+{% tab title="Gen 2: Htsysm7679" %}
+### Bounded `EPROCESS` masked DWORD edits (`0xAA01`)
 
-The second generation is much more restricted in intent: it lets a process **write to its own `EPROCESS`**, allowing it to edit information about itself. CrackProof uses exactly one feature of this: setting the **Protected Process (PP) flag** so usermode tooling can't open, read, or inject into the protected process (status `C03`/`C04`).
+Generation 2 (`Htsysm7679`, device type `0xAA01`, IOCTLs `0xAA013880` / `0xAA013884` / `0xAA013888`) removes general shellcode execution and instead performs masked 32-bit clear, set, or read operations on `IoGetCurrentProcess() + offset` with unsigned `offset < 0x1000`.
 
-Two further details:
+* **Protected Process (`PP`) toggle:** at `C03`/`C04`, the loader sets the current process's `EPROCESS` Protected Process bitfields so usermode debuggers and injectors cannot open full-access handles. Because `PP` breaks certain Win32/NT calls (such as `NtCreateSection`), the usermode loader hooks those functions (logged under `C04`) to clear `PP`, call the original API, and set `PP` again.
+* **BYOVD exposure:** caller validation relies only on a reversible per-PID cipher, so any local process that reproduces the PID transform can modify fields within its own `EPROCESS` (`offset < 0x1000`), or inject into a target before `C04` activates `PP`.
+{% endtab %}
 
-- Some APIs misbehave under PP (`NtCreateSection` among them), so the loader hooks those functions to temporarily drop the PP flag, call the original, and re-enable it. The hooked-function list appears in the debug log.
-- The access "authentication" is a per-process-ID encryption scheme, but any program that correctly encrypts its process ID gets the same `EPROCESS` write primitive, which is equivalent to arbitrary kernel memory access. A second abuse path: inject a DLL into a process before it gains PP, then enjoy protected status for the injected code. Despite this, the driver has shipped with a valid WHQL signature, making it a practical bring-your-own-vulnerable-driver (BYOVD) candidate.
+{% tab title="Gen 3: Htsysm767901 & Htsysm1B4001" %}
+### `ObRegisterCallbacks` handle filtering (`0xAA02`)
 
-Undoing the PP flag requires kernel-level access (a kernel or hypervisor debugger, a PP-toggling driver, or hooking `DeviceIoControl` before the flag is set).
+Generation 3 (`Htsysm767901` and `Htsysm1B4001`, device type `0xAA02`, 12 IOCTLs `0xAA023800..0xAA02382C`) drops `EPROCESS` editing completely and registers an object-manager callback (`ObRegisterCallbacks`; altitude `88180.011104000001` on `Htsysm1B4001`, derived from `1B4001`) tracking up to 100 protected processes and a 12-entry telemetry ring.
 
-## Htsysm generation 3: handle restriction (Htsysm767901)
+* **Stripped access mask (`& 0xFFFFFFC5`, clearing `0x3A`):** removes `PROCESS_CREATE_THREAD` (`0x02`), `PROCESS_VM_OPERATION` (`0x08`), `PROCESS_VM_READ` (`0x10`), and `PROCESS_VM_WRITE` (`0x20`) from unapproved handle opens/duplications.
+* **Exemption rules:** allows `KernelHandle`, self-access, up to 5 configured caller PIDs (`0xAA02380C`), up to 3 configured caller-parent PIDs (`0xAA023810`), and `csrss.exe`, `lsass.exe`, `conhost.exe`, or `svchost.exe` **only when executing from the configured system directory** (`0xAA023800`, plus an expected parent PID `0xAA023814` for `svchost.exe`).
+* **Three-state handshake:** enrollment uses self-code and return-address hashing rather than a static PID cipher, and grants no kernel write primitive to usermode callers.
+{% endtab %}
+{% endtabs %}
 
-The newest generation abandons privilege-granting entirely. Instead it **denies unapproved processes handles with dangerous access rights** to protected processes: `PROCESS_CREATE_THREAD`, `PROCESS_VM_OPERATION`, `PROCESS_VM_READ`, and `PROCESS_VM_WRITE`. Approved processes are a fixed allowlist of system binaries (`svchost.exe`, `csrss.exe`, `lsass.exe`, `conhost.exe`).
+## Version stamps (`0x7679` and `1B40`)
 
-This generation has a more thorough authentication check than its predecessors, grants protected processes no special powers of their own, and offers little of value to malware. It is the first design in the line that restricts itself to defense.
+`0x00007679` in `Htsysm7679` / `Htsysm767901` matches the `0x00007679` configuration-cluster stamp in PE32 `EighthStage` and Stage 5 marker tables (see [PE32, DLL, and marker-less layouts](../loading-and-pe-repair/loading/layout-variants.md)). Newer Windows builds logging `Htsysm1B4001` at `C02`/`C03` share the `1B40` stamp seen in Android builds, use the Generation-3 `0xAA02` callback driver (with fewer usermode API hooks needed at `C04`), and frequently enable `E`-series device checks (`E55`, `E91`).
 
-## The `0x7679` version stamp
+## Summary table
 
-The driver names encode a build stamp: `Htsysm7679` and `Htsysm767901` (= `7679` variant `01`). The same dword `0x00007679` appears inside protected files as the **configuration-cluster stamp** in the 32-bit loader's final stage (see [PE32, DLL, and marker-less layouts](../loading-and-pe-repair/loading/layout-variants.md)), and as half of an 8-byte tag inside stage-5 marker tables. It functions as a version identifier tying a protected build to its driver generation, and is a useful fingerprint when classifying unknown samples.
-
-## The `Htsysm1B4001` device name
-
-Some newer builds log the device name `Htsysm1B4001` at `C02`/`C03` instead of `Htsysm7679` or `Htsysm767901`. The `1B40` stamp also appears in the Android native-library family. This is another observed service and device name, not a fourth generation with its own documented privilege model. One observed log of this name listed fewer hooks at `C04` and continued into the `E`-series stages described in [Startup sequence and status reporting](startup-status.md).
-
-## Quick reference
-
-| Component | Kind | Purpose |
+| Component | Layer | Role |
 | --- | --- | --- |
-| `HtpecIt.dll` | Manual-mapped usermode DLL | Anti-tamper/injection/VM checks (`Axx` stages) |
-| `HtdpStub2.dll` | Manual-mapped usermode DLL | Loader extension; page-fault demand-decrypt handler |
-| `HtsyskNT.dll` | Kernel DLL (loaded by the gen-1 driver) | Kernel manual-mapper and I/O (`B21`) |
-| `HtpecmNT.dll` | Kernel DLL (loaded by the gen-1 driver) | Process monitoring/termination (`BB0`) |
-| HtsysmNT | Kernel driver, gen 1 | Unauthenticated kernel shellcode IOCTL |
-| Htsysm7679 | Kernel driver, gen 2 | `EPROCESS` write; Protected Process flag |
-| Htsysm767901 | Kernel driver, gen 3 | Handle access-right restriction |
-| Htsysm1B4001 | Device/service name | Observed on `1B40`-family Windows builds |
+| `HtpecIt.dll` (`it`) | Manually mapped usermode DLL | `Axx` anti-tamper, injection, VM, and host checks |
+| `HtdpStub2.dll` (`dt`) | Manually mapped usermode DLL | Demand-decrypt page-fault handler and page tables |
+| `HtsyskNT.dll` (`sk`) / `HtpecmNT.dll` (`pm`) | Gen-1 kernel DLLs | Kernel manual mapper (`B21`) and process monitor (`BB0`) |
+| `HtsysmNT` | Kernel driver (Gen 1) | Unauthenticated ring-0 shellcode execution |
+| `Htsysm7679` | Kernel driver (Gen 2, `0xAA01`) | Bounded (`offset < 0x1000`) masked DWORD edits on current `EPROCESS` |
+| `Htsysm767901` / `Htsysm1B4001` | Kernel driver (Gen 3, `0xAA02`) | `ObRegisterCallbacks` handle-right stripping with path/PID exemptions |

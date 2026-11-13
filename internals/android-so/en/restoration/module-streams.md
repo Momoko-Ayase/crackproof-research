@@ -1,17 +1,27 @@
 ---
-description: "Dispatch nested records and apply the required Android decoder modules."
+description: "Required and optional Stage 2 module artifacts consumed during static ELF and metadata restoration."
+icon: route
 ---
 
 # Module streams
 
-The initial stream identifier is `0xE2`. Stage 2 first registers itself as `0xE2` and the file-tail mapping as `0xD0` in a 256-entry table (`0x1800` bytes, 24 bytes per slot). The required module set for ELF restoration is:
+Stage 2 stream extraction begins at root stream `0xE2` (which registers itself as `0xE2` and the `SHT_LOUSER` file-tail mapping as `0xD0` in its 256-slot runtime table) and recursively decodes every container and nested interpreter stream (`0xE3`..`0xE8` fed by `0xF3`..`0xF8`).
 
-| Module | Role |
-| --- | --- |
-| `0x9B` | Seeds, AES material, and configuration |
-| `0x9D` | Protected descriptors, segments, and compressed-block streams |
-| `0x9E` | Hidden dynamic-symbol patches |
+## Static restoration modules
 
-Direct records derive a child identifier from their command identifier. The dispatcher keeps a module registry and passes each record only to the module that declares that identifier. It records the content hash of each accepted child, so the same stream can't silently overwrite a previously restored range.
+Every protected library contains runtime environment and integrity modules alongside the restoration payload. Static reconstruction uses three required modules and up to three optional ones:
 
-An unknown module, a missing required module, or a child whose declared range falls outside its parent stops restoration. The partial image isn't published as a successful result.
+| Module | Requirement | Static restoration role |
+| --- | --- | --- |
+| `0x9B` | Required | Supplies `header_seed`, `container_seed`, the reversed AES-256 round-key schedule, and `skip_aes` |
+| `0x9D` | Required | Supplies the `ProtectedDescriptor`, the primary `PT_LOAD` writer container, and the auxiliary relocation/symbol container |
+| `0x9E` | Required | Supplies hidden `.dynsym` entries and `.dynstr` names stripped from the on-disk ELF |
+| `0x96` | Optional | Supplies `auxiliary_symbol_seed` to undo the per-row symbol-index rotation in `0x9D`'s auxiliary relocation tables |
+| `0x98` | Optional | Emulated with a bounded AArch64 control-flow and integer interpreter to recover real `.init_array` constructors and prune `RET`-only placeholders |
+| `0x0C` | Optional (IL2CPP `v24.1`) | Supplies the `methodIndex` permutation seed and 256-entry exception table for external `v24.1` `global-metadata.dat` |
+
+## Duplicate and non-restoration records
+
+* **Runtime-only modules:** records for environment probes, import helpers, or unclassified identifiers (`0x8F`, `0x97`, `0x81`, `0x40`, `0x8E`, and others listed in [Runtime modules](../runtime/modules.md)) are decoded and validated during stream traversal, then ignored during ELF reconstruction.
+* **Idempotent duplicates:** if two records produce the same `command_id` with identical SHA-256 digests, extraction keeps a single copy; if their digests differ, extraction fails rather than guessing which payload wins.
+* **Missing baseline modules:** if any of `0x9B`, `0x9D`, or `0x9E` is absent after stream traversal completes, ELF restoration aborts without writing an output file.

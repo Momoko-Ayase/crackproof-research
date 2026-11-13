@@ -1,10 +1,11 @@
 ---
-description: "Content-based detection and classification of protected files (KONN magic, native/managed EXE and DLL)."
+description: "Content-based KONN detection and PE32/PE32+ native vs managed module classification."
+icon: fingerprint
 ---
 
 # detect.py
 
-The reference implementation of detection and classification. It follows the logic documented in [Recognition and build families](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/file-structure/recognition).
+Reference implementation of `KONN` header KDF recognition and PE32/PE32+ classification; see [Recognition and build families](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/file-structure/recognition).
 
 ```python
 """Content-based detection and classification of a protected PE file.

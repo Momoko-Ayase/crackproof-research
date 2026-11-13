@@ -31,6 +31,20 @@ site:
           content:
             directory: ./home/zh-tw
             language: zh-tw
+        - type: space
+          key: space-19
+          title: 日本語
+          path: ja
+          content:
+            directory: ./home/ja
+            language: ja
+        - type: space
+          key: space-20
+          title: 한국어
+          path: ko
+          content:
+            directory: ./home/ko
+            language: ko
     - type: section
       key: section-1
       title: Windows
@@ -60,6 +74,20 @@ site:
           content:
             directory: ./internals/windows/zh-tw
             language: zh-tw
+        - type: space
+          key: space-21
+          title: 日本語
+          path: ja
+          content:
+            directory: ./internals/windows/ja
+            language: ja
+        - type: space
+          key: space-22
+          title: 한국어
+          path: ko
+          content:
+            directory: ./internals/windows/ko
+            language: ko
     - type: section
       key: section-3
       title: Android SO
@@ -88,6 +116,20 @@ site:
           content:
             directory: ./internals/android-so/zh-tw
             language: zh-tw
+        - type: space
+          key: space-23
+          title: 日本語
+          path: ja
+          content:
+            directory: ./internals/android-so/ja
+            language: ja
+        - type: space
+          key: space-24
+          title: 한국어
+          path: ko
+          content:
+            directory: ./internals/android-so/ko
+            language: ko
     - type: section
       key: section-2
       title: Reference
@@ -116,6 +158,20 @@ site:
           content:
             directory: ./reference/zh-tw
             language: zh-tw
+        - type: space
+          key: space-25
+          title: 日本語
+          path: ja
+          content:
+            directory: ./reference/ja
+            language: ja
+        - type: space
+          key: space-26
+          title: 한국어
+          path: ko
+          content:
+            directory: ./reference/ko
+            language: ko
     - type: section
       key: section-5
       title: Senbei
@@ -145,6 +201,20 @@ site:
           content:
             directory: ./senbei/zh-tw
             language: zh-tw
+        - type: space
+          key: space-27
+          title: 日本語
+          path: ja
+          content:
+            directory: ./senbei/ja
+            language: ja
+        - type: space
+          key: space-28
+          title: 한국어
+          path: ko
+          content:
+            directory: ./senbei/ko
+            language: ko
     - type: section
       key: section-6
       title: Arare
@@ -174,3 +244,17 @@ site:
           content:
             directory: ./arare/zh-tw
             language: zh-tw
+        - type: space
+          key: space-29
+          title: 日本語
+          path: ja
+          content:
+            directory: ./arare/ja
+            language: ja
+        - type: space
+          key: space-30
+          title: 한국어
+          path: ko
+          content:
+            directory: ./arare/ko
+            language: ko

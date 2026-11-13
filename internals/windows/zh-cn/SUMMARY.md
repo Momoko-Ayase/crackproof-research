@@ -5,28 +5,28 @@
 ## 文件结构 <a href="#file-structure" id="file-structure"></a>
 
 * [概览](file-structure/file-format.md)
-* [容器与加密头](file-structure/container-layout.md)
+* [容器与加密头部](file-structure/container-layout.md)
 * [识别与构建家族](file-structure/recognition.md)
 * [节数据与伴生文件](file-structure/companion-layout.md)
 
 ## 数据变换 <a href="#data-transforms" id="data-transforms"></a>
 
 * [概览](data-transforms/data-transforms.md)
-* [滚动密钥与旋转密码](data-transforms/rolling-and-rotation.md)
+* [滚动密钥与循环移位算法](data-transforms/rolling-and-rotation.md)
 * [LFSR、字符串与页变换](data-transforms/lfsr-strings-pages.md)
-* [校验和与密钥推进](data-transforms/checksums.md)
+* [校验和与密钥递进](data-transforms/checksums.md)
 * [AES-CBC 层](data-transforms/aes.md)
 * [Huffman 与 LZ 压缩](data-transforms/compression.md)
-* [按构建定制的字节变换](data-transforms/bytecode-transform.md)
+* [按构建生成的字节变换](data-transforms/bytecode-transform.md)
 
 ## 加载与 PE 修复 <a href="#loading-and-pe-repair" id="loading-and-pe-repair"></a>
 
 * [加载与节恢复](loading-and-pe-repair/loading/README.md)
   * [阶段链与标记布局](loading-and-pe-repair/loading/stage-chain.md)
   * [PE32、DLL 与无标记布局](loading-and-pe-repair/loading/layout-variants.md)
-  * [结构发现与验证](loading-and-pe-repair/loading/discovery-validation.md)
+  * [结构发现与校验](loading-and-pe-repair/loading/discovery-validation.md)
 * [PE 重建](loading-and-pe-repair/pe-reconstruction/README.md)
-  * [头、节与零填充范围](loading-and-pe-repair/pe-reconstruction/memory-image.md)
+  * [头部、节与零填充范围](loading-and-pe-repair/pe-reconstruction/memory-image.md)
   * [导入、TLS 与导出](loading-and-pe-repair/pe-reconstruction/imports-tls-exports.md)
   * [重定位、页变换与 CLR 数据](loading-and-pe-repair/pe-reconstruction/relocations-managed.md)
 

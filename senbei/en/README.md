@@ -1,29 +1,30 @@
 ---
-description: "A static unpacker for CrackProof-protected Windows PE files and Android AArch64 shared libraries."
+description: "Static unpacker and inspector for CrackProof-protected Windows PE files, Android AArch64 libraries, and IL2CPP metadata."
+icon: screwdriver-wrench
 ---
 
 # Senbei
 
-Senbei is a static unpacker for programs protected by CrackProof. Point it at a file, an app package, or a folder, and it writes restored copies without launching or attaching to the protected program.
+Senbei (`1.4.0`) is a static unpacker and structural inspection tool for CrackProof-protected binaries. It recovers and validates binaries from individual files, Android app packages, and directories without executing or attaching to the target.
 
-Senbei reads the protected bytes, replays the protection algorithm, validates the result against structural checks, and writes the recovered image. A candidate that fails validation is rejected, never emitted as a silently damaged binary.
+Native releases for Windows and Linux include both the `senbei` command-line tool and the `senbei-gui` desktop workbench, localized in English, Simplified Chinese, Traditional Chinese, Japanese, and Korean. A WebAssembly build of the same core engine runs locally in the browser for loose Windows PE and metadata files.
 
-Supported inputs:
+## Supported inputs
 
-* Protected Windows `.exe` and `.dll` files (64-bit and 32-bit, native and managed), including external `.exe._` and `.dll._` companion payloads
-* `global-metadata.dat` files with supported method-token layouts
-* Protected Android `.so` files, standalone or inside `.apk`, `.apks`, and `.xapk` packages
+* **Windows PE (`PE32` and `PE32+`):** protected `.exe` and `.dll` modules (native and managed .NET), including external `.exe._` and `.dll._` companion payloads.
+* **Android native libraries (`ELF64` AArch64):** standalone protected `.so` files and `.apk`, `.apks`, or `.xapk` app packages.
+* **Unity IL2CPP metadata:** `global-metadata.dat` files across Windows `-GMD` (`v31`) and Android seeded (`v24.1`, `v29`, `v31`, `v39`) or embedded XOR (`v24`) layouts.
 
-The protection formats and runtime behavior behind these inputs are documented in [CrackProof for Windows internals](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/) and [CrackProof for Android SO internals](https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/).
+The underlying container formats and transforms are documented in [CrackProof for Windows internals](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/) and [CrackProof for Android SO internals](https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/).
 
 ## In this section
 
-| Page                      | What it covers                                              |
-| ------------------------- | ----------------------------------------------------------- |
-| [Usage](usage.md)         | Running the command-line tool: targets, flags, and exit codes |
-| [Design](design.md)       | How the workspace and the restoration pipelines are organized |
-| [Development](development.md) | Building, testing, and contributing                      |
+<table data-view="cards"><thead><tr><th width="48"></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><i class="fa-terminal"></i></td><td><strong>Usage</strong></td><td>CLI commands (<code>unpack</code>, <code>inspect</code>, <code>--dry-run</code>, <code>--json</code>), folder and package rules, display languages, flags, and exit codes.</td><td><a href="usage.md">Usage</a></td></tr><tr><td><i class="fa-window-maximize"></i></td><td><strong>GUI</strong></td><td>Native desktop workbench (<code>senbei-gui</code>): visual batch queue, research inspector, Hex + RVA viewer, PE Compare, and settings.</td><td><a href="gui.md">GUI</a></td></tr><tr><td><i class="fa-diagram-project"></i></td><td><strong>Design</strong></td><td>Nine-crate workspace layout, profile and trace architecture, Windows and Android pipelines, and WebAssembly boundaries.</td><td><a href="design.md">Design</a></td></tr><tr><td><i class="fa-hammer"></i></td><td><strong>Development</strong></td><td>Building CLI, desktop GUI, and WebAssembly targets, running corpus/fuzz/parity suites, benchmarks, and environment variables.</td><td><a href="development.md">Development</a></td></tr></tbody></table>
 
-## Browser app
+## Interfaces at a glance
 
-The same engine also runs in the browser, compiled to WebAssembly. Files are processed locally and never uploaded. The browser build handles single files; folder scanning and Android package orchestration stay in the command-line tool.
+| Surface | Supported targets | Output & reporting |
+| --- | --- | --- |
+| `senbei` (CLI) | Loose files, folders, `.apk`/`.apks`/`.xapk` | Restored files, run logs, colored terminal output, `--json` schema v1 reports |
+| `senbei-gui` (Desktop) | Loose files, folders, `.apk`/`.apks`/`.xapk` | Restored files, interactive `Overview`/`Research`/`Hex`/`Compare`/`Entries`/`Log`, JSON & text report export |
+| Browser (`web/`) | Loose Windows PE files (with `._` companions) & `global-metadata.dat` | Local in-browser download and `Export JSON` report (inputs never leave the device) |

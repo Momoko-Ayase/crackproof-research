@@ -1,75 +1,66 @@
 ---
-description: "The runtime boot sequence, status values, and diagnostic logging left by protected binaries."
+description: "12-bit runtime boot status codes, %temp% gated debug logs, ErrLog-Pec mailslots, and AAA-BBB-CCC failure codes."
+icon: list-ol
 ---
 
 # Startup sequence and status reporting
 
-A protected binary's first thread of execution belongs to CrackProof, not the program. The loader walks a fixed pipeline: environment checks, anti-analysis sweeps, kernel-driver and submodule setup, then the staged decryption from [Loading and section recovery](../loading-and-pe-repair/loading/README.md), then (optionally) re-encryption of what it just decrypted, and only then a jump to the original entry point (OEP). This page describes that pipeline as observed at runtime.
+Before original program code runs, CrackProof executes a configurable startup pipeline across the host stub and its manually mapped support modules, ending at status `280` (jump to OEP):
+
+```mermaid
+flowchart LR
+    S200["200..210\nInit & arch"] --> P1["410..540\nPhase 1 checks"] --> KRN["C00..C04 / Bxx\nOS & Htsysm"]
+    KRN --> ASEQ["Axx sequencer\n& DLL A15"] --> PRE["5D0..5E2, 5C0\nPrelude & DLLs"]
+    PRE --> DEC["610, [640], 655, 6E1\nDecrypt & reloc"] --> PG["800..840, 660\nor 800, 830"]
+    PG --> EX["[E20..E91]\nDriver checks"] --> OEP["280\nJump to OEP"]
+```
 
 ## The boot sequence and status codes
 
-The loader reports progress as 12-bit **status codes**, roughly one per stage. The list isn't exhaustive. Stages are configurable per build, so any given binary shows a subset:
+Each enabled stage logs a 12-bit hex status code:
 
 | Code | Stage |
 | --- | --- |
-| `200` | Startup |
-| `210` | Host architecture check |
-| `410` | Usermode anti-debug start |
-| `510` | CRC-32 of a loader memory region |
-| `520` | `NtQueryInformationProcess` check |
-| `52F` | Kernel-debugger check |
-| `540` | VMware backdoor probe (and/or CPU feature flags) |
-| `560` | Code-section decrypt setup |
-| `561` | Select a support module (absent or unused on some newer builds) |
-| `C00` | OS minimum-version check |
-| `C01` | Boot-option check (`testsigning`, `disableintegritychecks`) |
-| `C02` | Install the Htsysm driver service. The log names the device (`Htsysm7679`, `Htsysm767901`, or `Htsysm1B4001`) and the on-disk driver file under `C:\Windows\System32`. That filename is a per-deployment artifact, not a format constant. |
-| `C03` | Initialize the newer Htsysm driver |
-| `C04` | Set the Protected Process flag; install hooks |
-| `A0F` | Injected-DLL check |
-| `A09` | VM check using hardware registry strings |
-| `A08` | Copy clean ntdll/kernel32 code from disk to memory |
-| `A04` | Same, aborting if the on-disk copy is patched |
-| `A07` | Terminate injected threads |
-| `A01` | Abort if injected threads are found |
-| `A03` | Parent-process check (`cmd.exe` / `explorer.exe`) |
-| `A11` | For DLLs: check the host process (a `peC` section, or imports from `KeRnEl32.dLl`) |
-| `A15` | For DLLs: host-trust marker logged after `5D0`; carries no check of its own and only appears once the earlier check chain has passed |
-| `B00` | OS compatible-version check |
-| `B21` | Load `HtsyskNT.dll` (old driver path) |
-| `BD0` | Ensure `C:\Windows\msc.log.log` doesn't exist |
-| `BE0` | SoftICE/Syser debugger check |
-| `BB0` | Load `HtpecmNT.dll` (old driver path) |
-| `5D0` `552` `570` `590` `5B0` `5B1` `598` `5A0` `5E1` `5E2` | Decrypt prelude stages |
-| `A06` | Late API hooks, when the stage is logged |
-| `5C0` | Load runtime DLLs (missing ones are logged) |
-| `610` | Decrypt the PE header |
-| `640` | Decrypt executable pages |
-| `655` | Relocation |
-| `6E1` | Tail work; some builds re-encrypt part of the executable range |
-| `800` `810` `820` | Page-encrypt setup |
-| `840` | Install the exception-handler hook; re-encrypt executable pages |
-| `E20` `E40` `E52`–`E59` | Later integrity stages on some `1B40`-family builds |
-| `E55` `E91` | Device-name checks for analysis-tool drivers |
-| `660` | Stage after page-encrypt setup, before the OEP jump |
-| `280` | Jump to the OEP |
+| `200` / `210` | Loader startup / host architecture check |
+| `410` | Usermode anti-debug check (`IsDebuggerPresent`; live captures show no SEH substages in `410`) |
+| `510` | CRC-32 integrity check over a loader memory range |
+| `520` / `52F` | `NtQueryInformationProcess` debug check / kernel-debugger check |
+| `540` | VMware I/O-port backdoor probe and/or CPU feature check |
+| `560` / `561` | Section-decrypt setup / support-module selection |
+| `C00` | Minimum Windows build check: logs two `(0x01A00000 + build)` dwords (host build, minimum build) |
+| `C01` | Boot-configuration check (`testsigning`, `disableintegritychecks`) |
+| `C02` / `C03` / `C04` | Install `Htsysm` service (`Htsysm7679`, `Htsysm767901`, or `Htsysm1B4001`) / initialize driver / register callbacks or `EPROCESS` protection and hooks |
+| `A03` | Parent-process check (`explorer.exe` / `cmd.exe`) |
+| `A09` | VM hardware/BIOS registry prefix check |
+| `A0F` | Injected-DLL scan |
+| `A08` / `A04` | Copy clean `ntdll` / `kernel32` `.text` from disk (`A04` also aborts if the on-disk system DLL is modified) |
+| `A07` / `A01` | Terminate unexpected threads / abort if foreign threads remain |
+| `A11` | DLL host-process check (`peC` section or exact-case `KeRnEl32.dLl` import in the host EXE) |
+| `A15` | DLL sequencer marker logged after `5D0` once host checks pass (no check body; never logged on EXEs) |
+| `B00` / `BD0` / `BE0` | Compatible OS check / `C:\Windows\msc.log.log` absence check / legacy SoftICE-Syser device check |
+| `B21` / `BB0` | Legacy driver helper loads (`HtsyskNT.dll` / `HtpecmNT.dll`) |
+| `5D0` `552` `570` `590` `5B0` `5B1` `598` `5A0` `5E1` `5E2` | Staged decrypt prelude steps |
+| `A06` / `5C0` | Late API hooks / load imported runtime DLLs |
+| `610` | Bulk section and header decryption |
+| `640` | Bulk executable-page decryption prior to page sealing |
+| `655` / `6E1` | Base relocation fixups / tail section setup |
+| `800` `810` `820` `840` | Page-protection setup (`800`..`820`), `KiUserExceptionDispatcher` hook + `PAGE_NOACCESS` sealing (`840`) |
+| `830` | Page-setup completion on non-page-encrypted native builds (`800` -> `830`) |
+| `660` | Post-page-seal handoff stage before `280` |
+| `E20` `E40` `E52`..`E59` `E55` `E91` | Late integrity and analysis-driver device checks on `1B40`-family builds |
+| `280` | Final handoff to the original entry point (OEP) |
 
-Observed sequences confirm features are per-module: in one title, the host EXE logs `640 … 840` (bulk decrypt, then page re-encryption), while a native plugin DLL in the same process goes from `610` (section decryption) straight to `655`, bulk-decrypted once, never page-encrypted.
-
-The `A`-series checks are not hard-wired into the stage walker. A single sequencer function drives them, and the walker calls it several times with different modes; each call runs only the subset of checks that the build's option flags select. A protected DLL is driven in its own mode. That is why a DLL log shows `A09` and `A11` before `5D0` and `A15` after it, while the host log for the same title shows `A09` `A0F` `A08` `A07` before `5D0` and `552` `570` after it.
-
-The `C00` line logs two dwords. Each is `0x01A0` plus a Windows build number: the first is the host build, the second is the minimum accepted build. Observed minima correspond to Windows 10.
-
-One observed `Htsysm1B4001` log listed fewer hooks at `C04` and continued into later `E`-series stages, including the device-name checks at `E55` and `E91`.
+Per-module configuration is visible in multi-module captures (see [Sample debug logs](https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/sample-debug-logs)): a page-encrypted host EXE runs `610 -> 640 -> 655 -> 6E1 -> 800..840 -> 660 -> 280`, whereas a bulk-decrypted native plugin DLL in the same process runs `610 -> 655 -> 6E1 -> 800 -> 830 -> 280`. A single mode-driven sequencer dispatches the `A`-series checks across passes.
 
 ## Debug logging
 
-The loader writes a verbose debug log for every protected module when a specific folder exists under `%temp%`. The folder name is 12 hexadecimal characters and differs per executable. The most direct way to learn the name is to break on or hook `CreateFileW`. The folder's creation time must be within about two days; an older folder is left in place, and that run writes no log.
-
-Log lines carry the status codes listed in [The boot sequence and status codes](#the-boot-sequence-and-status-codes) plus occasional free-form diagnostics (missing DLL names, hooked-function lists, addresses).
-
-A second channel sends an encrypted log to the mailslot `\\.\mailslot\ErrLog-Pec<number>`. Both channels share a 9-digit error format, `AAA-BBB-CCC`: the recovery status code at failure, a sub-stage, and a third field. Observed values include `046-019-01F` (kernel callbacks disabled), `048-012-002` (Hyper-V), and `601-000-008` (an analysis-tool driver).
+* **`%temp%\<12 hex>` folder gate:** each protected module derives a 12-hex-character folder name; if `%temp%\<12 hex>` exists and its creation timestamp is within roughly 48 hours, the loader writes a plaintext trace file (`HHMMSSmmmE-...` for EXEs, `HHMMSSmmmD-...` for DLLs). Hooking or breaking on `CreateFileW` reveals the probed path immediately.
+* **`\\.\mailslot\ErrLog-Pec<4 hex>` channel:** an independent diagnostic channel derives `<4 hex>` as `((key + 1) * 0x3039) mod 0x8003` (from the first 16-bit word of the 12-hex logging key) and writes an XOR-rolled report (`state = (derive(key) + 1)^2 ^ ~length; word ^= state; state = ror32(state + i, 7)` from `-- Version` onward) when a mailslot listener is present.
+* **`AAA-BBB-CCC` closing code:** both channels close with a 9-character status code:
+  * **`AAA` (3 decimal digits):** `000` on clean startup, or the failing stage's 1-based decimal index in a 104-entry stage table (for example `C03` -> `046`, `A09` -> `048`, `E91` -> `601`).
+  * **`BBB` (3 uppercase hex digits):** the first sub-stage code recorded during the failing stage.
+  * **`CCC` (3 uppercase hex digits):** the first cause/error code recorded while `BBB` was still unset (observed examples: `046-019-01F`, `048-012-002`, `601-000-008`).
 
 {% hint style="info" %}
-**Locating a stage in the binary.** Status codes are written through a helper that encodes them as the 16-bit value `(code << 4) | 1`. Breaking at the log write, then searching the binary for that word as bytes (for example `0xC01` → `11 C0`), identifies the stage that emitted it. That search is the fastest known way to map the loader's code.
+**Finding stage emitters in memory.** The logging helper packs a 12-bit code into `ECX` with low-nibble tag `1` for stage status (`(code << 4) | 1`, e.g. `0xC01` -> `0xC011`), `3` for `CCC` cause codes (`(code << 4) | 3`), and `5` for `BBB` sub-stage codes (`(code << 4) | 5`). Only core bootstrap codes (`200`, `560`, `590`, `5A0`, `5E1`, `5E2`, `800`) reside in the host module's own loader section (with Phase 1 immediates scrubbed after execution); `410`/`510`/`520`/`540`, `Cxx`, and `Axx` immediates live inside the manually mapped helper DLLs (`HtpecIt`, `dm`, etc.).
 {% endhint %}

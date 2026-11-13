@@ -1,10 +1,11 @@
 ---
-description: "The independent reference port of the algorithms; compiles to a program that prints ground-truth vectors."
+description: "Independent Rust port of the Windows transforms used to generate ground-truth vectors.txt records."
+icon: gears
 ---
 
 # rust\_vectors.rs
 
-The reference port used to produce the ground-truth vectors. Every primitive is a direct transcription of the algorithms as implemented in protected binaries. Build it with `rustc -O rust_vectors.rs` and run it to regenerate `vectors.txt`.
+Independent Rust transcription of the Windows primitives used to generate `vectors.txt`. Compile with `rustc -O rust_vectors.rs` and run to print all 25 records.
 
 ```rust
 // Vector generator for the CrackProof research documentation.

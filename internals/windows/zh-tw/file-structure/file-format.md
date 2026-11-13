@@ -1,13 +1,10 @@
 ---
-description: "Windows 受保護文件的佈局、識別方法及 stub 與可選伴生數據的劃分。"
+description: "磁碟容器佈局、KONN 標頭辨識、組建家族分類與外部伴生檔案拆分。"
+icon: folder-tree
 ---
 
-# 受保護文件結構
+# 受保護檔案結構
 
-Windows 格式保留面向 PE 加載器的有效外層映像，但把原始映像與加載器數據放在按地址組織的獨立容器中。分析的第一步是將該容器與普通文件尾數據區分開，並判斷所用佈局家族。
+受保護的 Windows 二進位檔在前 `0x1000` 位元組保留可載入的外層 PE 標頭，將加密參數標頭置於 `0x1000`，並把分階段載入器與壓縮後的應用程式區段存放於其後（或拆分至同資料夾下的 `._` 伴生檔案）。
 
-| 主題 | 可確定的內容 |
-|---|---|
-| [容器與加密頭](container-layout.md) | 大偏移範圍、八個 dword 組成的 `info` 表及其密鑰派生 |
-| [識別與構建家族](recognition.md) | 用於區分 PE32、PE32+、原生/託管 EXE 與原生/託管 DLL 的證據 |
-| [節數據與伴生文件](companion-layout.md) | 節記錄如何映射到載荷，以及外置 `._` 數據如何與 stub 組合 |
+<table data-view="cards"><thead><tr><th width="48"></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><i class="fa-box-archive"></i></td><td><strong>容器結構與加密標頭</strong></td><td>固定於 <code>0x1000</code> 的容器切分、8 個 dword 的 <code>info</code> 標頭金鑰衍生與負載搬移範圍。</td><td><a href="container-layout.md">容器結構與加密標頭</a></td></tr><tr><td><i class="fa-fingerprint"></i></td><td><strong>格式辨識與組建家族</strong></td><td>基於檔案內容的 <code>KONN</code> 偵測、PE32 與 PE32+ CLR 模組分類，以及各類容器版型。</td><td><a href="recognition.md">格式辨識與組建家族</a></td></tr><tr><td><i class="fa-copy"></i></td><td><strong>區段資料與伴生檔案</strong></td><td><code>0x1080</code> 處以位元反相編碼的區段資料基底，以及外部 <code>._</code> 伴生檔案配對與覆蓋寫入。</td><td><a href="companion-layout.md">區段資料與伴生檔案</a></td></tr></tbody></table>

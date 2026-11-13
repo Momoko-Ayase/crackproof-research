@@ -1,12 +1,13 @@
 ---
-description: "The LFSR stream, import-name cipher, and sparse per-page code transform."
+description: "The 0x8003 LFSR stub cipher, RVA-keyed import-name cipher, and per-page .text code scrambles."
+icon: wave-square
 ---
 
 # LFSR, string, and page transforms
 
-## The LFSR keystream
+## LFSR keystream (`dd6`)
 
-The [per-build bytecode stubs](bytecode-transform.md) are themselves wrapped in an LFSR keystream. The stream is data-independent (seed 1, feedback polynomial `0x8003`, eight bits emitted per byte, LSB first), so it can be replayed at any position. That is what makes trial-decoding candidate stub locations cheap:
+Each 96-byte [per-build bytecode stub](bytecode-transform.md) slot stores its unencrypted program length at `pos + 95` (`<= 95`) and masks `d[pos .. pos + length]` with a fixed-seed Galois LFSR (initial state `1`, polynomial `0x8003`, 8 bits per byte emitted LSB-first):
 
 ```python
 def lfsr_keystream(n):
@@ -31,11 +32,11 @@ def lfsr_decrypt_block(d, pos):
         d[pos + i] ^= ks[i]
 ```
 
-A stub block occupies a fixed 96-byte slot; the byte at `pos + 95` is the (unencrypted) length of the program inside.
+Because the keystream depends only on byte offset `0..length`, candidate 96-byte windows can be tested at any offset using a precomputed 95-byte keystream table.
 
-## The import-name string cipher
+## Import-name string cipher (`dd7`)
 
-DLL names and imported function names are encrypted with a rolling byte cipher: nibble swap, subtract the key, step the key by 67. The initial key is the low byte of the string's RVA, so a name can't be decrypted without knowing where it lives.
+Encrypted DLL names and imported symbol names use a NUL-terminated rolling byte cipher: swap nibbles (`ror8(..., 4)`), subtract `key`, map `0` to `(-key) & 0xFF` so an interior byte never becomes a premature NUL terminator, and advance `key` by `67`:
 
 ```python
 def string_cipher(d, pos, key):
@@ -51,11 +52,13 @@ def string_cipher(d, pos, key):
         i += 1
 ```
 
-The `b == 0` remap avoids producing a NUL mid-string (which would truncate the walk): if the subtraction yields zero, the byte is replaced by the two's complement of the key instead.
+{% hint style="warning" %}
+**Initial `key` for DLL names vs function names.** A DLL name at `name_rva` starts at `pos = name_rva` with `key = name_rva & 0xFF`. A by-name import points to an `IMAGE_IMPORT_BY_NAME` record at `hint_name_rva` whose 2-byte `Hint` precedes the ASCII symbol string: decryption starts at `pos = hint_name_rva + 2`, while the initial key is still `hint_name_rva & 0xFF` (the record RVA, not `(hint_name_rva + 2) & 0xFF`).
+{% endhint %}
 
-## The per-page code scramble
+## Per-page code scramble (`dd8`)
 
-Executable sections carry a sparse, page-granular scramble on top of everything else: one byte per 16-byte block is XORed, at an in-block offset that varies per block. The pattern skips block 0 (its key state still advances). 255 of each page's 4096 bytes are touched.
+Executable code sections optionally carry an extra sparse XOR pass that flips 1 byte in each of blocks `1..255` (255 bytes per 4,096-byte page; block `0` advances `key` without XORing):
 
 ```python
 def page_scramble(d, va, size, key):
@@ -79,10 +82,9 @@ def page_scramble_pe32(d, pa, page, big_formula):
         d[pa + bi * 16 + (ri & 0xF)] ^= key & 0xFF
 ```
 
-{% hint style="warning" %}
-The shift (64-bit: 0 or 15) and the formula choice (32-bit: `page+1` or `0x8000*(page+1)`) are **not recorded anywhere in the file**. Two builds can carry byte-identical configuration stamps yet require different choices. A third outcome is also required: leave the bytes unchanged. Native DLLs often keep plaintext `.text`; applying either formula there still XORs about one byte per 16.
-
-On 64-bit images, a recognized CRT entry stub is stronger evidence than padding counts. The common shape is `48 83 EC ib / E8 rel32 / 48 83 C4 ib / E9 rel32` (the two stack immediates match). Accept a candidate only when it's the sole shift, including “no transform”, whose decoded `call` and `jmp` targets both remain inside `.text`. Unrecognized entry code falls back to padding statistics: replay each shift on sample pages and count positions that become `0xCC`. Require a clear gain over the unchanged bytes (both a margin over the baseline and an absolute floor). Small gains are the noise of XORing 255 pseudo-random positions per page and must not trigger a transform.
-
-On 32-bit images the same `0xCC` comparison chooses between `page+1` and `0x8000*(page+1)`, and skips the pass when neither formula raises the padding count well above the unchanged baseline.
+{% hint style="info" %}
+**Selecting the scramble mode.** Neither the 64-bit shift (`0`, `15`, or unchanged) nor the 32-bit formula (`page + 1`, `0x8000 * (page + 1)`, or unchanged) is stored in the container header, and many native DLLs leave `.text` unscrambled:
+1. **64-bit CRT entry check:** test the 18-byte MSVC entry stub (`48 83 EC ib / E8 rel32 / 48 83 C4 ib / E9 rel32` with matching stack immediates) across `unchanged`, `shift 0`, and `shift 15`; select a candidate immediately if it is the unique mode whose `call` and `jmp` targets both land inside `.text`.
+2. **64-bit `RET` + `int3` epilogue score:** otherwise sample interior `.text` pages and score total byte length of `0xC3` (`RET`) followed by four or more `0xCC` padding bytes, requiring a gain of at least `8` bytes over the unchanged baseline.
+3. **Mutated-byte `0xCC` fallback (64-bit & 32-bit):** only if all `RET + int3` scores are zero on 64-bit (and always on 32-bit), count mutated positions that become `0xCC` and require at least `2x` the unchanged baseline and at least `8` hits; otherwise leave `.text` untouched.
 {% endhint %}

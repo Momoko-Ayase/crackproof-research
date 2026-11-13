@@ -1,35 +1,53 @@
 ---
-description: 不同受保護佈局如何恢復導入名、TLS 狀態與導出數據。
+description: "各家族匯入表解密、.kmiat 匯入區段重建、TLS 還原與重定位啟用，以及匯出表覆寫。"
+icon: sitemap
 ---
 
-# 導入、TLS 與導出
+# 匯入表、TLS 與匯出表
 
-## 導入：加密的名字，重建的表
+## 匯入表與字串還原
 
-導入名（DLL 名與按名函數名）以[字符串密碼](../../data-transforms/lfsr-strings-pages.md#導入名字符串密碼)加密，密鑰是各字符串自身 RVA 的低字節。各家族的還原遍歷不同，但收尾規則一致：
+加密的匯入字串採用 `string_cipher`（`dd7`）：位於 `name_rva` 的 DLL 名稱從 `pos = name_rva` 開始解密，初始金鑰為 `key = name_rva & 0xFF`；而依名稱匯入的 `IMAGE_IMPORT_BY_NAME` 項目位於 `hint_name_rva`，會跳過開頭 2 位元組的 `Hint`（並將 `Hint` 清零），從 `pos = hint_name_rva + 2` 開始解密，初始金鑰則為 `hint_name_rva & 0xFF`。依序數（Ordinal）匯入的 thunk（PE32+ 為第 63 位元，PE32 為第 31 位元；在 PE32+ 上務必讀取完整的 64 位元 thunk）則保持原樣不動。
 
-* 每個名字就地解密並轉小寫。
-* 按名 thunk 的 hint/name 字符串被解密，2 字節 hint 字段清零。序數 thunk（最高位置位：PE32+ 為 bit 63，PE32 為 bit 31）跳過。只讀 PE32+ thunk 的低 dword 會把序數誤當成小 RVA 而破壞頭部；8 字節寬度很關鍵。
-* IAT 數據目錄（第 12 項）邊界經由首個 thunk 追蹤恢復。
+{% tabs %}
+{% tab title="64 位元含特徵標記 (walk5)" %}
+* 走訪第 5 階段 `walk5` 資料表中每筆 20 位元組的項目（`+12` 為 DLL 名稱 RVA，`+0` / `+16` 為 thunk 串列）。受控組件的 `walk5 == 0`。
+* 原地解密每個 DLL 名稱並轉為小寫；位於 `hint_name_rva + 2` 的函式名稱字串則在原地解密後**保留原始大小寫**（符號名稱區分大小寫），同時將 `Hint` 清零。
+* `DataDirectory[12]`（IAT）取自先前從 `info[3]` 解密保存的 128 位元組資料目錄陣列。
+{% endtab %}
 
-表來源各異：
+{% tab title="64 位元無特徵標記 (DD[1])" %}
+* 由於匯入字串存放在 `.text` 區段內，必須等 `.text` 完成 `dd8` 分頁還原**之後**，才從已還原的 `DataDirectory[1]` 開始走訪 `IMAGE_IMPORT_DESCRIPTOR`（若保存的資料目錄中 `DD[1]` 為零，則改用錨點記錄的匯入表 RVA）。
+* 若模組名稱或函式名稱本身已是可列印 ASCII 字串，則跳過 `string_cipher`；解密後的 DLL 名稱會轉為小寫，函式名稱則保留原始大小寫。
+* 掃描所有描述元的 `FirstThunk` 串列上下界，據此計算出 `DataDirectory[12]`（IAT）的範圍。
+{% endtab %}
 
-* **標記佈局（64 位）**：stage 5 內的 walk5 加密指針表。walk5 指針為 null 表示沒有表可走——託管程序集把該槽留空，因為它們的導入只是 CLR 引導 stub。
-* **無標記佈局**：PE 導入目錄本身，由 `DataDirectory[1]` 驅動——當元數據的導入目錄為零時（託管映像常見）回退到錨點階段保存的值。名字解密在代碼頁擾動之後運行，因為這些構建上導入字符串位於 `.text` 內。
-* **專用 DLL 佈局**：現有表的就地解密。
-* **32 位**：EighthStage 導入表，或校驗更優時取元數據目錄。
+{% tab title="專用 64 位元 DLL" %}
+* 直接順著匯入表原地解密 DLL 名稱與依名稱匯入的函式字串，且不將 DLL 名稱轉為小寫。
+* 從 `info[3] + 16` 處的 656 位元組 `byte_rotate2` 區塊還原 `DataDirectory[12]`。
+{% endtab %}
 
-**`.kmiat` 搬遷（32 位 EXE）。** 當加載器寫出的 IAT 與原 `.idata` 佈局不符時，導入元數據（描述符、查找表、名字池）被重建進最後一節，更名 `.kmiat`，大小 `0x7000`，特徵 `0xE0000060`；活動 IAT 留在原 RVA，導入目錄改指新表。`api-ms-win-crt-*` 名歸一為 `ucrtbase.dll`。DLL 跳過此步——它們保留真實的導入表。
+{% tab title="PE32 與 .kmiat" %}
+* 在 `EighthStage`（`+0x18`）匯入表與保存的資料目錄匯入表（`DD[1]`）之間擇一使用。
+* **原地 `.idata` 型 PE32：** 直接在原地解密名稱字串（`.idata` 型 EXE 由 thunk 上下界計算 `DD[12]`；PE32 DLL 則將 `DD[12]` 清為 `(0, 0)`）。
+* **`.kmiat` 重建（僅限 PE32 EXE）：** 當載入器寫入的 IAT 配置與標準 `.idata` 結構不一致時，會將最後一個區段改名為 `.kmiat`（大小設為 `0x7000`，屬性旗標 `0xE0000060`），在其中重新建立匯入描述元、OriginalFirstThunk 陣列（保留 `+0x2C` 對齊間隙），以及轉小寫的 DLL 名稱與保留大小寫的符號字串（並將 `api-ms-win-crt-*` 正規化為 `ucrtbase.dll`）；實際執行期使用的 IAT 則留在原位，並將 `DD[12]` 清為 `(0, 0)`：
 
-## TLS 被剝離並在運行時重裝
+```mermaid
+flowchart LR
+    K1[".kmiat：OFT 陣列"] --> K2["+0x2C 對齊間隙"] --> K3["IMAGE_IMPORT_DESCRIPTOR 陣列\n(DD[1] 重新指向此處)"] --> K4["DLL 與 Hint/Name 字串池"]
+    K3 -. FirstThunk .-> IAT["原始執行期 IAT\n(保留於原 RVA)"]
+```
+{% endtab %}
+{% endtabs %}
 
-保護層移除整個 `IMAGE_TLS_DIRECTORY`：數據目錄項、結構體與原始數據模板。運行時加載器在映射模塊時自行重裝 TLS。覆蓋結構體指針字段的基址重定位也無法完整倖存。64 位載荷直接丟棄它們。32 位 DLL 僅以中和形式保留這四個條目：降級為 `IMAGE_REL_BASED_ABSOLUTE`，但保留原始偏移。真正的填充保持偏移 0。保護層的加載器手工修正 TLS，因此操作系統從不需要這些條目。
+## TLS 還原與重定位重新啟用
 
-靜態重建的映像得不到這種待遇。普通 Windows 加載器需要有效的 TLS 目錄，否則不會分配 TLS 槽、不會寫 `_tls_index`。此後每次 C++ `thread_local` 訪問都經由一個垃圾槽解析，模塊在初始化期間崩潰（運行時初始化深處 `0xC0000005`）。真正的目錄在加載器 stub 的 `.rdata`/`.tls` 中以明文倖存（單文件構建保留在受保護文件內；伴生布局保留在 stub 中）。因此重建時按 RVA 逐字節覆蓋結構體與原始數據模板，並恢復覆蓋結構體指針字段的重定位。64 位構建為四個 64 位字段追加 `DIR64` 條目。32 位 DLL 的四個槽位仍在，重新啟用為 `IMAGE_REL_BASED_HIGHLOW` 即可。若保持中和狀態，被映射到非首選基址的 DLL 會帶著陳舊的 `AddressOfIndex`，操作系統加載器在經由它寫 TLS 槽索引時於 `LdrpAllocateTlsEntry` 中崩潰。較舊的單文件構建早於這種剝離，根本沒有 TLS 目錄。
+CrackProof 會從加密酬載中移除 TLS 狀態，改由執行期載入器自行處理 TLS；若靜態還原時未從明文外層 stub 補回 TLS 資料，輸出的靜態映像在存取 `_tls_index` 或執行 `LdrpAllocateTlsEntry` 時就會發生 `0xC0000005` 存取違規：
 
-## 明文導出目錄
+* **單一檔案 64 位元含特徵標記組建：** 保存的資料目錄仍留有非零的 `DD[9]`，但目標 RVA 處的 `IMAGE_TLS_DIRECTORY64` 已被清零；重建流程會依對應 RVA 從受保護原檔複製明文結構與原始資料範本（單一檔案含特徵標記組建採用 `/FIXED`，無須合成重定位項目；無特徵標記的單一檔案組建若發現還原出的結構全為零，則直接清空 `DD[9]`）。
+* **外部伴生檔案（`._`）64 位元組建：** 伴生酬載會將 `DD[9]`、TLS 結構與範本全數清零，並捨棄對應的基底重定位項目。重建時必須從外層 stub PE 補回 `DD[9]`、`IMAGE_TLS_DIRECTORY64` 結構與原始資料範本，接著在 `.reloc` 尾端**補上四筆 `IMAGE_REL_BASED_DIR64` 重定位項目**，分別涵蓋 `StartAddressOfRawData`、`EndAddressOfRawData`、`AddressOfIndex` 與 `AddressOfCallBacks`。
+* **PE32 EXE 與 DLL：** 從載入器 stub 複製明文 `IMAGE_TLS_DIRECTORY32` 與資料範本（若 stub 中不存在，則退回建立最小化的 `.tls` / `.data` 佔位結構）。在 **PE32 DLL** 上，CrackProof 會將 `.reloc` 內對應四個 TLS 指標的重定位項目降級為 `IMAGE_REL_BASED_ABSOLUTE`（`type = 0`），但仍保留非零的分頁內偏移量；重建時必須**將這四個槽位重新改回 `IMAGE_REL_BASED_HIGHLOW`（`type = 3`）**，DLL 變更載入基底時才能正確修正 `IMAGE_TLS_DIRECTORY32` 的四個指標欄位。
 
-導出目錄在 payload 中從不加密。它住在哪裡取決於佈局：
+## 匯出表目錄（`DD[0]`）
 
-* **單文件佈局**：導出區域以明文留在受保護文件中其 RVA 處；加載器原樣拷入映像。（該區域經 `DataDirectory[0]` 定位，可從明文頭部讀取。）
-* **外置伴生布局**：伴生體在導出區域解密為垃圾（`NumberOfFunctions` 等均為密文）。運行時加載器從 stub `.rdata` 中保留的明文副本重建導出。靜態重建同樣必須從 stub 覆蓋導出目錄區域，否則分析工具會在導出表上出錯。
+單一檔案組建在受保護原檔的對應 RVA 處仍保有明文匯出表目錄。外部伴生檔案（`._`）酬載在匯出表範圍內解密出來則是雜訊資料，因此重建時需直接從外層 stub PE 的 `.rdata` 區段將整個 `DataDirectory[0]` 區間覆寫回來。

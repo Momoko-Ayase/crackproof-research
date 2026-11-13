@@ -1,23 +1,35 @@
 ---
-description: "The combined Huffman and LZ stream format used for compressed section records."
+description: "3-byte Huffman tree entries and the four literal, accumulator, run-fill, and LZ token modes."
+icon: file-zipper
 ---
 
 # Huffman and LZ compression
 
-## The Huffman/LZ compression format
+## Hybrid Huffman/LZ stream format
 
-Most payload blocks are compressed with a custom hybrid: a Huffman-coded token stream where tokens are literals, run fills, or LZ back-references. The decoding table travels with the data, at `key_offset` in the same buffer.
+Stages 3 through 5 and compressed section blocks decode through a 3-byte-per-node Huffman table stored inside the working buffer at `key_offset`, producing a stream of 10-bit tokens:
 
-**Table format.** The table is a forest of 3-byte entries: a u16 symbol/child field and a u8 code-length field. Root selection reads 8 bits of input as the entry index. The top bit (`0x8000`) marks a leaf; internal nodes store the index of the first of a sibling pair, and one more input bit chooses between them. The stored length byte counts the bits consumed so far (8 for a root), so a leaf reached after N internal levels has a total code length of 8 + N bits.
+```mermaid
+flowchart LR
+    BITS["8-bit root lookup\n(word & 0xFF) * 3"] --> LEAF{"tab & 0x8000\n(leaf bit)?"}
+    LEAF -- No --> WALK["Walk sibling pairs\n1 input bit per level\n(depth <= 64)"]
+    WALK --> LEAF
+    LEAF -- Yes --> MODE["10-bit symbol:\nmode = sym & 0x300\npayload = sym & 0xFF"]
+    MODE --> M0["0x000: Literal byte"]
+    MODE --> M1["0x100: Big-endian pending count"]
+    MODE --> M2["0x200: Repeat 1/2/4B unit max(pending,1) times"]
+    MODE --> M3["0x300: Copy payload bytes from pending+payload back"]
+```
 
-**Token format.** A token's bits 8–9 select the mode, bits 0–7 are the payload:
+* **3-byte table entries:** each entry is `(u16 tab, u8 bits)`. Reading the low 8 input bits indexes the root table; `tab & 0x8000` marks a leaf, while internal nodes store the index of a sibling pair selected by one additional input bit per tree level (`8 + depth` total bits).
+* **10-bit leaf symbols:** bits `8..9` select the mode and bits `0..7` carry `payload`:
 
-| Mode | Meaning |
-| --- | --- |
-| `0x000` | Literal: emit the payload byte |
-| `0x100` | Count accumulator: append the payload to a big-endian pending value (emits nothing by itself) |
-| `0x200` | Run fill: repeat the previously written 1/2/4-byte unit `pending × payload` times |
-| `0x300` | LZ back-reference: copy `payload` bytes from `pending + payload` bytes behind the output cursor |
+| Mode (`tab & 0x300`) | Payload (`tab & 0xFF`) | Operation |
+| --- | --- | --- |
+| `0x000` | Literal byte | Write `payload` (`1` byte) |
+| `0x100` | Count byte | Reject if `pending >= 256`; shift into `pending = (pending << 8) \| payload` (`0` bytes written) |
+| `0x200` | Unit width (`1`, `2`, or `4`) | Set `reps = max(pending, 1)`, repeat the preceding `payload`-byte unit `reps` times (`reps * payload` bytes written), and reset `pending = 0` |
+| `0x300` | Copy length (`payload`) | Copy `payload` bytes from `pending + payload` bytes behind `dest`, then reset `pending = 0` |
 
 ```python
 def decompress(d, src, dest, key_offset, s_size, d_size):
@@ -117,4 +129,4 @@ def decompress(d, src, dest, key_offset, s_size, d_size):
     return written == d_size
 ```
 
-The boolean result is a corruption signal and a concrete validation signal: where the container doesn't record a key or shift choice, candidates are tried until one decompresses cleanly. Several such trial-and-validate points appear in [Loading and section recovery](../loading-and-pe-repair/loading/README.md). The same token classes and 3-byte Huffman entries appear in the [Android native-library format](https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/data-transforms/compression).
+Because `decompress` enforces tree depth, back-reference bounds, `pending` width, and exact `written == d_size` output length, trial decompression rejects wrong stage keys, shift guesses, and false-positive bytecode stubs across [Loading and section recovery](../loading-and-pe-repair/loading/README.md). The same 3-byte table entries and four token modes are used in [CrackProof for Android SO internals](https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/data-transforms/compression).

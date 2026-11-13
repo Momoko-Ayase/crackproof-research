@@ -1,33 +1,44 @@
 ---
-description: 重定位策略、最終頁變換，以及託管映像所需的特殊處理。
+description: "/FIXED 與 ASLR 重定位規則、各家族 .text 打亂順序，以及精準 CLR 中繼資料覆寫。"
+icon: cubes
 ---
 
-# 重定位、頁變換與 CLR 數據
+# 重定位、分頁轉換與 CLR 資料
 
-## 重定位與 /FIXED 分野
+## 基底重定位：`/FIXED` 與 ASLR 策略
 
-各構建刻意在結果可否重定向上不同：
+* **單一檔案 64 位元含特徵標記組建與 32 位元 EXE（`/FIXED`）：** 加殼器已捨棄基底重定位表並清空 `DllCharacteristics`。靜態重建時會將 `DataDirectory[5]` 與 `DllCharacteristics` 一併清零，使 EXE 固定載入於預設的 `ImageBase`。
+* **所有 DLL（32 位元與 64 位元，不分家族）：** DLL 必須維持可重定位能力；重建流程會保留 `DataDirectory[5]`、確保設定 `IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE`（`0x0040`），並在 PE32 DLL 上重新啟用被改為 `ABSOLUTE` 的 TLS 重定位項目。
+* **無特徵標記 64 位元組建與外部伴生檔案（`._`）組建：** 保留原有的 ASLR 旗標（`DYNAMIC_BASE` / `HIGH_ENTROPY_VA`）與 `DataDirectory[5]`（若伴生檔案還原了 TLS，則同步補入四筆 `DIR64` TLS 重定位項目）。
 
-* **較舊單文件 EXE 構建是 `/FIXED`。** 外殼丟棄基址重定位表並清空 `DllCharacteristics`；映像只能在首選基址加載。忠實的重建同樣如此：`DataDirectory[5]` 清零、`DllCharacteristics` 清零。
-* **DLL（任何佈局）必須保持可重定位。** DLL 幾乎總是被映射到非首選基址；剝離其重定位會使其無法加載。重建保留 `DataDirectory[5]` 並確保置位 `IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE`（`0x0040`）。
-* **無標記與伴生構建不是 `/FIXED`。** 它們攜帶真實的 ASLR 標誌與有效重定位表，任何重定向都必須重定位一切——包括已還原 TLS 目錄的指針，這正是 TLS 還原期間要追加重定位的原因。32 位家族以另一種方式滿足同一要求：其 DLL 以中和的 `ABSOLUTE` 槽位保留四個 TLS 字段條目，重新啟用為 `HIGHLOW`，而非追加（見[導入、TLS 與導出](imports-tls-exports.md#tls-被剝離並在運行時重裝)）。
+## `.text` 分頁打亂（`dd8`）執行順序
 
-## 代碼頁擾動，排在最後
+無特徵標記組建會將加密的匯入字串與明文 CLR 中繼資料一併存放在 `.text` 內，因此含特徵標記與無特徵標記兩套管線必須在不同時間點執行 `dd8`：
 
-[頁級擾動](../../data-transforms/lfsr-strings-pages.md#頁級代碼擾動)在節恢復之後施加於 `.text`。各家族觀察到的順序約束：
+```mermaid
+flowchart TB
+    subgraph Marker["64 位元含特徵標記管線"]
+        direction LR
+        M1["還原區段"] --> M2["walk5 匯入表"] --> M3["區段標頭與匯出表"] --> M4[".text dd8"] --> M5["還原 EP 與資料目錄"] --> M6["CLR 與 TLS"]
+    end
+    subgraph Markerless["64 位元無特徵標記管線"]
+        direction LR
+        L1["還原區段"] --> L2["區段標頭與匯出表"] --> L3["還原 EP 與資料目錄"] --> L4[".text dd8\n(僅當 EP 位於 .text)"] --> L5["DD[1] IDT 匯入表"] --> L6["CLR 與 TLS"]
+    end
+```
 
-* **標記佈局**：擾動在入口點/數據目錄還原之前運行。
-* **無標記佈局**：擾動推遲到導入名解密之後，並在最終字節上重新選擇——且僅當入口點落在 `.text` 內才運行。託管映像在擾動**之後**才恢復 CLR 元數據，因為元數據區域位於 `.text` 內但不是被擾動的代碼：擾動它會每 16 字節約破壞 1 字節，產生無效的 COR20 簽名。
-* **32 位**：當節已是明文（原生 DLL）時完全跳過擾動，通過比較 `0xCC` 還原得分與無擾動基線來檢測。
+在無特徵標記組建上，`dd8` 必須排在區段標頭及進入點／資料目錄還原之後（且僅在 `AddressOfEntryPoint` 落於 `.text` 區段內時執行），並排在 `DD[1]` IDT 匯入名稱解密與 CLR 覆寫**之前**；否則 `dd8` 會把剛解密完的匯入字串再次打亂，或破壞覆寫回來的 `COR20` / `BSJB` 位元組。
 
-## CLR 元數據與方法體必須分別處理
+## 精準覆寫還原 CLR 中繼資料
 
-某些託管佈局會在受保護文件按 RVA 映射後的文件偏移處原樣保留 COR20 頭（`cb == 0x48`）、BSJB 元數據流與 CLR 資源。節恢復完成後，可以把這些範圍複製回去。在無標記佈局中，應在頁變換之後恢復它們，因為這些數據可能位於 `.text` 地址範圍內，卻不是需要變換的代碼。
+受控（Managed）CrackProof 組建會將 IL 方法本體放在區段酬載內加密，而 ECMA-335 中繼資料結構則以明文保留在外層檔案或伴生 stub 中：
 
-託管**伴生** DLL 則把這些結構保存在加載器 stub 中，而不是受保護載荷裡。恢復集合是 COR20 頭加上它引用的每個非空範圍：BSJB 元數據（必需）、資源、強名稱簽名、代碼管理器表、vtable 修復表及其點名的槽數組、導出地址跳轉表與託管原生頭。方法體絕不屬於覆蓋範圍——它們來自解密後的伴生體。
+* **單一檔案無特徵標記 64 位元組建：** 在 `dd8` 完成後，依對應 RVA 覆寫補回 `COR20` 標頭（`cb == 0x48`）與 `BSJB` 中繼資料串流。
+* **單一檔案含特徵標記 64 位元組建：** 覆寫補回 `COR20`、`BSJB` 中繼資料，以及 `COR20.Resources`（`+0x18`）。
+* **受控伴生檔案（`._`）DLL：** 從外層 stub PE 覆寫補回 `COR20`（`0x48` 位元組），並逐一檢查其參照的七個子區間，凡非零者一併覆寫：`MetaData`（`BSJB`，必備）、`Resources`、`StrongNameSignature`、`CodeManagerTable`、`VTableFixups`（連同其參照的各個槽位陣列）、`ExportAddressTableJumps` 與 `ManagedNativeHeader`。
 
-保留的元數據**不包含每個 IL 方法體的明文副本**。方法體位於 PE 節中，仍受該構建的節數據變換與頁變換影響。若直接用受保護文件填充整個節，就可能用變換後的字節覆蓋已經正確恢復的方法。應先恢復節內容，再僅替換經過獨立驗證的 CLR 範圍——絕不從受保護文件或 stub 複製整節。
+{% hint style="warning" %}
+**區段還原完成後，切勿整段複製含有 CLR 的區段。** IL 方法本體與 `COR20`、`BSJB` 共用 `.text` 區段，且已由 `walk4` + `dd8` 解密還原；若事後拿受保護原檔或 stub 的整個區段直接蓋過去，已解密的 IL 方法本體就會被密文覆蓋。（唯有舊版專用 64 位元 DLL 管線是**先**預填 CLR 區段，再由 `walk4` 將還原的方法本體寫在上方。）
+{% endhint %}
 
-如果恢復後的 COR20 目錄指向 `cb` 為零的頭，並且沒有有效的保留頭可用，就應清除該目錄。把空頭交給 CLR 啟動路徑會失敗，而且容易被誤判為節恢復錯誤。混合模式映像還必須保留原生入口標誌；純託管映像應與該情況分開判斷。
-
-Unity il2cpp 作品在 PE 之外還有一層獨立混淆：`global-metadata.dat` 內的方法令牌。見 [il2cpp 元數據混淆](../../analysis/il2cpp-metadata.md)。
+若 `DataDirectory[14]` 指向全零的 `COR20` 標頭（`cb == 0`）且找不到合法的保留副本，則直接清空 `DataDirectory[14]`。Unity IL2CPP 作品則是對原生 `GameAssembly.dll` 加殼（不含 CLR 標頭），並另外對 `global-metadata.dat` 做混淆處理；詳見 [il2cpp 中繼資料混淆](../../analysis/il2cpp-metadata.md)。

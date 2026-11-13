@@ -1,14 +1,10 @@
 ---
-description: "The reversible data transforms used across Windows headers, loader stages, names, sections, and code pages."
+description: "Overview of the reversible ciphers, checksums, AES schedule, Huffman/LZ codec, and bytecode VM used on Windows."
+icon: shuffle
 ---
 
 # Data transforms
 
-CrackProof layers several small transforms rather than relying on one container-wide cipher. Their inputs, address dependence, and order matter: applying the correct transform to the wrong range can still produce plausible bytes.
+CrackProof layers byte and dword ciphers, CRC-32 key derivation, AES-CBC, Huffman/LZ compression, and per-build bytecode permutations across headers, stage descriptors, import strings, section payloads, and executable code pages. Each page in this group specifies the bit-level operations with executable Python reference code.
 
-The pages separate the transforms by role:
-
-- [Rolling-key and rotation ciphers](rolling-and-rotation.md) cover the early stage and small-record operations.
-- [LFSR, string, and page transforms](lfsr-strings-pages.md) cover embedded instruction streams, import names, and sparse code-page changes.
-- [Checksums and key progression](checksums.md) explain record validation and how one result advances the next key.
-- [AES-CBC](aes.md), [Huffman/LZ compression](compression.md), and the [per-build byte transform](bytecode-transform.md) form the main section-data path.
+<table data-view="cards"><thead><tr><th width="48"></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><i class="fa-rotate"></i></td><td><strong>Rolling-key and rotation ciphers</strong></td><td><code>payload_xor_chain</code>, <code>xor_ror_dwords</code>, and the descriptor/address-keyed triple byte-rotation ciphers.</td><td><a href="rolling-and-rotation.md">Rolling-key and rotation ciphers</a></td></tr><tr><td><i class="fa-wave-square"></i></td><td><strong>LFSR, string, and page transforms</strong></td><td><code>0x8003</code> LFSR stub cipher, RVA-keyed import-name string cipher, and per-page <code>.text</code> scrambles.</td><td><a href="lfsr-strings-pages.md">LFSR, string, and page transforms</a></td></tr><tr><td><i class="fa-hashtag"></i></td><td><strong>Checksums and key progression</strong></td><td>Reflected CRC-32, rotating word checksums, and triangular multi-round key advancement.</td><td><a href="checksums.md">Checksums and key progression</a></td></tr><tr><td><i class="fa-key"></i></td><td><strong>AES-CBC layer</strong></td><td>Zero-IV AES-CBC decryption with in-buffer schedules and rotated final-round S-box tables.</td><td><a href="aes.md">AES-CBC layer</a></td></tr><tr><td><i class="fa-file-zipper"></i></td><td><strong>Huffman and LZ compression</strong></td><td>3-byte Huffman tree entries and the four literal, accumulator, run-fill, and LZ token modes.</td><td><a href="compression.md">Huffman and LZ compression</a></td></tr><tr><td><i class="fa-microchip"></i></td><td><strong>Per-build byte transform</strong></td><td>Nine-opcode <code>AL</code> x86 bytecode interpreter and 256-byte inverse lookup table for section payloads.</td><td><a href="bytecode-transform.md">Per-build byte transform</a></td></tr></tbody></table>

@@ -1,43 +1,47 @@
 ---
-description: "A repeatable workflow for locating stages, interpreting logs, and checking reconstructed images."
+description: "Step-by-step workflow for capturing debug logs, mapping stage code, dumping pages, and validating restored PEs."
+icon: list-check
 ---
 
 # Analysis workflow
 
-These steps locate stages, interpret the debug log, and check a reconstructed image.
+{% stepper %}
+{% step %}
+## Capture the per-build `%temp%` debug log
 
-## Methodology
+Break on or trace `CreateFileW` at process start to observe the 12-hex-character directory probed under `%temp%`, create that folder (its creation timestamp must be within roughly 48 hours), and re-run the binary. Every protected EXE and DLL writes a stage-by-stage trace (`HHMMSSmmmE-...` / `HHMMSSmmmD-...`) ending with an `AAA-BBB-CCC` closing summary (see [Startup sequence and status reporting](../runtime/startup-status.md#the-boot-sequence-and-status-codes)).
+{% endstep %}
 
-### Turn the loader's logging against itself
+{% step %}
+## Map status codes to host and helper code
 
-The most productive first step is enabling the debug log. Create the per-executable 12-hex-character folder under `%temp%` (learn the name by breaking on `CreateFileW`), then run the binary. The folder's creation time must be within about two days, or that run writes no log. Every protected module logs its own boot: status codes per stage, missing DLLs, hooked functions, addresses. Combined with the status table in [Startup sequence and status reporting](../runtime/startup-status.md#the-boot-sequence-and-status-codes), the log localizes any failure or behavior to a specific stage without any disassembly.
+The logging helper receives a 32-bit packed value in `ECX` whose low 16 bits encode `(code << 4) | 1` for stage status, `| 3` for `CCC` cause codes, and `| 5` for `BBB` sub-stages. Core bootstrap codes (`200`, `560`, `590`, `5A0`, `5E1`, `5E2`, `800`) appear inside the host module's loader section before post-execution scrubbing, whereas `410`/`510`/`520`/`540`, `Cxx`, and `Axx` immediates live inside the manually mapped helper DLLs (`HtpecIt.dll`, `dm`, etc.).
+{% endstep %}
 
-### Map status codes back to code
+{% step %}
+## Separate polymorphic decoys from real stage code
 
-When the log isn't enough, the `(code << 4) | 1` encoding turns each status code into a 2-byte pattern searchable in the binary. Searching for the word finds the exact instruction that reports that stage, which maps the loader the way a symbol table would. This works on the on-disk loader stub and on decrypted stage buffers alike.
+* Skip obvious register-saving timing decoys (`in eax, dx` followed by `jne $+2` with zero displacement) and `TF` (`#DB`) SEH traps; trace from the instruction that initializes the reserved context register instead.
+* Where junk bytes after unconditional jumps desynchronize static disassembly, emulate the stage with file I/O (`CreateFileW` / `MapViewOfFile`) backed by the on-disk binary, or diff two protected modules from the same build family to isolate per-build data tables from shared stage code.
+{% endstep %}
 
-### Read the loader with the right expectations
+{% step %}
+## Dump page-encrypted modules across VADs
 
-- **Don't trust natural entry points.** The obvious stubs are no-op decoys (register save/restore around a timing probe). The real entry is the code that initializes the context structure: search for the unique instruction that sets up the reserved context register and follow from there.
-- **Expect desynchronized disassembly.** Junk bytes after jumps and mid-instruction jump targets defeat linear sweeps; decompilers frequently bail out with "control flows out of bounds". Where static analysis stalls, emulate the stage (a CPU emulator with hooked Win32 stubs, with file APIs answered from the protected file's own bytes), capture its writes, then port the recovered primitives back to static code.
-- **Compare across builds.** Loader code is bit-identical between different protected modules of the same family; only data tables differ. A cross-sample diff isolates the tables (a few hundred bytes) from the algorithm (everything else), which is the fastest way to see what is per-build configuration versus code.
+* Use Virtual Address Descriptor (`VAD`) extractors rather than file-cache extractors, since decrypted pages live in private memory.
+* Check per-section page residency after OEP (`280`): bulk-decrypted modules (`800 -> 830`) have all executable pages populated immediately, whereas page-encrypted modules (`640 -> 840`) leave untouched pages `PAGE_NOACCESS` until faulted in.
+* Schedule in-process helpers after the `A07` foreign-thread sweep, and diff two post-boot snapshots taken seconds apart to detect newly faulted pages or active `scribble` re-masking.
+{% endstep %}
 
-### Dump page-encrypted modules correctly
+{% step %}
+## Validate reconstructed PE images statically
 
-- A single memory snapshot captures only the demand-decrypted working set. Check the fill rate per section (a bulk-decrypted module has every page populated; page-encrypted ones show sparse, execution-driven coverage), and force every page to fault in before dumping when necessary.
-- Verify the dump is post-decryption: the bytes at the true OEP should be a sane prologue (for example `48 89 5C 24 08` on x64 MSVC builds). A garbage or zero OEP region means the snapshot came too early, so wait past initialization.
-- Cache-manager-based forensic extractors (for example Volatility's `dumpfiles`) only see what the OS thinks is on disk; decrypted pages live in private memory and are invisible to them. Use virtual-address-space extractors (module-list or VAD-based) instead.
-- Take two snapshots a few seconds apart and diff. A nonzero diff indicates background re-encryption (the re-encrypt pass at status `840`); a zero diff confirms the pages are stable.
-- Time in-process helpers around the `A07` injected-thread sweep; threads spawned before the sweep may be killed. The sweep's completion is visible in the debug log.
+Verify five structural invariants before trusting a recovered PE:
 
-### Verify a reconstructed image
-
-A reconstructed image can look successful and still be wrong, because a heuristic can choose a plausible-looking but incorrect table. Cheap structural checks catch every failure mode observed in practice:
-
-1. `MZ` and `PE\0\0` signatures; optional-header magic `0x10B`/`0x20B`; sane section count.
-2. The entry point maps to a mapped, executable, nonzero region (an all-zero entry stub is the classic "left encrypted" symptom).
-3. The first import descriptor's DLL name is readable ASCII ending in `.dll` (still-ciphertext imports are the second classic symptom).
-4. Managed images: COR20 header `cb == 0x48` and the metadata stream signature `BSJB`.
-5. DLLs: a present base-relocation directory.
-
-A clean report isn't proof of correctness, but a failed check is a reliable "broken" signal.
+1. Valid `MZ` and `PE\0\0` signatures, optional-header magic `0x10B` or `0x20B`, and in-bounds section headers.
+2. For native modules with a nonzero entry point, `AddressOfEntryPoint` maps into a nonzero executable range (and CRT entry-stub `call`/`jmp` targets stay inside `.text`).
+3. Across up to 256 `IMAGE_IMPORT_DESCRIPTOR`s (on native modules), module names decode to printable ASCII `.dll` / `.exe` names and by-name `IMAGE_IMPORT_BY_NAME` strings are readable ASCII.
+4. For managed assemblies (`DD[14]` nonzero), `COR20` header `cb == 0x48` and the referenced metadata root begins with `BSJB`.
+5. For all DLLs, `DataDirectory[5]` (`BaseReloc`) is nonzero and `DYNAMIC_BASE` (`0x0040`) is set.
+{% endstep %}
+{% endstepper %}

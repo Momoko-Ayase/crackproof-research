@@ -1,18 +1,19 @@
 ---
-description: Windows 载荷阶段使用的滚动 XOR、dword 旋转与字节旋转变换。
+description: "载荷滚动异或链、双字异或循环右移与三重字节循环移位算法。"
+icon: rotate
 ---
 
-# 滚动密钥与旋转密码
+# 滚动密钥与循环移位算法
 
-容器的每一层都由一小组原语构成。一旦逐个定义清楚，分阶段加载器就只是「在偏移 X 处以密钥 Y 调用原语 N」的严格有序重复。本页精确定义每个原语，并给出 Python 实现。
+各阶段头部与指针表使用四种基于 8 位和 32 位无符号回绕运算的原地解密算法。
 
 {% hint style="success" %}
-本页所有代码片段都已实际执行并与受保护二进制中实现的算法核对：每个函数的输出都在相同输入上与参考移植逐字节比对一致。
+本页所有 Python 函数均由 `verification/verify_docs.py` 自动执行，并与独立参考测试向量逐字节比对校验。
 {% endhint %}
 
-## 约定
+## 通用位宽辅助函数
 
-所有缓冲区都是可变字节数组（`bytearray`）；原始算法原地工作。全文使用的辅助函数：
+本页解密函数均在 `bytearray` 缓冲区上原地操作，并共用以下位运算与读写辅助函数：
 
 ```python
 MASK32 = 0xFFFFFFFF
@@ -32,9 +33,9 @@ def rol8(x, n):  return ((x << n) | (x >> (8 - n))) & 0xFF
 def ror8(x, n):  return ((x >> n) | (x << (8 - n))) & 0xFF
 ```
 
-## 滚动密钥家族
+## 载荷滚动异或链
 
-两个密码共享同一滚动密钥设计：密钥从种子开始，每个单元与当前密钥异或，随后密钥混入单元值、循环索引与索引平方向前滚动。头部 KDF（见[容器与加密头](../file-structure/container-layout.md)）是 8 单元实例；payload 主体密码是同族的长形式，种子与更新规则不同：
+[容器布局与加密头部](../file-structure/container-layout.md)中的 `header_kdf` 与 `payload_xor_chain` 共用相同的下标平方反馈结构，区别在于此处使用 `+ i` 替代 `- i`，并以 `info[0] + ~decrypt_size` 作为初始种子：
 
 ```python
 def payload_xor_chain(file_data, out, info, decrypt_size):
@@ -47,11 +48,11 @@ def payload_xor_chain(file_data, out, info, decrypt_size):
         k = (i * i) ^ ((k + cell + i) & MASK32)
 ```
 
-由于密钥逐 dword 向前滚动，该链必须从头开始解——不重放整条链就无法对 payload 做随机访问。
+由于滚动密钥 `k` 混入了每一个密文双字 `cell`，解密必须从 `i = 0` 开始，并传入准确的 `decrypt_size`（常规构建为 `info[6] - info[3] + 8192`，全载荷加密的紧凑 PE32 构建为 `info[5]`）。
 
-## XOR + 循环右移 dword 密码
+## 双字异或循环右移算法（`dd3`）
 
-这个密码用于解开每个阶段的指针块。它从缓冲区自身读出 `(base_addr, length)` 描述符，然后变换每个 dword：与滚动密钥异或、按固定移位量循环右移、再减去循环索引。移位量按调用点取 19 或 21。
+`xor_ror_dwords` 先从 `pos` 读取 `{base_addr, length}`，随后将区间内的每个双字与 `key` 异或、循环右移 `shift` 位（64 位阶段为 `19` 或 `21`），再减去双字下标 `i`：
 
 ```python
 def xor_ror_dwords(d, pos, key, shift):
@@ -64,11 +65,11 @@ def xor_ror_dwords(d, pos, key, shift):
         put_u32(d, off, (ror32(v, shift) - i) & MASK32)
 ```
 
-32 位构建还会对其中一个阶段在候选集 `[19, 21, 17, 23, 15, 25, 13, 11]` 上爆破移位量，接受输出能解析为合法阶段表的那个（见[加载与节恢复](../loading-and-pe-repair/loading/README.md)）。
+PE32 构建的 `ThirdStage` 移位量随构建选自 `[19, 21, 17, 23, 15, 25, 13, 11]`；静态还原时依次试探这 8 个候选值，保留解密结果能通过后续阶段表结构校验的一项（详见[PE32、DLL 与无标记布局](../loading-and-pe-repair/loading/layout-variants.md)）。
 
-## 三重字节旋转密码
+## 三重字节循环移位算法（`dd4` 与 `dd5`）
 
-两个字节密码共享同一结构：每字节三次位旋转，旋转之间异或两个滚动密钥字节。它们的区别在于旋转量与初始密钥的派生方式。
+这两个函数均对每个字节连续执行三次循环左移，并在相邻移位之间分别异或两个自增的密钥字节：
 
 ```python
 def byte_rotate3(d, pos):
@@ -98,7 +99,7 @@ def byte_rotate2(d, va, size):
         b2 = (b2 + 1) & 0xFF
 ```
 
-位置密钥变体有一个加载器各表遍历重度依赖的性质：**每个输出字节只依赖输入字节与其地址的低 8 位**——无跨字节状态。因此任意 4 字节都可以在不触碰缓冲区其余部分的情况下试解：
+在 `byte_rotate2` 中，偏移 `va + i` 处的明文字节仅取决于 `d[va + i]` 与 `(va + i) & 0xFF`，不依赖前序字节的状态传递，因此定位描述符表时可以直接做不修改原缓冲区的 4 字节试探解密：
 
 ```python
 def trial_byte_rotate2(d, va):
@@ -112,4 +113,4 @@ def trial_byte_rotate2(d, va):
     return get_u32(out, 0)
 ```
 
-加载器中贯穿始终的 16 字节描述符都用 `byte_rotate2` 加密，按位置串联：每个描述符的密钥来自其自身地址，遍历在长度字段为零时终止。
+连续排列的 16 字节加载器描述符均按各自所在的 RVA 用 `byte_rotate2` 加密，并以 `length == 0` 作为序列结束标记。

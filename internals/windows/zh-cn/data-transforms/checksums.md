@@ -1,12 +1,13 @@
 ---
-description: CRC-32、三角数密钥推进及连接受保护记录的校验和链。
+description: "反射 CRC-32 校验和、三角和密钥步进，以及阶段间的密钥传递链。"
+icon: hashtag
 ---
 
-# 校验和与密钥推进
+# 校验和与密钥步进
 
-## CRC-32 校验和
+## 反射 CRC-32 校验和
 
-校验和使用标准反射 CRC-32（多项式 `0xEDB88320`，即 zlib/以太网 CRC——`crc32(b"123456789") == 0xCBF43926`）。出现两种描述符形式：
+阶段完整性校验与密钥派生均使用标准反射 CRC-32（多项式 `0xEDB88320`，与 zlib/IEEE 802.3 一致，满足 `crc32(b"123456789") == 0xCBF43926`）。描述符提供 `(offset, length)` 对，`calculate_checksum` 将目标区间的 CRC-32 与 `length` 异或：
 
 ```python
 def _build_crc_table():
@@ -36,11 +37,11 @@ def calculate_checksum(d, pos):
     return crc32(d[offset:offset + length]) ^ length
 ```
 
-第二种形式以滚动初值链式覆盖**原始文件字节**（用上一次结果作 `initial` 调用 `crc32_append`），用于[加载与节恢复](../loading-and-pe-repair/loading/README.md)中那条只用于校验的遍历。
+[阶段链与有标记布局](../loading-and-pe-repair/loading/stage-chain.md)中仅用于校验的 `walk3` 描述符序列采用分段递推方式：将上一段的输出作为 `initial` 传入 `crc32_append(initial, data)`，依次累加加壳文件内多段字节区间的 CRC-32。
 
-## 三角数密钥调度
+## 三角和密钥步进
 
-若干阶段密钥通过累加结构化整数级数来“推进”——每轮把 1 到 `(m+1) * 100` 的每个整数都加上：
+从前一阶段提取出的种子双字在混入下一阶段密钥之前，需先执行 `iterations` 轮三角和累加（第 `m` 轮累加 `1 + 2 + ... + (m + 1) * 100`）：
 
 ```python
 def advance_key(key, iterations):
@@ -51,18 +52,19 @@ def advance_key(key, iterations):
     return key
 ```
 
-种子是从刚解密的前一阶段读出的内容，所以只有之前的一切都解密正确，推进后的密钥才会正确。这是防篡改设计的一半；另一半是[校验和链](#校验和链)。
+## 阶段密钥合成
 
-## 校验和链
-
-最后一个原语不是密码，而是密钥的组合方式。一个阶段的解密密钥通常形如：
-
+```mermaid
+flowchart LR
+    ACC["xor_acc\n（头部/阶段校验区间\ncalculate_checksum 的累积异或）"] --> KEY["stage_key =\nxor_acc ^ stage_crc ^ advanced_seed"]
+    CRC["stage_crc\n（对前序已解密阶段计算的\ncalculate_checksum）"] --> KEY
+    SEED["内容种子\n-> advance_key(seed, rounds)"] --> KEY
 ```
-stage_key = xor_accumulator ^ crc32_checksum_of_earlier_content ^ content_derived_seed
-```
 
-* **xor 累加器**：遍历一张 `(offset, length)` 区域描述符表，把各项的 `calculate_checksum` 值异或累积。
-* **校验和**：对只有在前序阶段正确解密后才以明文存在的字节做 CRC-32。
-* **种子**：从刚解密的内容读出的一个 dword，通常再经 `advance_key` 推进。
+后续每个阶段的解密密钥由三项输入异或合成：
 
-其结果是：各阶段无法乱序解密；上游任何一字节被改动，下游由它派生的所有密钥全部报废。这条链是容器的防篡改机制。反过来，它也表明重建映像是否自洽：任何一处选择出错，后续阶段都解不开，而不是产生隐性的错误结果。[阶段链与标记布局](../loading-and-pe-repair/loading/stage-chain.md)说明各构建家族如何组合这些要素。
+* **`xor_acc`：** 对锚点表或头部表中的描述符列表逐项调用 `calculate_checksum` 得到的累积异或值。
+* **前序阶段 CRC-32（`stage_crc`）：** 对前序阶段解密得到的明文字节调用 `calculate_checksum` 的结果。
+* **内容派生种子：** 从刚解密完成的阶段中读取一个双字，并经 `advance_key` 多轮步进后的结果。
+
+由于每一阶段的密钥都同时依赖前序阶段明文与头部校验和，各阶段必须严格按顺序依次解码；任何偏移偏差、移位参数错误或字节损坏都会导致后续阶段解密和 Huffman 解压立即失败。

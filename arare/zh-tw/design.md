@@ -1,51 +1,57 @@
 ---
-description: "工作區佈局、編碼約定與用戶態運行時行為。"
+description: "Crate 架構、單份儲存酬載編碼、三階段執行期啟動流程，以及與商業版的剩餘差異。"
+icon: diagram-project
 ---
 
-# 設計
+# 架構設計
 
-Arare 生成受保護的 Windows PE 文件，並構建自己的嵌入式加載器。不以商用字節一致為目標。兼容性由結構佈局族與已驗證行為描述。
+Arare 會將標準 Windows PE 輸入編碼為 [CrackProof for Windows 內部機制](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/) 所記錄的四種結構版面家族（`pe32`、`pe64-classic`、`pe64-modern` 與 `legacy-dll`），並嵌入自行實作且採用 MIT 授權的原生與 Managed 執行階段載入器。
 
-## 工作區
+## Workspace 架構
 
-| 組件 | 職責 | 許可證 |
+| 元件 | 職責 | 授權條款 |
 | --- | --- | --- |
-| `arare-pe` | 不可變的已校驗 PE 模型與磁盤到映像映射 | MIT |
-| `arare-codec` | 滾動變換、AES、字節程序、Huffman/LZ | MIT |
-| `arare-engine` | 配置圖、Windows 加載器放置、託管編排 | AGPL-3.0-only |
-| `arare-runtime`、`runtime/src`、`runtime/arch` | 獨立構建的原生重建與啟動 | MIT |
-| `runtime/managed` | JIT 前的託管初始化與內存適配器 | MIT |
-| `tools/managed` | 源碼編寫的 ECMA-335 元數據/包裝生成 | AGPL-3.0-only |
-| `arare-cli` | 輸入/輸出、選項、診斷與發佈 | AGPL-3.0-only |
+| `arare-pe` | 具邊界檢查的 PE32/PE32+ 解析器與檔案偏移／RVA 映射器 | MIT |
+| `arare-codec` | 滾動式 XOR／旋轉加密、AES-CBC 金鑰排程、bytecode VM stub、Huffman/LZ | MIT |
+| `arare-runtime`, `runtime/src`, `runtime/arch` | 內嵌 C/ASM 原生重建、環境檢查輔助模組與頁面存取例外分派器 | MIT |
+| `runtime/managed` | 內嵌 C# JIT 前模組初始化器與記憶體轉接層 | MIT |
+| `arare-engine` | 版面設定檔編碼器、區段前置裁剪、載入器合成與 Managed 流程協調 | AGPL-3.0-only |
+| `tools/managed` | 獨立的 ECMA-335 中繼資料改寫器與 IL 包裝層產生器 | AGPL-3.0-only |
+| `arare-cli` / `gui` | CLI 命令、原子檔案寫入與 WPF 批次前端 | AGPL-3.0-only |
+| `verification/senbei-oracle` | 在 workspace 外連結未修改之 Senbei 1.3.1 的隔離測試 crate | AGPL-3.0-only |
 
-獨立的 `verification/senbei-oracle` crate 僅在測試中鏈接未改動的 Senbei。oracle 運行腳本解析顯式選擇的 Senbei 源碼目錄；普通構建不會解析 Senbei。複製的 AGPL 源碼不得進入運行時依賴圖。
+封裝流程由 `arare_engine::protect(input: &[u8], options: &Options) -> Result<Artifact, Error>` 驅動。`Options` 包含九個設定欄位：`profile`、`seed`、`compression`、`storage`、`checks`、`page_encrypt`、`scribble`、`errlog` 與 `antidebug_av`。
 
-引擎 API 是 `protect(input: &[u8], options: &Options) -> Result<Artifact, Error>`。`Options` 選擇適用的 `Profile`、壓縮、種子，以及內嵌或伴生存儲。固定的顯式種子用於測試復現；普通打包從操作系統獲取新的隨機數。
+## 單份儲存編碼與區段裁剪
 
-階段按校驗和與密鑰依賴的相反順序編碼。表大小隨實際輸入增長。運行時消費的表示與 Senbei 恢復的相同。僅 Arare 理解的私有重建尾部不能替代格式兼容。
+各階段會依相依順序反向編碼，使計算出的總和檢查碼與衍生階段金鑰能直接填入前段標頭，無須附加 Arare 私有的尾端區塊：
 
-四個族——PE32、經典 PE32+、現代無標記 PE32+ 與遺留 DLL——有不同的發現、階段、元數據與收尾規則。族名描述佈局，不是虛構的商用版本。
+* **原始區段實體裁剪（`trim_placeholder_raw`）：** 原始應用程式區段只會壓縮儲存一份於 `.arpay` 內，不會在磁碟上重複保留完整原始資料。原始區段的實體 `SizeOfRawData` 會裁剪至未加密磁碟覆寫所需的檔案對齊前綴（包含 `export` 目錄、`CLR` 標頭與 `COR20` 中繼資料／資源資料流、`TLS` 目錄／範本、載入器 `preserved_ranges`，以及 x64 附屬檔 TLS 跳轉修補區）。在 `VirtualSize` 之後仍帶有非零初始化位元組的區段會維持原狀不裁剪，僅捨棄尾端的零填補對齊位元組。
+* **單份 PE 資源儲存：** PE 資源（`DataDirectory[2]`）會記錄於 `Startup.resources` 以供重定位與附屬檔 TLS 重疊檢查使用，但不會列入 `LoaderPatch.preserved_ranges`，因此資源只會在 `.arpay` 中儲存一份並隨酬載一併還原。
+* **匯入表還原：** 無論 thunk 內儲存的是純 RVA 或完整虛擬位址（`ImageBase + RVA`），`copy_imports` 皆能還原依名稱匯入的 hint/name 項目。
 
-## 運行時
+## 執行階段啟動流程
 
-運行時使用兩類源碼構建的輔助模塊：環境檢查與頁保護。原生輸出嵌入對應架構的兩個輔助 DLL。託管輸出攜帶 x86、x64 兩種輔助模塊及兩種原生解碼器，並按進程架構選擇。使用中的輔助模塊在內存中解密並手動映射，其 MZ/PE 魔數會被清零，也不會加入 PEB 模塊列表。這些職責對應已觀察的 HtpecIt/HtdpStub2 拆分，使用 Arare 自己的名稱。
+原生輸出檔內嵌兩個手動映射的輔助 DLL（分別負責環境檢查與頁面保護，對應商業版 `HtpecIt` / `HtdpStub2` 的職責拆分，且抹除 MZ/PE 標頭、不登錄於 PEB 模組清單）；Managed 輸出檔則同時攜帶 x86 與 x64 兩組輔助 DLL，並於啟動時依行程架構擇一載入：
 
-原生第一階段在讀取受保護文件之前運行（410、510、520、52F、540，以及可選的 541）。第二階段在文件暫存之後運行（A03、C00、B00、C01、A09、A11、A0F、BD0、A04 或 A08、可選 BE0、A07/A01）。託管啟動先讀取編碼輸入，再運行檢查。啟用 `host-process` 的原生 DLL 隨後記錄 `A15`，作為沒有檢查體的序列標記。頁密封之後的第三階段運行可選的 E55/E91 設備觀察。已有證據的部分遵循已觀察到的檢查順序；`541` 是 Arare 專用的 Hyper-V 來賓策略。
+```mermaid
+flowchart TD
+    S200["200: 開啟 %TEMP% 除錯記錄閘門\n(DLL 繼承 EXE 記錄狀態)"] --> P1["第 1 階段檢查\n410, 510, 520, 52F, 540, [541]"]
+    P1 --> S560["560: 映射並載入磁碟／附屬檔酬載"]
+    S560 --> P2["第 2 階段檢查\nA03, C00, B00, C01, A09, A11, A0F,\nBD0, A04|A08, [BE0], A07/A01 + DLL A15"]
+    P2 --> S610["610 / 655 / 6E1: 重建區段、\n套用重定位並解析 IAT"]
+    S610 --> S800["800..840: Hook KiUserExceptionDispatcher\n並將可執行頁面設為 PAGE_NOACCESS"]
+    S800 --> P3["第 3 階段檢查: [E55], [E91]"]
+    P3 --> S280["280: 抹除啟動資料表並跳轉至 OEP"]
+    P1 -. 檢查未通過 .-> REJ["關閉記錄 (AAA-BBB-CCC) + ErrLog-Pec\n-> AV 存取違規 (-AV=ON) -> TerminateProcess"]
+    P2 -. 檢查未通過 .-> REJ
+    P3 -. 檢查未通過 .-> REJ
+```
 
-`A15` 是標記，不是檢查。主機可執行文件從不記錄它。Arare 的 `A11` 使用協作式主機身份（原生 `.arldr` / 託管 `.armclr` 標記，加上可選戳記）。商用工件掃描名為 `peC` 的節，或精確大小寫的 `KeRnEl32.dLl` 導入；該可偽造性被接受。
+* **階段 `410` 除錯器檢查與 AV 處置：** 原生 `410` 會檢查 `IsDebuggerPresent`、`PEB.BeingDebugged`、`NtGlobalFlag`、硬體除錯暫存器（`DR0`..`DR3`、`DR7`），以及查詢核心狀態的 `NtQueryInformationProcess`（`ProcessDebugPort`、`ProcessDebugFlags`、`ProcessDebugObjectHandle`）。在原生 EXE 上（預設 `--antidebug-av=on`），`ar_reject` 會在呼叫 `TerminateProcess` 前先引發 `EXCEPTION_ACCESS_VIOLATION` 並寫入空指標位址（Managed 模組則直接呼叫 `TerminateProcess`）。
+* **宿主標記（`A11` / `A15`）：** 啟用 `host-process` 時，原生 DLL 會將 `A15` 記錄為純流程標記而不執行額外檢查邏輯。`A11` 則檢查協作式 Arare 宿主區段（`.arldr` 或 `.armclr`）與選用的執行期戳記，而非商業版的 `peC` / `KeRnEl32.dLl` 標記。
+* **存取違規觸發的頁面解密與階段 `280` 清理：** Arare 會在每次封裝時產生專屬的頁面加密 bytecode 與排程表，在同行程相容模組間共用單一 `KiUserExceptionDispatcher` hook，並在階段 `280` 跳轉至 OEP 前抹除已用畢的匯入映射表、輔助 DLL 區塊與啟動描述元。
 
-DLL 繼承其調用方 EXE 的 `%TEMP%` 調試日誌門控與文件夾，即使種子不同。只要存在主機上下文，它始終優先，即使其門控已關閉或過期。`--check host-process=off` 不會關閉該繼承。
+## 實驗性核心驅動元件與商業版剩餘差異
 
-頁加密構建在重建後把可執行應用程序頁就地重新加密，並設為 `PAGE_NOACCESS`。處理程序通過修補 `ntdll!KiUserExceptionDispatcher` 安裝。兼容模塊向同一個進程分發器註冊。頁加密實際開啟時，含可寫可執行節的輸入會被拒絕。
-
-Arare 生成自己的頁密碼程序與密鑰日程。商用研究記錄了一種已觀察的按需頁密碼公式，第二遍變換仍未解析。共同的頁故障處理與階段碼只能證明機制大體相同，不能證明密碼或保護強度相同。同樣，Arare 的主機標記與可選檢查不能證明它與商用主機互通。
-
-狀態 `280` 之後，原生啟動清除用盡的導入映射、輔助 blob、源頁表與一次性配置。後續通知所需的幾何信息以及保留的主機身份會留下。按需解密程序仍可供後續故障使用。
-
-## 內核
-
-`kernel/` 是獨立編寫的實驗性提供程序。普通 `protect` 沒有內核選項。普通 Cargo 構建不需要 WDK。有效性聲明需要真實的內核執行證據，而不是主機替身或一次成功的 WDK 構建。
-
-## 剩餘缺口
-
-已實現的用戶態選項覆蓋 410、510、520、52F、540、A03、C00、C01、BD0、B00、A09、A0F、A07/A01、A11、A08、A04、BE0、E55、E91，以及 Arare 專用的 541、A15 標記、頁加密、scribble 與可選 ErrLog-Pec。剩餘的商用保真工作包括證據不完整的檢查謂詞、主機目錄准入、未識別的 E 系列對象、已加載模塊完整性節奏、已驗證的商用默認矩陣，以及單獨的 Windows 10 執行。與商用 CrackProof 主機的互操作是另一項里程碑。
+`kernel/` 目錄包含獨立撰寫的實驗性驅動程式專案，未納入 Cargo 建置與 `arare protect` 流程。目前與商業版 CrackProof 的剩餘差異包括：樣本中僅部分觀測到的檢查觸發細部條件、宿主目錄白名單判定、尚未對應的 `E` 系列檢查物件、啟動後的週期性模組重新掃描、經完整核對的商業版預設檢查矩陣，以及獨立的 Windows 10 實機測試。

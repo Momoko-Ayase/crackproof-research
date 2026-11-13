@@ -1,22 +1,31 @@
 ---
-description: "受保护宿主、原生 DLL 和托管 DLL 的脱敏调试日志。"
+description: "采自页面加密宿主 EXE、原生插件 DLL 与托管 DLL 的脱敏运行时调试日志。"
+icon: file-lines
 ---
 
 # 调试日志示例
 
-这些是真实的 CrackProof 调试日志，捕获方式是在 `%temp%` 下创建该可执行文件对应的 12 个十六进制字符文件夹并启动受保护程序（见 [调试日志](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status#调试日志)）。路径与产品名已替换为通用占位符；选项标志、状态码、地址、hook 列表等其余内容均为原文。
+以下为真实的 CrackProof 运行时日志，启动前在 `%temp%` 下创建各二进制文件对应的 12 字符十六进制目录即可采集（详见 [调试日志](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status#debug-logging)）。文件路径与产品名称已替换为通用占位符；加壳选项标记、状态码、内存地址与被 hook 的 API 列表均原样保留。
 
-## 如何阅读日志
+## 日志结构
 
-* **第 1 行**——受保护模块的路径。
-* **第 2 行**——该构建打包时使用的保护选项标志（每个 `-XX` 记号对应一个打包器选项）。
-* **第 3/4 行**——时间戳与模块的加载基址。
-* **后续行**——12 位 [状态码](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status#启动序列与状态码)，每个 stage 一行；缩进的 `000`–`00N` 行携带 stage 特定的细节（地址、计数、被 hook 的函数）。
-* **最后几行**——完成时间戳与 9 位错误码（`000-000-000` = 成功）。
+* **第 1 行：** 受保护 EXE 或 DLL 的完整路径。
+* **第 2 行：** 编译进该模块的加壳选项标记（如 `-CF`、`-CP`、`-PP` 等）。
+* **第 3 至 4 行：** 启动时间戳与十六进制模块加载基址。
+* **主体行：** 12-bit（3 位十六进制）[状态码](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/startup-status#the-boot-sequence-and-status-codes)，缩进的 `000`..`00D` 明细行则记录阶段参数、驱动名称及被 hook 的函数地址。
+* **结尾行：** 结束时间戳与 `AAA-BBB-CCC` 结果码（正常启动完成时为 `000-000-000`）。
 
-## 宿主 EXE，页加密
+## 采集日志原文
 
-```
+{% tabs %}
+{% tab title="宿主 EXE（页面加密）" %}
+本段日志的关键信息：
+
+* **`C00`（`01A065F4 01A037AB`）：** 每个双字均为 `0x01A00000 + build`，分别记录当前宿主机 Windows build 号 `26100`（`0x65F4`）与最低允许 build 号 `14251`（`0x37AB`）。
+* **`C03` 与 `C04`：** 初始化第二代驱动 `Htsysm7679`（见 [Htsysm 内核组件](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/kernel-components)），并 hook 15 个 `kernel32` / `kernelbase` / `ntdll` API，在不兼容的系统调用前后临时切换受保护进程（Protected Process）状态。
+* **`610 -> 640 -> 655 -> 6E1 -> 800..840 -> 660 -> 280`：** 整块解密可执行节（`640`），应用重定位（`655`），hook `KiUserExceptionDispatcher` 并将代码页设为 `PAGE_NOACCESS`（`840`），执行收尾交接步骤 `660`，最后跳转至 OEP（`280`）。
+
+```text
 E:\Package\app.exe
  -CF -CP -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -EUT64 -DE -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NDEP1 -NDC -NPD
 2026/05/15 04:55:07.178
@@ -93,18 +102,15 @@ A06
 2026/05/15 04:55:07.278
 000-000-000
 ```
+{% endtab %}
 
-值得注意的点：
+{% tab title="原生插件 DLL（整块解密）" %}
+本段日志的关键信息：
 
-* `C03` 给出驱动代际：`Htsysm7679`——第二代 Htsysm（见 [Htsysm 内核组件](https://app.gitbook.com/s/fEb9nKPvKsjkPAHMUbOt/runtime/kernel-components)）。
-* `C04` 列出为 Protected-Process 开关 hook 的全部 API（`NtCreateSection`、`NtAlpcSendWaitReceivePort`、`NtDuplicateObject`、`NtConnectPort`、`NtOpenProcess`、`NtOpenThread`……）以及加载器拦截 hook（`CreateProcessInternal*`、`CreateRemoteThread*`、`LdrLoadDll`、`CreateActCtxW`）。
-* `640 … 840`——该模块是**页加密**的：先整体解密，随后重新加密并安装异常处理 hook。`840` 之后的 `002` 行携带三个地址（重新加密的区间与处理程序数据）。
-* `570` 与 `A06` 在启动后期 hook 更多 API（`user32!SetFocus`、`CreateWindowExA/W`、`uxtheme!ThemeInitApiHook`）。
-* `660` 是一个不在公开状态表中的 stage——在此处出现于 `840` 与最终的 `280`（跳转 OEP）之间。
+* **`A11` -> `5D0` -> `A15`：** `A11` 校验宿主 EXE 是否带有 CrackProof 宿主特征标记；`A15` 在 `5D0` 之后输出，作为确认宿主校验已通过的纯 DLL 流程标记。
+* **无 `640` / `840`（`-NCP`）：** 各节在 `610` 一次性完成解密，在 `655` 应用重定位，随后经 `800 -> 830 -> 280` 结束引导，所有代码页保持明文常驻内存。
 
-## 原生插件 DLL，仅整体解密
-
-```
+```text
 E:\Package\app_Data\Plugins\native_plugin.dll
  -CF -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -DE -NCP -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NEUT64 -NDEP1 -NDC -NPD
 2026/05/15 04:55:14.518
@@ -133,17 +139,14 @@ A15
 2026/05/15 04:55:14.619
 000-000-000
 ```
+{% endtab %}
 
-值得注意的点：
+{% tab title="托管 DLL" %}
+本段日志的关键信息：
 
-* `A11`——DLL 的宿主进程检查，仅存在于受保护 DLL。
-* `A15` 跟在宿主进程检查之后。它是不带检查体的纯标记：宿主验证已通过，启动进入解密前奏。
-* **没有 `640`/`840`**——该构建只整体解密一次（`610`），从不做页加密；对比上面的宿主 EXE。页加密是逐模块的选项。
-* `800` 携带单个地址——新填充的映像区域。
+* 执行最精简的 CLR DLL 启动序列：`510` 加载器 CRC 校验、`A09` 虚拟机注册表检查、`A11` 宿主 EXE 检查、解密前序步骤 `5D0..5A0`、`610` 解密节与方法体，随后直接在 `280` 移交控制权（无驱动初始化、重定位或页面加密）。
 
-## 托管 DLL，最简序列
-
-```
+```text
 E:\Package\app_Data\Managed\Assembly-CSharp.dll
  -CF -CP -C2 -E2 -CC -T12 -RC3 -GWH -DA -DD -PP -I -EL5 -CK2 -CD1 -CD2 -CD3 -CD4 -EUT64 -DE -NCP2 -NC -NE -NCC2 -NRC -NDA3 -NEL -NEL2 -NEL3 -NEL4 -NELA -NEVS -NERR -NWEB -NEUT32 -NDEP1 -NDC -NPD
 2026/05/15 04:55:09.342
@@ -163,5 +166,5 @@ A11
 2026/05/15 04:55:09.368
 000-000-000
 ```
-
-托管构建运行最短的流水线：环境检查、节解密（`610`），然后直达 OEP（`280`）——无驱动初始化、无页加密、无重定位 stage。
+{% endtab %}
+{% endtabs %}

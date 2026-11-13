@@ -1,10 +1,11 @@
 ---
-description: "The per-build custom byte transform: x86 stub decoder, interpreter, translation table, and inverse chain."
+description: "Per-build AL x86 bytecode stub decoder, interpreter, 256-byte lookup table, and inverse."
+icon: microchip
 ---
 
 # bytecode\_vm.py
 
-The bytecode VM that decodes each build's unique x86 stub, as documented in [Per-build byte transform](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/bytecode-transform).
+Decoder, interpreter, 256-byte LUT generator, and inverse builder for per-build `AL` stubs; see [Per-build byte transform](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/data-transforms/bytecode-transform).
 
 ```python
 """The per-build custom byte transform ("bytecode VM").

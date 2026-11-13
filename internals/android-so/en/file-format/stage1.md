@@ -1,45 +1,50 @@
 ---
-description: "Decode and validate the fixed-size outer header before reading the payload."
+description: "Decode and validate the Stage 1 parameter header inside SHT_LOUSER before decrypting Stage 2."
+icon: box-archive
 ---
 
 # Stage 1 header
 
-The private `SHT_LOUSER` section isn't a single blob. Observed layout:
+The `SHT_LOUSER` section contains four regions in sequence:
 
-| Order | Content |
-| --- | --- |
-| 1 | Outer wrapper (`0x23C` bytes) |
-| 2 | Encrypted parameter area (`0x1000` bytes); only the first 32 bytes form the word header |
-| 3 | Encrypted stage 2 image |
-| 4 | Remaining record streams |
+```mermaid
+flowchart LR
+    W["+0x000: Outer wrapper\n(0x23C bytes)"] --> P["+0x23C: Parameter area\n(0x1000 bytes; 32B header at start)"]
+    P --> S2["+0x23C + payload_offset:\nEncrypted Stage 2 image"]
+    S2 --> TAIL["4B-aligned end:\nRemaining Stage 2 stream data"]
+```
 
-The observed default wrapper size is `0x23c` bytes (572 decimal). Two word-transform constants have been observed: `0xbf20165d` and `0xbf189bdd`. Each family uses one of them. Read the size and the constant from the private section when a build supplies a different value; the defaults are recognition clues, not universal assumptions.
+Observed builds use an outer wrapper size (`outer_size`) of `0x23C` bytes (572 bytes), followed by a `0x1000`-byte parameter block whose first 32 bytes hold the encrypted eight-dword Stage 1 header. Two Stage 1 word-cipher constants `C` occur across observed families: `0xBF20165D` and `0xBF189BDD`.
 
-How the stub finds that section at load time is described in [Stage 1 bootstrap](../runtime/stage1-bootstrap.md). The word cipher itself is on [Word, stream, and record ciphers](../data-transforms/word-and-record.md).
+Runtime discovery of this section is covered in [Stage 1 bootstrap](../runtime/stage1-bootstrap.md), and the surrounding cipher family is documented in [Word, stream, and record ciphers](../data-transforms/word-and-record.md).
 
 ## Header fields
 
-The decrypted word header contains eight 32-bit values:
+Decrypting the first 32 bytes at `section_offset + outer_size` yields eight little-endian `u32` fields:
 
-| Field | Meaning | Required relation |
-| --- | --- | --- |
-| `key` | Per-file arithmetic key | Non-zero in observed files |
-| `reserved` | Reserved word | Must be zero |
-| `payload_offset` | File-relative payload start | Aligned and inside the private section |
-| `payload_size` | Protected payload length | Non-zero and inside the section |
-| `payload_key` | Key passed to the next stage | Preserved for stage 2 |
-| `entry_offset` | Protected entry offset | Inside the recovered image range |
-| `protect_size` | Range covered by protection | Doesn't exceed the image |
-| `size_copy` | Copy of the payload length | Must equal `payload_size` |
+| Offset | Field | Meaning | Validation rule |
+| --- | --- | --- | --- |
+| `+0x00` | `key` | Per-file Stage 1 header key | Restored into word 0 after decrypting words `1..7` |
+| `+0x04` | `reserved` | Unused field | `== 0` |
+| `+0x08` | `payload_offset` | Stage 2 start relative to the parameter header (`section_offset + outer_size`) | `>= 0x20` and `payload_offset + payload_size <= section_size - outer_size` |
+| `+0x0C` | `payload_size` | Encrypted Stage 2 byte length | `> 0` and 4-byte aligned (`payload_size % 4 == 0`) |
+| `+0x10` | `payload_key` | Word-cipher key used by Stage 1 to decrypt the Stage 2 image | Passed to the Stage 1 word cipher over `payload_size` bytes |
+| `+0x14` | `entry_offset` | Entry offset inside the decrypted Stage 2 image | `< payload_size` |
+| `+0x18` | `protect_size` | `mprotect` length inside the decrypted Stage 2 image | `<= payload_size` |
+| `+0x1C` | `size_copy` | Duplicate of `payload_size` | `== payload_size` |
 
-The words are restored with unsigned 32-bit arithmetic. For word index `i`, the observed form is:
+{% hint style="warning" %}
+`payload_offset` is measured from the start of the 32-byte parameter header (`section_offset + outer_size`), not from the beginning of the ELF file. The file offset of the encrypted Stage 2 image is `section_offset + outer_size + payload_offset`.
+{% endhint %}
 
+For word index `i` (`0..7`), decryption uses unsigned 32-bit wraparound:
+
+```text
+plain[i] = ((cipher[i] + (i + 3) * key) ^ (C * (i + 1))) & 0xFFFFFFFF
 ```
-plain[i] = (cipher[i] + (i + 3) * key) XOR (C * (i + 1))
-```
 
-`C` is the family word constant. All intermediate values wrap at 32 bits. The first word supplies `key` and is written back after the 32-byte header is decrypted. Restore the complete header, then apply the field checks, rather than trusting a single decoded value. The remaining 0x1000 − 32 bytes of the parameter area aren't part of this eight-word table.
+Word `0` supplies `key` (`key = cipher[0] ^ C` before write-back, with `plain[0] = key` stored after words `1..7` are decoded). Stage 1 then decrypts the Stage 2 image at `section_offset + outer_size + payload_offset` using the same word cipher with `payload_key` and constant `C`. The Stage 2 root record stream (`0xE2`) starts inside `SHT_LOUSER` immediately after the 4-byte-aligned end of the Stage 2 image.
 
-## Fail-closed checks
+## Header validation
 
-Reject the file when the header is truncated, the reserved word is non-zero, the copied size differs, the payload is unaligned or out of range, or the entry/protected ranges don't fit the image. These checks prevent random section data from being mistaken for a valid stream.
+Candidate combinations of `(outer_size, C)` are accepted only when all eight header invariants hold and the resulting Stage 2 image plus trailing stream fit inside `SHT_LOUSER`. Any truncated section, non-zero `reserved` word, mismatched `size_copy`, unaligned `payload_size`, or out-of-range `entry_offset` / `protect_size` rejects the candidate before Stage 2 parsing begins.

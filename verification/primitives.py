@@ -188,7 +188,8 @@ def lfsr_decrypt_block(d, pos):
 
 def string_cipher(d, pos, key):
     """Decrypt a NUL-terminated string in place: nibble swap, rolling
-    subtract (step 67). The initial key is the low byte of the string RVA."""
+    subtract (step 67). Initial key is name_rva & 0xFF for DLL names, or
+    hint_name_rva & 0xFF for IMAGE_IMPORT_BY_NAME strings at hint_name_rva + 2."""
     i = 0
     while d[pos + i] != 0:
         b = ror8(d[pos + i], 4)

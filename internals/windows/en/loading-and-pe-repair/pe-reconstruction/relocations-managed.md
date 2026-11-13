@@ -1,33 +1,44 @@
 ---
-description: "Relocation policy, the final page transform, and the special handling required for managed images."
+description: "/FIXED vs ASLR relocation rules, family-specific .text scramble ordering, and surgical CLR metadata overlays."
+icon: cubes
 ---
 
 # Relocations, page transforms, and CLR data
 
-## Relocations and the /FIXED split
+## Base relocations and `/FIXED` vs ASLR policy
 
-Builds differ deliberately in whether the result may be rebased:
+* **Single-file 64-bit marker & 32-bit EXEs (`/FIXED`):** the packer discards base relocations and clears `DllCharacteristics`. Static reconstruction zeroes `DataDirectory[5]` and `DllCharacteristics` so the EXE loads at its preferred `ImageBase`.
+* **All DLLs (32-bit and 64-bit, any family):** DLLs must remain relocatable; reconstruction preserves `DataDirectory[5]`, ensures `IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE` (`0x0040`) is set, and re-arms neutralized TLS relocations on PE32 DLLs.
+* **Marker-less 64-bit & external-companion (`._`) builds:** preserve active ASLR flags (`DYNAMIC_BASE` / `HIGH_ENTROPY_VA`) and `DataDirectory[5]` (appending the four `DIR64` TLS relocations when companion TLS is restored).
 
-- **Older single-file EXE builds are `/FIXED`.** The shell discards the base-relocation table and clears `DllCharacteristics`; the image can only load at its preferred base. A faithful reconstruction mirrors this: `DataDirectory[5]` zeroed, `DllCharacteristics` zeroed.
-- **DLLs (any layout) must stay relocatable.** A DLL is almost always mapped away from its preferred base; stripping its relocations makes it unloadable. Reconstruction keeps `DataDirectory[5]` and ensures `IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE` (`0x0040`) is set.
-- **Marker-less and companion builds aren't `/FIXED`.** They carry real ASLR flags and a valid relocation table, and any rebase must relocate everything, including the restored TLS directory's pointers, which is why those relocations are appended during TLS restoration. The 32-bit family meets the same requirement differently: its DLLs keep the four TLS-field entries as neutralized `ABSOLUTE` slots that are re-armed to `HIGHLOW`, not appended (see [Imports, TLS, and exports](imports-tls-exports.md#tls-is-stripped-and-reinstalled-at-runtime)).
+## `.text` page-scramble (`dd8`) ordering
 
-## The code-page scramble, ordered last
+`dd8` must run at different points in the marker vs marker-less pipelines because marker-less builds store encrypted import strings and plaintext CLR metadata inside `.text`:
 
-The [per-page scramble](../../data-transforms/lfsr-strings-pages.md#the-per-page-code-scramble) applies to `.text` after section recovery. Ordering constraints observed across families:
+```mermaid
+flowchart TB
+    subgraph Marker["64-bit Marker pipeline"]
+        direction LR
+        M1["Recover sections"] --> M2["walk5 imports"] --> M3["Section hdrs & exports"] --> M4[".text dd8"] --> M5["Restore EP & DDs"] --> M6["CLR & TLS"]
+    end
+    subgraph Markerless["64-bit Marker-less pipeline"]
+        direction LR
+        L1["Recover sections"] --> L2["Section hdrs & exports"] --> L3["Restore EP & DDs"] --> L4[".text dd8\n(only if EP in .text)"] --> L5["DD[1] IDT imports"] --> L6["CLR & TLS"]
+    end
+```
 
-- **Marker layout:** scramble runs before the entry-point/data-directory restoration.
-- **Marker-less layout:** scramble is deferred until after import-name decryption and is re-selected over the final bytes, and only runs when the entry point falls inside `.text`. Managed images restore their CLR metadata **after** the scramble, because the metadata region lives inside `.text` but isn't scrambled code: scrambling it would corrupt roughly one byte per 16 and produce an invalid COR20 signature.
-- **32-bit:** the scramble is skipped entirely when the section is already plaintext (native DLLs), detected by comparing the `0xCC`-restoration score against the no-scramble baseline.
+On marker-less builds, running `dd8` after section-header and EP/directory restoration (gated on `AddressOfEntryPoint` falling inside `.text`) and **before** `DD[1]` import-name decryption and CLR overlay prevents `dd8` from re-scrambling freshly decrypted import strings or corrupting overlaid `COR20`/`BSJB` bytes.
 
-## CLR metadata and method bodies require different handling
+## Surgical CLR metadata restoration
 
-Some managed layouts preserve the COR20 header (`cb == 0x48`), the BSJB metadata stream, and CLR resources verbatim in the protected file at their RVA-mapped file offsets. These ranges can be copied back after section recovery. In marker-less layouts they are restored after the page transform, because they may occupy addresses inside `.text` without being transformed code.
+Managed CrackProof builds encrypt IL method bodies inside section payloads while keeping ECMA-335 metadata structures unencrypted in the outer file or companion stub:
 
-Managed **companion** DLLs keep these structures in the loader stub rather than the protected payload. The restore set is the COR20 header plus every non-empty range it references: the BSJB metadata (required), resources, the strong-name signature, the code-manager table, vtable fixups together with the slot arrays they name, the export-address jump table, and the managed native header. Method bodies are never part of the overlay; they come from the decrypted companion.
+* **Single-file marker-less 64-bit:** overlays the `COR20` header (`cb == 0x48`) and `BSJB` metadata stream at their RVAs after `dd8`.
+* **Single-file marker 64-bit:** overlays `COR20`, `BSJB` metadata, and `COR20.Resources` (`+0x18`).
+* **Managed companion (`._`) DLLs:** overlays `COR20` (`0x48` bytes) from the stub PE together with all seven referenced sub-ranges when nonzero: `MetaData` (`BSJB`, required), `Resources`, `StrongNameSignature`, `CodeManagerTable`, `VTableFixups` (plus each referenced slot array), `ExportAddressTableJumps`, and `ManagedNativeHeader`.
 
-The preserved metadata does **not** include a plaintext copy of every IL method body. Method bodies reside in PE sections and remain subject to the section-data and page transforms used by that build. Filling an entire section from the protected file can therefore overwrite correctly recovered methods with transformed bytes. Restore the section contents first, then replace only the independently verified CLR ranges, never a whole section from the protected file or the stub.
+{% hint style="warning" %}
+**Never copy an entire CLR-bearing section after section recovery.** IL method bodies share `.text` with `COR20` and `BSJB` and are recovered by `walk4` + `dd8`; overwriting the whole section from the protected file or stub replaces decrypted method bodies with ciphertext. (Only the older dedicated 64-bit DLL pipeline pre-fills the CLR section *before* `walk4` writes recovered method bodies on top of it.)
+{% endhint %}
 
-If the recovered COR20 directory points to a header whose `cb` is zero and no valid preserved header is available, clear the directory. Passing an empty header to the CLR startup path produces a failure that can be mistaken for bad section recovery. Mixed-mode images also need their native-entrypoint flag preserved; a pure managed image can be identified separately from that case.
-
-Unity il2cpp titles add a separate obfuscation outside the PE: method tokens inside `global-metadata.dat`. See [il2cpp metadata obfuscation](../../analysis/il2cpp-metadata.md).
+If `DataDirectory[14]` points to a zeroed `COR20` header (`cb == 0`) with no valid preserved copy, `DataDirectory[14]` is cleared. Unity IL2CPP titles pack native `GameAssembly.dll` without CLR headers and obfuscate `global-metadata.dat` separately; see [il2cpp metadata obfuscation](../../analysis/il2cpp-metadata.md).

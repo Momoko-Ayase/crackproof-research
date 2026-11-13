@@ -1,10 +1,11 @@
 ---
-description: "Huffman/LZ 混合解壓器：3 字節表項，字面量/行程填充/回溯引用令牌。"
+description: "3 位元組 Huffman 樹與四模式字面值/行程/LZ 解壓縮器。"
+icon: file-zipper
 ---
 
 # huffman.py
 
-這是用於 stage 與節數據塊的解壓器，算法與 [Huffman 與 LZ 壓縮](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/compression) 中的記載一致。
+用於載入器階段與區段資料區塊的 Huffman/LZ 混合解壓縮器，對應 [Huffman 與 LZ 壓縮](https://app.gitbook.com/s/sFi4W2Zr1UBoxZd5YI3A/data-transforms/compression)。
 
 ```python
 """The Huffman/LZ hybrid decompressor.

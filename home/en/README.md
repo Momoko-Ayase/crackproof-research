@@ -1,7 +1,6 @@
 ---
-description: >-
-  Independent technical research into CrackProof protection formats and runtime
-  behavior.
+description: "Independent technical research into CrackProof protection formats and runtime behavior."
+icon: house
 layout:
   width: wide
   title:
@@ -24,18 +23,18 @@ layout:
 
 # CrackProof Research
 
-CrackProof® is a family of commercial binary-protection systems from HyperTech. This site records independently verified details of its file formats, data transforms, loaders, and runtime components.
+CrackProof® is a family of commercial binary-protection systems from HyperTech. This site documents independently verified details of its file formats, data transforms, staged loaders, and runtime components.
 
-The research currently covers Windows PE files and Android native libraries. Each platform has its own container format and restoration path, so their internals are documented separately.
+The research covers Windows PE files and Android AArch64 shared libraries. Each platform uses a distinct container format and restoration pipeline, so their internals are documented in separate sections.
 
-<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Windows internals</strong></td><td>Protected PE layout, transforms, staged loading, PE reconstruction, and runtime behavior.</td><td><a href="https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/">CrackProof for Windows internals</a></td></tr><tr><td><strong>Android SO internals</strong></td><td>Protected AArch64 ELF layout, module streams, container decoding, ELF restoration, and IL2CPP metadata.</td><td><a href="https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/">CrackProof for Android SO internals</a></td></tr><tr><td><strong>Verification &#x26; reference</strong></td><td>Executable test vectors and small reference implementations for the documented Windows transforms.</td><td><a href="https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/">Verification &#x26; reference</a></td></tr><tr><td><strong>Senbei</strong></td><td>The project's own static unpacker for protected Windows PE files and Android shared libraries: usage, design, and development.</td><td><a href="https://app.gitbook.com/s/ul1YGOqMPNVceXYP7FFj/">Senbei</a></td></tr><tr><td><strong>Arare</strong></td><td>The project's own source-built Windows PE protector: usage, GUI, support, design, and development.</td><td><a href="https://app.gitbook.com/s/ePWLVFU0kRqnVPWx6nxD/">Arare</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th width="48"></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><i class="fa-desktop"></i></td><td><strong>Windows internals</strong></td><td>Protected PE layout, ciphers, staged loading, PE reconstruction, and runtime checks.</td><td><a href="https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/">CrackProof for Windows internals</a></td></tr><tr><td><i class="fa-mobile-screen-button"></i></td><td><strong>Android SO internals</strong></td><td>Protected AArch64 ELF layout, nested module streams, container decoding, ELF restoration, and IL2CPP metadata.</td><td><a href="https://app.gitbook.com/s/fcBZibCo72OSh5jVcKoo/">CrackProof for Android SO internals</a></td></tr><tr><td><i class="fa-code"></i></td><td><strong>Verification &amp; reference</strong></td><td>Executable test vectors, runnable Python implementations, and anonymized debug logs for the Windows transforms.</td><td><a href="https://app.gitbook.com/s/8S0xnfw9UP9A2yylicaA/">Verification &amp; reference</a></td></tr><tr><td><i class="fa-screwdriver-wrench"></i></td><td><strong>Senbei</strong></td><td>Static unpacker for protected Windows PE files, Android shared libraries, and IL2CPP metadata: CLI, desktop GUI, design, and development.</td><td><a href="https://app.gitbook.com/s/ul1YGOqMPNVceXYP7FFj/">Senbei</a></td></tr><tr><td><i class="fa-shield-halved"></i></td><td><strong>Arare</strong></td><td>Source-built Windows PE protector reproducing observed layout families: CLI, GUI, support matrix, design, and development.</td><td><a href="https://app.gitbook.com/s/ePWLVFU0kRqnVPWx6nxD/">Arare</a></td></tr></tbody></table>
 
-## Research boundaries
+## Research scope
 
-The pages describe observable structures and behavior. Names are taken from binaries, logs, established platform terminology, or a literal description of what a field does. A claim counts as format behavior only when more than one sample shows it, or when an internal consistency rule supports it.
+Every documented rule comes from observable binary structures and runtime behavior. Field and component names follow strings in the binaries, debug log output, standard platform specifications, or literal descriptions of what the bytes do. A behavior is generalized as part of the format when multiple samples share it or when an internal consistency check enforces it.
 
-Protected product names, deployment-specific driver names, and identifying sample details are omitted. The research pages don't name the implementation projects used to verify them; the Senbei and Arare sections separately document the project's own tools.
+Protected product names, deployment-specific driver filenames, and sample-identifying paths are omitted throughout the research sections. Senbei and Arare are documented separately in their own product sections.
 
-## Legal notice
-
-Use this information only with binaries you own or are explicitly authorized to analyze. Laws and license terms governing circumvention vary by jurisdiction. This independent publication contains no vendor source code or keys, is not affiliated with HyperTech, and does not authorize redistribution of restored binaries.
+{% hint style="warning" %}
+**Legal notice.** Use this material only with binaries you own or are explicitly authorized to analyze. Laws and license agreements governing circumvention of technological protection measures vary by jurisdiction. This independent publication contains no vendor source code or keys, has no affiliation with HyperTech, and does not authorize redistributing restored binaries.
+{% endhint %}

@@ -1,10 +1,11 @@
 ---
-description: "Compares the Windows Python reference implementations with fixed vectors and known answers."
+description: "Standalone 31-comparison verification harness for the Windows Python reference files."
+icon: circle-check
 ---
 
 # run\_tests.py
 
-The harness regenerates inputs with the reference port's LCG sequence and runs 31 comparisons against `vectors.txt` and known answers. Save the reference Python files and vectors together, then run `python run_tests.py`. From the documentation repository root, use `python verification/run_tests.py`. The vector path is resolved beside the script. Expected final output: `all vectors match`.
+Generates deterministic LCG inputs and executes 31 comparisons against `vectors.txt` and known answers. Run `python verification/run_tests.py` from the repository root (`all vectors match`).
 
 ```python
 """Compare the Windows Python reference implementations with the checked-in

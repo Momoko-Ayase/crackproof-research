@@ -1,81 +1,52 @@
 ---
-description: "工作区布局以及 Windows 与 Android 恢复流水线。"
+description: "九个 crate 的工作区架构、保护画像与分析追踪、观察者回调、双平台流水线及 WASM 边界。"
+icon: diagram-project
 ---
 
-# 设计
+# 架构设计
 
-本页介绍 Senbei 的工作区布局，以及 Windows 与 Android 恢复流水线。
+## 工作区结构
 
-## crate 布局
+Cargo 工作区包含九个成员 crate，`senbei-wasm`（浏览器端绑定）与 `fuzz`（`libFuzzer` 测试驱动）作为独立 crate 排除在主工作区之外：
 
-工作区由七个 crate 组成；浏览器绑定 `senbei-wasm` 是工作区之外的独立 crate。
-
-* `senbei-cli` 是命令行入口。
-* `senbei-io` 负责文件系统编排。
-* `senbei-pe` 提供基础格式解析。
-* `senbei-elf` 提供基础格式解析。
-* `senbei-crypto` 提供共享原语。
-* `senbei-metadata` 恢复元数据。
-* `senbei-engine` 负责保护方案专属的流水线。
-
-单一平台的源码直接放在 `src/` 下。多平台 crate 把平台代码放在 `src/windows/` 与 `src/android/` 下，共享代码直接放在 `src/` 下。
-
-```text
-senbei-cli/src/main.rs
-senbei-crypto/src/
-senbei-crypto/src/android/
-senbei-crypto/src/windows/
-senbei-elf/src/
-senbei-engine/src/windows/
-senbei-engine/src/android/
-senbei-io/src/
-senbei-io/src/android/
-senbei-io/src/windows/
-senbei-metadata/src/
-senbei-metadata/src/windows/
-senbei-metadata/src/android/
-senbei-pe/src/
-senbei-wasm/src/
+```mermaid
+flowchart TD
+    CLI["senbei-cli\n(CLI 与 JSON)"] --> IO["senbei-io\n(扫描、伴随文件、APK、日志)"]
+    GUI["senbei-gui\n(egui/wgpu 桌面工作台)"] --> IO
+    CLI --> I18N["senbei-i18n\n(五语言文案库)"]
+    GUI --> I18N
+    IO --> I18N
+    WASM["senbei-wasm\n(WebAssembly 接口)"] --> IO
+    IO --> ENG["senbei-engine\n(Windows 与 Android 流水线)"]
+    ENG --> I18N
+    ENG --> PE["senbei-pe"]
+    ENG --> ELF["senbei-elf"]
+    ENG --> CRY["senbei-crypto"]
+    ENG --> META["senbei-metadata"]
 ```
 
-`senbei-pe` 与 `senbei-elf` 负责经过验证的格式模型、地址映射与 ELF 动态哈希辅助。它们不依赖解包引擎、文件系统代码或平台保护逻辑。
+| Crate | 职责 |
+| --- | --- |
+| `senbei-cli` | 命令行解析、终端着色与多语言输出、JSON 序列化及集成测试套件 |
+| `senbei-gui` | 原生 `eframe`/`wgpu` 桌面工作台（`Workbench` 界面层不直接访问文件系统，由 `native.rs` 驱动后台任务） |
+| `senbei-i18n` | 零 `unsafe` 的五语言文案库（`Msg`、`Step`、`Term`、`Cli`、`Message`），同时为 `--json` 和 `.log` 保留固定英文协议字符串 |
+| `senbei-io` | 文件夹扫描、Windows `._` 伴随文件拼接、Android `.apk`/`.apks`/`.xapk` 流式读取、`RunObserver` 与 `CancelToken` |
+| `senbei-engine` | Windows PE 与 Android ELF 静态还原流水线、`profile.rs` 报告模型及带容量上限的分析追踪收集器 |
+| `senbei-pe` / `senbei-elf` | 纯内存格式解析器、RVA/文件偏移换算，以及 ELF SysV/GNU 哈希表与布局辅助函数（零文件系统 I/O） |
+| `senbei-crypto` | Windows（`src/windows/`）与 Android（`src/android/`）加密算法、AES 轮密钥编排、字节码 VM 及 Huffman/LZ 解压 |
+| `senbei-metadata` | 元数据布局定义（`layout.rs`）、跨平台共用的 `v31` 结构重映射，以及 Android 种子派生 `v24.1`/`v29`/`v31`/`v39` 与精简版 `v24` 还原 |
+| `senbei-wasm` | 独立的 `wasm32-unknown-unknown` 绑定层，在一次性 Web Worker 内调用 `senbei-io` 的纯内存字节接口 |
 
-## 保护 profile
+跨平台 crate 将平台专有实现隔离在 `src/windows/` 与 `src/android/` 子目录下，共享数据模型直接放在 `src/` 根目录。
 
-开发树中的共享模型 `senbei-engine/src/profile.rs` 记录观察到的格式、保护证据、候选尝试、选中流程、恢复状态与最终静态验证状态。其 `format_version` 表示报告格式版本，不是保护器构建版本。检测不会替代试解再验证，也不会根据未经验证的指纹指定 CrackProof 版本。
+## 分析报告、追踪记录与状态回调
 
-轻量检测让恢复与验证保持未尝试状态。面向研究的 `inspect` 命令会继续分析：它结合解析出的输入结构、有边界的局部探测与实际静态恢复跟踪，然后丢弃恢复字节。作用域内有容量上限的跟踪收集器记录流水线真正使用的参数与选择；普通解包不收集这些跟踪。各项事实区分源文件偏移、解码后载荷偏移与工作映像 RVA。
+* **`senbei-engine/src/profile.rs`：** 记录输入格式、识别依据、每条尝试过的候选路径及其淘汰错误、最终命中的路径、还原状态与静态校验结果（其中 `format_version` 表示报告 schema 版本号，而非 CrackProof 壳版本）。
+* **带上限的分析追踪（`inspect`）：** `inspect` 将解析出的输入结构、受限范围的头部/阶段探测结果，以及完整静态还原期间记录的追踪事件（带数量上限）汇总到一起，并在清理临时产物前为每个偏移标明所属坐标空间（`file`、`spliced`、`payload` 或 `rva`）。
+* **状态回调与协作式取消：** `senbei-engine::progress` 将各阶段进度事件实时推送给 `senbei-io::observe::RunObserver`（包含 `scanned`、`input_started`、`progress`、`produced`、`input_finished`）。`produced` 会在 `Inspect` 或 `DryRun` 清理临时工作目录之前触发，使 `senbei-gui` 能在配置的 MiB 上限内保留恢复后的内存映像；`CancelToken` 则用于在两个输入项之间停止批处理。
 
-恢复报告保留被拒绝候选及其错误，即使后续流程成功也不会丢弃。伴生文件准备可以在候选运行前阻止恢复；覆盖恢复后的验证描述实际返回的映像，而不是早先的候选。条件允许时，研究检查同时报告受保护与恢复后的结构，但不会把形似有效的表或成功的局部探测当作完整恢复的结论。静态验证不表示 Windows 或 Android 链接器已成功加载该映像。
+## Windows、Android 与元数据流水线
 
-元数据布局定义位于 `senbei-metadata/src/layout.rs`，与恢复算法分离。头部识别报告原始版本与已实现的能力。`known` 表示存在布局定义，不表示输入的表已经通过验证。版本 24 仍需要所属应用的模块 `0x0C` 与布局验证；仅凭原始版本不能识别 v24.1。带种子方法令牌恢复支持现有的 v29、v31 与紧凑 v39 流程，结构化恢复仍仅支持 v31。未知版本保留数值标记，但不声称支持恢复。
-
-## Windows 引擎
-
-`senbei-engine/src/windows/` 包含 PE 检测、布局发现、EXE 与 DLL 恢复、确定性块并行以及结构完整性检查。候选布局先经过试解再验证，然后才会被接受为输出。
-
-外置伴生输入重建为 `stub[..4096]` 后接匹配的 `._` 载荷。stub 的导出、TLS 与声明的 CLR 区域在解包后覆盖回去，因为这些区域不存在于加密的伴生文件中。托管恢复沿 COR20 目录以及被引用的元数据、资源、vtable 修复表，按各文件的 RVA 映射进行，保留解密出的方法体。
-
-## Android 引擎
-
-`senbei-engine/src/android/extract/` 解密 stage-1 头部与 stage-2 记录流，并写出临时模块工作区。`senbei-engine/src/android/restore/` 把解码后的映像与修复容器应用到被掏空的 ELF 上，并重建动态链接器表。两个阶段在写输出前都验证边界与表放置。
-
-Windows 保护原语在 `senbei-crypto/src/windows/`，Android 保护原语在 `senbei-crypto/src/android/`。Android 带种子元数据恢复在 `senbei-metadata/src/android/`；结构化的 MethodDef 变换共享在 metadata crate 根部，因为两个平台路径都使用它。
-
-Android ELF 动态表根据输入节表及其实际文件范围定位。原始间隙太小时，恢复会在现有加载映像之后新增一个经过验证的只读 `PT_LOAD` 并更新动态标记；它绝不覆盖相邻节，也不发出不完整映像。
-
-## 扫描与包
-
-文件夹扫描使用平台目标名来避免打开批量资产：Windows 候选名为 `.exe`、`.dll` 与 `global-metadata.dat`；Android 候选名为 `.so` 与 `global-metadata.dat`。共享遍历器在 `senbei-io/src/scan.rs`；平台名称过滤与 PE 伴生字节适配在 `senbei-io/src/windows/`，Android 包适配在 `senbei-io/src/android/`。Windows 的 `.exe._`、`.dll._` 伴生文件是其同级 stub 的辅助输入，不计入跳过数。
-
-APK、APKS、XAPK 文件是容器。Senbei 先读取它们的 ZIP 清单，必要时跟进嵌套 APK 条目，只提取 `.so` 与精确匹配 `global-metadata.dat` 的条目。提取直接流式写到临时文件，压缩副本与解压副本不会同时驻留内存。
-
-## 验证
-
-每个启发式布局都使用试解再验证。未通过结构检查、校验和或表边界的候选会被拒绝，然后尝试下一个候选。恢复失败会报告为错误，而不是发出静默损坏的二进制文件。
-
-PE 完整性检查验证头部、节范围、入口点映射、导入名、重定位需求与托管元数据签名。Android 恢复验证 ELF 范围、解码后的容器大小、修复表边界与重建的动态表。
-
-## WebAssembly
-
-浏览器绑定通过 I/O 字节 API 依赖 `senbei-engine`。原生文件系统与 Android 包编排不在浏览器版工作流内。每次浏览器版解包都在一次性 worker 中运行，因为 WebAssembly 无法像原生代码那样从捕获的 panic 中恢复。
+* **Windows（`senbei-engine/src/windows/`）：** 覆盖 PE32（标准与紧凑布局）、带标记 64 位、无标记 64 位、旧版专用 64 位 DLL，以及 `stub[..4096] ++ companion`（`._`）等输入形态，对候选锚点、位移量、种子和字节码存根逐一试解密并校验，随后执行确定性并行节解压及恢复后的 PE/CLR/数据目录完整性检查。
+* **Android（`senbei-engine/src/android/`）：** `extract/` 在 `ResourceLimits` 配额约束下将 Stage 1 与嵌套 Stage 2 数据流解码到临时工作目录；`restore/` 执行主 `PT_LOAD` 段写入并处理辅助重定位容器（`0x9B`、`0x9D`、`0x9E`，同时还原可选的 `0x96` 符号置换、解释执行 `0x98` AArch64 构造函数），将重建后的动态表原地写回或追加到末尾 `PF_R` `PT_LOAD` 段中，最后清零 `e_entry`。
+* **目录扫描与安装包处理（`senbei-io/`）：** 文件夹扫描仅筛选不小于 `4,128` 字节的 `.exe`、`.dll`、`.so`、`global-metadata.dat`、`.apk`、`.apks` 和 `.xapk` 文件，避免打开大量无关资源文件。ZIP 安装包处理会先解析中央目录，仅按需流式解出 `.so` 与 `global-metadata.dat` 条目到临时文件。

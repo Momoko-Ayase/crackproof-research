@@ -1,10 +1,11 @@
 ---
-description: "算法的独立参考移植；编译后可打印基准真值向量。"
+description: "生成 vectors.txt 基准测试向量的独立 Rust 参考移植。"
+icon: gears
 ---
 
 # rust\_vectors.rs
 
-这是用于产生基准真值向量的参考移植。每个原语都是对受保护二进制中所实现算法的直接转写。用 `rustc -O rust_vectors.rs` 构建并运行即可重新生成 `vectors.txt`。
+生成 `vectors.txt` 基准数据的独立 Rust 参考实现。使用 `rustc -O rust_vectors.rs` 编译并运行即可重新输出全部 25 条记录。
 
 ```rust
 // Vector generator for the CrackProof research documentation.

@@ -1,23 +1,35 @@
 ---
-description: 壓縮節記錄所用的 Huffman 與 LZ 組合流格式。
+description: "3 位元組 Huffman 樹節點，以及字面值、累加器、重複填值與 LZ 四種 token 模式。"
+icon: file-zipper
 ---
 
 # Huffman 與 LZ 壓縮
 
-## Huffman/LZ 壓縮格式
+## 混合式 Huffman/LZ 串流格式
 
-多數 payload 塊用一種定製混合格式壓縮：Huffman 編碼的 token 流，token 分字面量、遊程填充與 LZ 回拷三類。解碼錶隨數據同行，位於同一緩衝區的 `key_offset` 處。
+Stage 3 至 Stage 5 與壓縮區段區塊會透過位於工作緩衝區 `key_offset` 處、每節點 3 位元組的 Huffman 表解碼，產生 10 位元的 token 串流：
 
-**表格式。** 表是 3 字節表項構成的森林：一個 u16 符號/子節點字段與一個 u8 碼長字段。根選擇讀 8 位輸入作為表項索引。最高位（`0x8000`）標記葉子；內部節點存儲兄弟節點對中首個的索引，再多讀 1 位輸入在二者間選擇。存儲的長度字節累計迄今消耗的位數（根為 8），因此走過 N 層內部節點到達的葉子，其總碼長為 8 + N 位。
+```mermaid
+flowchart LR
+    BITS["8 位元根表查詢\n(word & 0xFF) * 3"] --> LEAF{"tab & 0x8000\n（葉節點位元）？"}
+    LEAF -- 否 --> WALK["走訪兄弟節點配對\n每層消耗 1 個輸入位元\n（depth <= 64）"]
+    WALK --> LEAF
+    LEAF -- 是 --> MODE["10 位元符號：\nmode = sym & 0x300\npayload = sym & 0xFF"]
+    MODE --> M0["0x000：字面位元組"]
+    MODE --> M1["0x100：大端序 pending 計數"]
+    MODE --> M2["0x200：將 1/2/4B 單位重複 max(pending,1) 次"]
+    MODE --> M3["0x300：往回 pending+payload 處複製 payload 位元組"]
+```
 
-**token 格式。** token 的 8–9 位選擇模式，0–7 位是載荷：
+* **3 位元組表項目：** 每個項目為 `(u16 tab, u8 bits)`。先以最低 8 個輸入位元查根表；`tab & 0x8000` 代表葉節點，內部節點則記錄兄弟節點配對的索引，每往下一層多消耗 1 個輸入位元以決定分支（共消耗 `8 + depth` 個位元）。
+* **10 位元葉節點符號：** 位元 `8..9` 選擇模式，位元 `0..7` 則攜帶 `payload`：
 
-| 模式      | 含義                                                  |
-| ------- | --------------------------------------------------- |
-| `0x000` | 字面量：輸出載荷字節                                          |
-| `0x100` | 計數累加器：把載荷拼進一個大端 pending 值（本身不輸出）                    |
-| `0x200` | 遊程填充：把剛寫出的 1/2/4 字節單元重複 `pending × payload` 次       |
-| `0x300` | LZ 回拷：從輸出遊標前 `pending + payload` 字節處拷貝 `payload` 字節 |
+| 模式（`tab & 0x300`） | 負載值（`tab & 0xFF`） | 動作 |
+| --- | --- | --- |
+| `0x000` | 字面位元組 | 寫入 `payload`（輸出 `1` 位元組） |
+| `0x100` | 計數位元組 | 若 `pending >= 256` 則視為無效並中止；否則併入 `pending = (pending << 8) \| payload`（輸出 `0` 位元組） |
+| `0x200` | 單位寬度（`1`、`2` 或 `4`） | 令 `reps = max(pending, 1)`，將前一個 `payload` 位元組寬的單位重複寫入 `reps` 次（輸出 `reps * payload` 位元組），並將 `pending` 歸零 |
+| `0x300` | 複製長度（`payload`） | 從 `dest` 往回 `pending + payload` 位元組處複製 `payload` 位元組，接著將 `pending` 歸零 |
 
 ```python
 def decompress(d, src, dest, key_offset, s_size, d_size):
@@ -117,4 +129,4 @@ def decompress(d, src, dest, key_offset, s_size, d_size):
     return written == d_size
 ```
 
-布爾返回值是損壞信號，也提供了明確的校驗條件：當容器沒有記錄某個密鑰或移位選擇時，就逐個嘗試候選，直到某個能乾淨解壓為止。[加載與節恢復](../loading-and-pe-repair/loading/README.md)中有多處這樣的「試解-驗證」點。同一套 token 類別與 3 字節 Huffman 項也出現在 [Android 原生庫格式](https://app.gitbook.com/s/HezwIJwx0lhm5CUG7g8R/data-transforms/compression)中。
+由於 `decompress` 會嚴格檢查樹深度、回溯參照邊界、`pending` 位元寬度，以及輸出長度是否精確滿足 `written == d_size`，因此在[載入與區段還原](../loading-and-pe-repair/loading/README.md)流程中，試解壓縮能可靠篩除錯誤的階段金鑰、旋轉位數猜測值與誤判的位元組碼存根。同一套 3 位元組表結構與四種 token 模式亦用於 [CrackProof for Android SO 內部機制](https://app.gitbook.com/s/HezwIJwx0lhm5CUG7g8R/data-transforms/compression)。

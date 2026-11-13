@@ -1,51 +1,57 @@
 ---
-description: "Workspace layout, encoding contract, and usermode runtime behavior."
+description: "Crate architecture, store-once payload encoding, three-phase runtime startup, and remaining commercial gaps."
+icon: diagram-project
 ---
 
 # Design
 
-Arare generates protected Windows PE files and builds its own embedded loader. Byte-identical commercial output is not a target. Compatibility is described by structural layout families and verified behavior.
+Arare encodes standard Windows PE inputs into the four structural layout families documented in [CrackProof for Windows internals](https://app.gitbook.com/s/PuKTEy2soDgSB3qfWACy/) (`pe32`, `pe64-classic`, `pe64-modern`, and `legacy-dll`) and embeds its own MIT-licensed native and managed runtime loaders.
 
-## Workspace
+## Workspace architecture
 
 | Component | Responsibility | License |
 | --- | --- | --- |
-| `arare-pe` | Immutable checked PE model and disk-to-image mapping | MIT |
-| `arare-codec` | Rolling transforms, AES, byte programs, Huffman/LZ | MIT |
-| `arare-engine` | Profile graphs, Windows loader placement, managed orchestration | AGPL-3.0-only |
-| `arare-runtime`, `runtime/src`, `runtime/arch` | Independently built native reconstruction and startup | MIT |
-| `runtime/managed` | Managed before-JIT initialization and memory adapters | MIT |
-| `tools/managed` | Source-written ECMA-335 metadata/wrapper generation | AGPL-3.0-only |
-| `arare-cli` | Input/output, options, diagnostics, and publication | AGPL-3.0-only |
+| `arare-pe` | Checked PE32/PE32+ parser and file-offset / RVA mapper | MIT |
+| `arare-codec` | Rolling XOR/rotation ciphers, AES-CBC schedules, bytecode VM stubs, Huffman/LZ | MIT |
+| `arare-runtime`, `runtime/src`, `runtime/arch` | Embedded C/ASM native reconstruction, check helpers, and page-fault dispatcher | MIT |
+| `runtime/managed` | Embedded C# before-JIT module initializer and memory adapters | MIT |
+| `arare-engine` | Profile encoders, placeholder trimming, loader synthesis, managed orchestration | AGPL-3.0-only |
+| `tools/managed` | Standalone ECMA-335 metadata rewriter and IL wrapper generator | AGPL-3.0-only |
+| `arare-cli` / `gui` | CLI commands, atomic output writes, and WPF batch front-end | AGPL-3.0-only |
+| `verification/senbei-oracle` | Isolated test crate linking unchanged Senbei 1.3.1 outside the workspace | AGPL-3.0-only |
 
-A separate `verification/senbei-oracle` crate links unchanged Senbei only for tests. The oracle runner resolves an explicitly selected Senbei source directory; normal builds don't resolve Senbei. Copied AGPL source cannot enter the runtime dependency graph.
+`arare_engine::protect(input: &[u8], options: &Options) -> Result<Artifact, Error>` drives packing. `Options` configures nine fields: `profile`, `seed`, `compression`, `storage`, `checks`, `page_encrypt`, `scribble`, `errlog`, and `antidebug_av`.
 
-The engine API is `protect(input: &[u8], options: &Options) -> Result<Artifact, Error>`. `Options` selects an applicable `Profile`, compression, a seed, and embedded or companion storage. A fixed explicit seed reproduces an Arare output for tests; ordinary packing obtains fresh randomness from the OS.
+## Store-once encoding and section trimming
 
-Stages are encoded in the reverse order of their checksum and key dependencies. Table sizes grow from actual input data. The runtime consumes the same representation that Senbei recovers. Private reconstruction trailers understood only by Arare are not a substitute for format compatibility.
+Stages are encoded in reverse dependency order so checksums and derived stage keys feed earlier headers without private Arare-only trailers:
 
-The four families — PE32, classic PE32+, modern marker-less PE32+, and legacy DLL — have different discovery, stage, metadata, and finish rules. Family names describe layout, not invented commercial versions.
+* **Placeholder raw trimming (`trim_placeholder_raw`):** original application sections are compressed once into `.arpay` rather than duplicated in full on disk. Physical `SizeOfRawData` on original sections is trimmed down to the file-aligned prefix needed for unencrypted disk overlays (`export` directory, `CLR` header and `COR20` metadata/resource streams, `TLS` directory/template, loader `preserved_ranges`, and x64 companion-TLS jump patches). Sections carrying nonzero initialized bytes past `VirtualSize` remain untrimmed while zero alignment tails are dropped.
+* **Single-copy PE resources:** PE resources (`DataDirectory[2]`) are tracked in `Startup.resources` for relocation and companion-TLS overlap checks while staying out of `LoaderPatch.preserved_ranges`, so resources are stored once inside `.arpay` and restored with the payload.
+* **Import recovery:** `copy_imports` recovers by-name hint/name entries whether thunks store bare RVAs or full virtual addresses (`ImageBase + RVA`).
 
-## Runtime
+## Runtime execution flow
 
-The runtime uses two source-built helper roles: environment checks and page protection. Native outputs embed the matching architecture's two helper DLLs. Managed outputs carry both x86 and x64 helper variants, plus both native decoders, and select by process architecture. Active helpers are decrypted in memory and manually mapped. Their MZ/PE magics are zeroed, and they don't join the PEB module list. These roles follow the observed HtpecIt/HtdpStub2 split under Arare-native names.
+Native outputs embed two manually mapped helper DLLs (environment checks and page protection, mirroring the commercial `HtpecIt` / `HtdpStub2` split with zeroed MZ/PE headers and no PEB module-list entry); managed outputs carry both x86 and x64 helper pairs and select at startup:
 
-Native phase one runs before the protected file is read (410, 510, 520, 52F, 540, and optional 541). Phase two runs after the file is staged (A03, C00, B00, C01, A09, A11, A0F, BD0, A04 or A08, optional BE0, A07/A01). Managed startup reads its encoded input before running its checks. Native DLLs with `host-process` enabled then log `A15` as a sequencer marker with no check body. Phase three, after page sealing, runs optional E55/E91 device observations. The sequence follows the observed check ordering where established; `541` is an Arare-specific Hyper-V guest policy.
+```mermaid
+flowchart TD
+    S200["200: Open %TEMP% debug log gate\n(inherit EXE context on DLLs)"] --> P1["Phase 1 checks\n410, 510, 520, 52F, 540, [541]"]
+    P1 --> S560["560: Map & stage disk / companion payload"]
+    S560 --> P2["Phase 2 checks\nA03, C00, B00, C01, A09, A11, A0F,\nBD0, A04|A08, [BE0], A07/A01 + DLL A15"]
+    P2 --> S610["610 / 655 / 6E1: Reconstruct sections,\napply relocations & resolve IAT"]
+    S610 --> S800["800..840: Patch KiUserExceptionDispatcher\n& PAGE_NOACCESS executable pages"]
+    S800 --> P3["Phase 3 checks: [E55], [E91]"]
+    P3 --> S280["280: Wipe boot tables & jump to OEP"]
+    P1 -. check failure .-> REJ["Close log (AAA-BBB-CCC) + ErrLog-Pec\n-> AV fault (-AV=ON) -> TerminateProcess"]
+    P2 -. check failure .-> REJ
+    P3 -. check failure .-> REJ
+```
 
-`A15` is a marker, not a check. Host executables never log it. `A11` in Arare uses cooperative host identity (native `.arldr` / managed `.armclr` markers plus an optional stamp). Commercial artifacts scan for a `peC` section or an exact-case `KeRnEl32.dLl` import; that spoofability is accepted.
+* **Stage `410` debugger checks and AV response:** native `410` checks `IsDebuggerPresent`, `PEB.BeingDebugged`, `NtGlobalFlag`, hardware debug registers (`DR0`..`DR3`, `DR7`), and kernel-backed `NtQueryInformationProcess` (`ProcessDebugPort`, `ProcessDebugFlags`, `ProcessDebugObjectHandle`). On native EXEs (`--antidebug-av=on` by default), `ar_reject` raises `EXCEPTION_ACCESS_VIOLATION` and faults on null before `TerminateProcess` (managed modules call `TerminateProcess` directly).
+* **Host markers (`A11` / `A15`):** `A15` is logged on native DLLs as a pure sequencer marker with no check body when `host-process` is enabled. `A11` checks for cooperative Arare host sections (`.arldr` or `.armclr`) plus an optional runtime stamp rather than commercial `peC` / `KeRnEl32.dLl` markers.
+* **On-fault page decryption and stage `280` cleanup:** Arare generates per-build page-cipher bytecode and schedules, installs one shared process-wide `KiUserExceptionDispatcher` hook across compatible modules, and erases spent import maps, helper blobs, and boot descriptors before jumping to OEP at `280`.
 
-A DLL inherits its invoker EXE's `%TEMP%` debug-log gate and folder, including when the seeds differ. An available host context always takes precedence, even when its gate is closed or stale. `--check host-process=off` does not disable that inheritance.
+## Experimental kernel provider and remaining commercial gaps
 
-Page-encrypted builds re-encrypt executable application pages in place after reconstruction and set them to `PAGE_NOACCESS`. The handler is installed by patching `ntdll!KiUserExceptionDispatcher`. Compatible modules register with one process dispatcher. Writable executable sections are rejected when page encryption is effectively on.
-
-Arare generates its own page-cipher programs and key schedules. The commercial research documents one observed demand-page formula and an unresolved second pass. Shared page-fault handling and stage codes establish the same broad mechanism, not identical ciphers or protection strength. Likewise, Arare's host markers and optional checks don't establish interoperability with commercial hosts.
-
-After status `280`, native startup clears spent import maps, helper blobs, source page tables, and one-shot config. Geometry needed by later notifications and retained host identity survive. Demand-decrypt programs remain available for subsequent faults.
-
-## Kernel
-
-`kernel/` is an independently authored experimental provider. Ordinary `protect` has no kernel option. Ordinary Cargo builds do not require the WDK. Effectiveness claims require actual kernel execution evidence, not host doubles or a successful WDK build.
-
-## Remaining gaps
-
-Implemented usermode options cover 410, 510, 520, 52F, 540, A03, C00, C01, BD0, B00, A09, A0F, A07/A01, A11, A08, A04, BE0, E55, E91, plus Arare-specific 541, the A15 marker, page encryption, scribble, and optional ErrLog-Pec. Remaining commercial-fidelity work includes exact check predicates where evidence is incomplete, host-directory admission, unidentified E-series objects, loaded-module integrity cadence, a verified commercial default matrix, and a separate Windows 10 execution run. Interoperability with commercial CrackProof hosts is a separate milestone.
+`kernel/` contains an independently written experimental driver project excluded from Cargo builds and `arare protect`. Remaining differences from commercial CrackProof builds include exact conditions for checks only partially observed in samples, host-directory admission, unmapped `E`-series check objects, periodic post-boot module re-scanning, a verified commercial default-check matrix, and standalone Windows 10 test runs.

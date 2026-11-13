@@ -1,20 +1,19 @@
 ---
-description: "Validate the rebuilt ELF image, program layout, and removal of protection-only data."
+description: "Finalize clean ELF64 section headers, clear e_entry, write the output atomically, and verify the restored binary."
+icon: file-export
 ---
 
 # ELF output
 
-The final image is rebuilt from the recovered ranges and the original program-header relationships. The output checks include:
+Once the `PT_LOAD` segments and dynamic-linking tables are rebuilt, ELF finalization removes protection-only structures and rewrites the non-allocatable tail of the file:
 
-* ELF64, little-endian AArch64 identification;
-* program-header and section-header ranges inside the file;
-* `PT_LOAD` alignment, file size, and memory size relationships;
-* dynamic-section pointers into the restored tables;
-* relocation entry size and count; and
-* an entry-point field cleared to zero: a leftover protector entry means the restoration failed.
+1. **Remove `SHT_LOUSER`:** the trailing private section header is dropped, and none of the Stage 1/2 payload bytes are copied into the output file.
+2. **Clear `e_entry` to `0`:** Android shared libraries run native constructors through `.init_array` rather than `e_entry`, so `e_entry` is zeroed.
+3. **Relocate non-`SHF_ALLOC` sections:** retained non-allocatable sections (such as `.shstrtab`) are packed after the end of the loadable segments (including any appended `PF_R` `PT_LOAD`), `.shstrtab` is validated, and the updated `Elf64_Shdr` table is written at the end with `e_shoff` and `e_shnum` updated.
+4. **Write atomically and re-parse:** outputs written to disk go through a temporary file before atomic rename, then are re-parsed from the written bytes.
 
-The private section, always the last section header, is omitted from the output. The entry-point field is cleared rather than replaced: the image has no recovered native ELF entry, because native constructors run from `.init_array`.
-
-On compact layouts the program-header table gains one extra read-only `PT_LOAD` for the rebuilt dynamic tables (see [Dynamic linking](dynamic-linking.md)). Protection-only padding isn't copied into a loadable segment because it fills a file gap.
-
-The output is parsed again from disk. A successful in-memory reconstruction that fails this second parse is treated as a failed restoration.
+{% hint style="info" %}
+**Hard post-write checks vs structural diagnostics.** Output validation distinguishes two tiers:
+* **Hard errors (abort restoration):** ELF64 little-endian AArch64 parse failure, `PT_LOAD` file ranges exceeding the output length, malformed `.shstrtab`, a surviving `SHT_LOUSER` section, non-zero `e_entry`, or `.dynsym` / `.rela.dyn` / `.rela.plt` counts disagreeing with the rebuilt tables.
+* **Cross-table diagnostics (reported as warnings):** linker-walk checks over `PT_LOAD` alignment/congruence/overlap, `DT_*` tag vs section agreement, `DT_RELACOUNT` prefix ordering, symbol-hash bucket bounds, relocation target/symbol bounds, and `.init_array` / `.fini_array` function pointers.
+{% endhint %}

@@ -1,57 +1,50 @@
 ---
-description: "第一階段如何定位私有節並解密第二階段映像。"
+description: "Stage 1 啟動常式如何定位磁碟上的 ELF 檔案、解密 Stage 2 並移交控制權。"
+icon: bolt
 ---
 
-# 第一階段引導
+# Stage 1 啟動流程
 
-第一階段是留在可見 `.text` 頭部的樁。`.init_array[0]` 指向它。該樁定位自身文件，讀取私有節，解密第二階段映像，然後移交控制權。
+`.init_array` 中有一筆項目指向保留在 `.text` 開頭的 `0x84` 位元組暫存器保存包裝常式（以 15 條 `STP` 指令保存 `X1`..`X30`、執行 `MOV X0, SP`、`BL` 進入啟動主體，返回後以 15 條 `LDP` 還原暫存器並 `RET`）。啟動主體會透過 `/proc/self/maps` 找出自身對應的磁碟檔案，讀取 `SHT_LOUSER` 私有區段，將 Stage 2 解密至匿名記憶體，再跳轉至其進入點。
 
 ```mermaid
 flowchart TD
-    A["Save registers and enter stage 1"] --> B["Compute the runtime image base"]
-    B --> C["Open and parse /proc/self/maps"]
-    C --> D["Read the ELF and the last PT_LOAD tail"]
-    D --> E["Find the SHT_LOUSER section"]
-    E --> F["Skip the 0x23C-byte outer wrapper"]
-    F --> G["Decrypt the 32-byte parameter header"]
-    G --> H["Anonymous RW map for stage 2"]
-    H --> I["Decrypt the stage 2 image in place"]
-    I --> J["Detect 4 KiB or 16 KiB pages"]
-    J --> K["Instruction-cache flush"]
-    K --> L["mprotect the stage 2 image"]
-    L --> M["Branch to the stage 2 entry"]
-    B -. any step fails .-> X["Error stub"]
-    C -. any step fails .-> X
-    D -. any step fails .-> X
-    E -. any step fails .-> X
-    G -. any step fails .-> X
+    A["進入 0x84 位元組 .init_array 包裝常式\n(保存 X1..X30，X0 = SP)"] --> B["透過 ADR 計算執行階段映像基底位址"]
+    B --> C["解密路徑字串，開啟並解析 /proc/self/maps"]
+    C --> D["讀取 ELF 標頭、程式標頭表、區段標頭表與 PT_LOAD 尾端"]
+    D --> E["定位 SHT_LOUSER (0x80000000)"]
+    E --> F["略過 0x23C 外層包裝並解密 32 位元組標頭"]
+    F --> G["為 Stage 2 建立匿名 RW mmap 映射"]
+    G --> H["以 payload_key 解密 Stage 2 字組"]
+    H --> I["偵測 4 KiB 或 16 KiB 系統頁面大小"]
+    I --> J["清除快取 (DC / IC / DSB / ISB) 並呼叫 mprotect"]
+    J --> K["跳轉至 stage2_base + entry_offset"]
+    B -. 失敗 .-> X["錯誤處理 stub"]
+    C -. 失敗 .-> X
+    D -. 失敗 .-> X
+    E -. 失敗 .-> X
+    F -. 失敗 .-> X
 ```
 
-## 定位文件
+## 定位 `SHT_LOUSER`
 
-樁用 `ADR` 取自身運行時地址，減去鏈接期偏移，再在 `/proc/self/maps` 裡找覆蓋該地址的映射。maps 路徑先解密到短緩衝區，`open` 之後立刻擦掉。解析 maps 失敗則停止。
+Stage 1 先以 `ADR` 取得目前 PC，減去連結期位移以算出已載入程式庫的基底位址；接著將 `"/proc/self/maps"` 解密至堆疊緩衝區，開啟檔案後立即清除該路徑緩衝區。找到載入基底位址對應的底層檔案路徑後，Stage 1 會讀取 ELF 標頭、程式標頭表與區段標頭表（`Elf64_Shdr` 單筆大小為 `0x40`），在最後一個 `PT_LOAD` 程式區段之後尋找 `sh_type == 0x80000000`（`SHT_LOUSER`）的區段。
 
-隨後讀取 ELF 頭，以及定位最後一個 `PT_LOAD` 所需的程序頭和節頭。第二次讀取從該段的文件末端開始，覆蓋容納私有節的文件尾。
+略過開頭 `0x23C` 位元組的外層包裝後，即可抵達 `0x1000` 位元組的參數區，其前 32 位元組會以該組建系列的字組常數 `C`（`0xBF20165D` 或 `0xBF189BDD`；詳見 [Stage 1 標頭](../file-format/stage1.md)）解碼。
 
-## 私有節
+## Stage 2 映射與暫存器參數移交
 
-節頭按 `Elf64_Shdr` 步長 `0x40` 掃描 `sh_type == 0x80000000`（`SHT_LOUSER`）。節起點之後，樁跳過 `0x23C`（572）字節，即[第一階段首部](../file-format/stage1.md)中的外層包裝，並把接下來的 32 字節當作加密參數首部。
+Stage 1 會配置一段長 `payload_size` 位元組的匿名可寫入記憶體區域，複製並以 `payload_key` 解密 Stage 2 映像，偵測系統採用 4 KiB 或 16 KiB 頁面，清除資料與指令快取（`DC` / `IC` / `DSB` / `ISB`），對 `protect_size` 範圍套用 `mprotect`，最後帶著八個暫存器參數跳轉至 `stage2_base + entry_offset`：
 
-首部和載荷密碼已觀察到兩種字常量：`0xbf20165d` 與 `0xbf189bdd`。每個家族使用其中之一。第一個字是密鑰，32 字節首部解密後會恢復它。
-
-## 移交第二階段
-
-樁映射一塊匿名可寫區域，拷入加密的第二階段映像，用載荷密鑰原地解密，探測頁大小（4 KiB 或 16 KiB），用 `DC`/`IC`/`DSB`/`ISB` 刷新指令緩存，再 `mprotect` 該映像。然後帶著下列寄存器跳到 `stage2_base + entry_offset`：
-
-| 寄存器 | 值 |
+| 暫存器 | 內容 |
 | --- | --- |
-| `X0` | 加載器上下文 |
-| `X1` | 自身映像基址 |
-| `X2` | 第二階段基址 |
-| `X3` | 第二階段大小 |
-| `X4` | 剩餘私有節基址 |
-| `X5` | 剩餘私有節大小 |
-| `X6` | 文件尾映射基址 |
-| `X7` | 文件尾映射大小 |
+| `X0` | 載入器 context 指標 |
+| `X1` | 受保護程式庫的執行階段映像基底位址 |
+| `X2` | 解密後的 Stage 2 基底位址 |
+| `X3` | 解密後的 Stage 2 位元組大小（`payload_size`） |
+| `X4` | 剩餘 `SHT_LOUSER` 串流基底位址（Stage 2 結尾對齊 4 位元組處） |
+| `X5` | 剩餘 `SHT_LOUSER` 串流大小 |
+| `X6` | 檔案尾端映射基底位址 |
+| `X7` | 檔案尾端映射大小 |
 
-`X6` 和 `X7` 在第二階段表裡登記為模塊 `0xD0`。
+Stage 2 進入後會立即將 `(X2, X3)` 登錄為模組 `0xE2`，並將 `(X6, X7)` 登錄為模組 `0xD0`。

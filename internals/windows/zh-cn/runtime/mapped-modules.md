@@ -1,23 +1,23 @@
 ---
-description: "嵌入加载器并绕过常规 Windows 加载器映射的辅助模块职责。"
+description: "由 HtdpsCmnGetFileInfo 手动映射的内嵌辅助 DLL 目录与职责。"
+icon: layer-group
 ---
 
 # 手动映射辅助模块
 
-CrackProof 运行的内容并不都住在受保护模块内。加载器自行映射辅助 DLL，因此它们对 Windows 加载器不可见。内核支持是另一条驱动线 Htsysm，三代设计迥异；见 [Htsysm 内核组件](kernel-components.md)。
+CrackProof 不会将主要运行时子系统直接放进受保护程序自身的节内，而是将辅助 DLL 内嵌在加载器载荷中，由内部加载函数 `HtdpsCmnGetFileInfo` 按双字母模块代号手动映射到内存。
 
-## 手动映射子模块
+## 子模块目录
 
-加载器经由内部模块加载器把辅助 DLL 映射进进程，通过函数 `HtdpsCmnGetFileInfo` 以双字母模块代码寻址。该调用把 DLL 装入内存并从其 PE 头取入口点。这些模块在内存中被刻意隐藏：其 `MZ` 与 `PE` 魔数可能被清零，但除此之外完整无缺，一旦定位就不难分析（传给内部加载器的结构体是最方便的锚点）。
+`HtdpsCmnGetFileInfo` 将目标辅助 DLL 手动映射至私有可执行内存（不挂入 `PEB` 加载器链表，因此遍历 `InLoadOrderModuleList` 或调用 `CreateToolhelp32Snapshot` 均无法枚举到），从其 PE 头部解析入口点，并可在映射完成后抹除其 `MZ` 与 `PE\0\0` 签名：
 
-| 代码 | 模块 | 状态组 | 角色 |
+| 双字母代号 | 模块名 | 状态码区间 | 运行期职责 |
 | --- | --- | --- | --- |
-| `it` | `HtpecIt.dll` | `Axx` | 防篡改、防注入、防 VM 检查 |
-| `dt` | `HtdpStub2.dll` | — | 附加加载器代码，包括[页级加密](page-protection.md#页级加密)的按需解密页错误处理器 |
-| `cm` | （用户态初始化） | `Bxx` | 旧 Htsysm 驱动初始化 |
-| `dm` | （用户态初始化） | `Cxx` | 新 Htsysm 驱动初始化 |
-| `sk` | `HtsyskNT.dll` | `B21` | 旧驱动路径：内核手动映射器、基础内核 I/O 与内存函数 |
-| `pm` | `HtpecmNT.dll` | `BB0` | 旧驱动路径：进程监控/终止（杀掉分析工具） |
+| `it` | `HtpecIt.dll` | `Axx` | 用户态防篡改、反注入、虚拟机注册表检查与宿主进程校验 |
+| `dt` | `HtdpStub2.dll` | `8xx` / 缺页触发时 | 按需页解密缺页处理模块（`KiUserExceptionDispatcher` 跳转目标）及单页描述符表 |
+| `cm` | （用户态辅助模块） | `Bxx` | 第一代 `Htsysm` 驱动部署与初始化 |
+| `dm` | （用户态辅助模块） | `Cxx` | 第二代与第三代 `Htsysm` 驱动部署及 IOCTL 握手 |
+| `sk` | `HtsyskNT.dll` | `B21` | 第一代内核态 DLL：内核手动映射器及内存/I/O 原语 |
+| `pm` | `HtpecmNT.dll` | `BB0` | 第一代内核态 DLL：进程监控与强行终止 |
 
-页错误处理器位于 `dt` 这一点解释了一个反复出现的观察：受保护模块自身映像内没有页解密代码——处理器及其逐页密钥数据住在一个手动映射模块里，朴素的模块枚举会漏掉它（它不出现在加载器模块列表中；只以私有可执行区域的形式出现）。
-
+由于页面解密例程与区域/页面描述符数组均归 `dt`（`HtdpStub2.dll`）管理（详见 [页面保护与加载器代码](page-protection.md)），仅转储主 `.exe` 或 `.dll` 模块会完全漏掉缺页处理逻辑；分析时需在私有可执行 VAD 区间中定位 `dt`，或顺着 `ntdll!KiUserExceptionDispatcher` 开头的内联跳转追踪过去。对应的内核侧组件见 [Htsysm 内核组件](kernel-components.md)。

@@ -1,23 +1,23 @@
 ---
-description: "嵌入加載器並繞過常規 Windows 加載器映射的輔助模塊職責。"
+description: "內嵌輔助 DLL（HtpecIt、HtdpStub2、cm、dm、sk、pm）與手動映射機制。"
+icon: layer-group
 ---
 
-# 手動映射輔助模塊
+# 手動映射輔助模組
 
-CrackProof 運行的內容並不都住在受保護模塊內。加載器自行映射輔助 DLL，因此它們對 Windows 加載器不可見。內核支持是另一條驅動線 Htsysm，三代設計迥異；見 [Htsysm 內核組件](kernel-components.md)。
+CrackProof 不把主要的執行期子系統直接放在受保護二進位檔自身的區段內，而是將多個輔助 DLL 內嵌於載入器酬載中，在執行期由內部載入函式（`HtdpsCmnGetFileInfo`）依雙字母模組代號查找並載入。
 
-## 手動映射子模塊
+## 子模組一覽
 
-加載器經由內部模塊加載器把輔助 DLL 映射進進程，通過函數 `HtdpsCmnGetFileInfo` 以雙字母模塊代碼尋址。該調用把 DLL 裝入內存並從其 PE 頭取入口點。這些模塊在內存中被刻意隱藏：其 `MZ` 與 `PE` 魔數可能被清零，但除此之外完整無缺，一旦定位就不難分析（傳給內部加載器的結構體是最方便的錨點）。
+`HtdpsCmnGetFileInfo` 會將指定的輔助 DLL 手動映射至私有可執行記憶體（因此不會出現在 `InLoadOrderModuleList` 或 `CreateToolhelp32Snapshot` 走訪的 `PEB` 載入模組串列中），從其 PE 標頭解析進入點，並可在載入後抹除 `MZ` 與 `PE\0\0` 簽章：
 
-| 代碼 | 模塊 | 狀態組 | 角色 |
+| 雙字母代號 | 模組名稱 | 狀態碼範圍 | 執行期職責 |
 | --- | --- | --- | --- |
-| `it` | `HtpecIt.dll` | `Axx` | 防篡改、防注入、防 VM 檢查 |
-| `dt` | `HtdpStub2.dll` | — | 附加加載器代碼，包括[頁級加密](page-protection.md#頁級加密)的按需解密頁錯誤處理器 |
-| `cm` | （用戶態初始化） | `Bxx` | 舊 Htsysm 驅動初始化 |
-| `dm` | （用戶態初始化） | `Cxx` | 新 Htsysm 驅動初始化 |
-| `sk` | `HtsyskNT.dll` | `B21` | 舊驅動路徑：內核手動映射器、基礎內核 I/O 與內存函數 |
-| `pm` | `HtpecmNT.dll` | `BB0` | 舊驅動路徑：進程監控/終止（殺掉分析工具） |
+| `it` | `HtpecIt.dll` | `Axx` | 使用者模式防竄改、反注入、VM 登錄檔與宿主行程檢查 |
+| `dt` | `HtdpStub2.dll` | `8xx` / 分頁存取違規期間 | 隨選分頁解密例外處理常式（`KiUserExceptionDispatcher` 跳轉目標）與分頁描述表 |
+| `cm` | （使用者模式輔助模組） | `Bxx` | 第 1 代 `Htsysm` 驅動程式部署與初始化 |
+| `dm` | （使用者模式輔助模組） | `Cxx` | 第 2 代與第 3 代 `Htsysm` 驅動程式部署與 IOCTL 交握 |
+| `sk` | `HtsyskNT.dll` | `B21` | 第 1 代核心模式 DLL：核心手動映射器與記憶體／I/O 存取原語 |
+| `pm` | `HtpecmNT.dll` | `BB0` | 第 1 代核心模式 DLL：行程監控與強制終止 |
 
-頁錯誤處理器位於 `dt` 這一點解釋了一個反覆出現的觀察：受保護模塊自身映像內沒有頁解密代碼——處理器及其逐頁密鑰數據住在一個手動映射模塊裡，樸素的模塊枚舉會漏掉它（它不出現在加載器模塊列表中；只以私有可執行區域的形式出現）。
-
+由於分頁解密常式以及區間／分頁描述元陣列全都位在 `dt`（`HtdpStub2.dll`）內（參見[分頁保護與載入器程式碼](page-protection.md)），若只傾印主程式 `.exe` 或 `.dll` 模組，就會完全漏掉分頁例外處理常式；分析時需掃描私有可執行的 VAD 記憶體區間，或直接順著 `ntdll!KiUserExceptionDispatcher` 開頭的 Inline Jump 追蹤，才能定位出 `dt`。核心端對應元件則整理於 [Htsysm 核心元件](kernel-components.md)。

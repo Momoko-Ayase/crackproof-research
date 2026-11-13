@@ -1,12 +1,13 @@
 ---
-description: CRC-32、三角數密鑰推進及連接受保護記錄的校驗和鏈。
+description: "反射式 CRC-32 校驗和、三角級數金鑰推進與跨階段金鑰鏈。"
+icon: hashtag
 ---
 
-# 校驗和與密鑰推進
+# 校驗和與金鑰推進
 
-## CRC-32 校驗和
+## 反射式 CRC-32 校驗和
 
-校驗和使用標準反射 CRC-32（多項式 `0xEDB88320`，即 zlib/以太網 CRC——`crc32(b"123456789") == 0xCBF43926`）。出現兩種描述符形式：
+階段驗證與金鑰衍生採用標準反射式 CRC-32（多項式 `0xEDB88320`，與 zlib 及 IEEE 802.3 相同；`crc32(b"123456789") == 0xCBF43926`）。描述子提供 `(offset, length)` 配對，`calculate_checksum` 則將該區間的 CRC-32 與 `length` 做 XOR：
 
 ```python
 def _build_crc_table():
@@ -36,11 +37,11 @@ def calculate_checksum(d, pos):
     return crc32(d[offset:offset + length]) ^ length
 ```
 
-第二種形式以滾動初值鏈式覆蓋**原始文件字節**（用上一次結果作 `initial` 調用 `crc32_append`），用於[加載與節恢復](../loading-and-pe-repair/loading/README.md)中那條只用於校驗的遍歷。
+另有一種串接變體會將前一段輸出傳入 `crc32_append(initial, data)`，跨多個原始檔案片段累加計算，用於[階段鏈與標記版型](../loading-and-pe-repair/loading/stage-chain.md)中純驗證性質的 `walk3` 檢查。
 
-## 三角數密鑰調度
+## 三角級數金鑰推進
 
-若干階段密鑰通過累加結構化整數級數來“推進”——每輪把 1 到 `(m+1) * 100` 的每個整數都加上：
+從前一階段取出的種子 dword 在混入下一階段金鑰前，會先經過 `iterations` 輪三角級數累加（第 `m` 輪累加 `1 + 2 + ... + (m + 1) * 100`）：
 
 ```python
 def advance_key(key, iterations):
@@ -51,18 +52,19 @@ def advance_key(key, iterations):
     return key
 ```
 
-種子是從剛解密的前一階段讀出的內容，所以只有之前的一切都解密正確，推進後的密鑰才會正確。這是防篡改設計的一半；另一半是[校驗和鏈](#校驗和鏈)。
+## 階段金鑰合成
 
-## 校驗和鏈
-
-最後一個原語不是密碼，而是密鑰的組合方式。一個階段的解密密鑰通常形如：
-
+```mermaid
+flowchart LR
+    ACC["xor_acc\n（標頭／階段 calculate_checksum\n區間的累積 XOR）"] --> KEY["stage_key =\nxor_acc ^ stage_crc ^ advanced_seed"]
+    CRC["stage_crc\n（前一已解密階段的\ncalculate_checksum）"] --> KEY
+    SEED["內容種子\n-> advance_key(seed, rounds)"] --> KEY
 ```
-stage_key = xor_accumulator ^ crc32_checksum_of_earlier_content ^ content_derived_seed
-```
 
-* **xor 累加器**：遍歷一張 `(offset, length)` 區域描述符表，把各項的 `calculate_checksum` 值異或累積。
-* **校驗和**：對只有在前序階段正確解密後才以明文存在的字節做 CRC-32。
-* **種子**：從剛解密的內容讀出的一個 dword，通常再經 `advance_key` 推進。
+每個後續階段的金鑰皆由三項輸入做 XOR 合成：
 
-其結果是：各階段無法亂序解密；上游任何一字節被改動，下游由它派生的所有密鑰全部報廢。這條鏈是容器的防篡改機制。反過來，它也表明重建映像是否自洽：任何一處選擇出錯，後續階段都解不開，而不是產生隱性的錯誤結果。[階段鏈與標記佈局](../loading-and-pe-repair/loading/stage-chain.md)說明各構建家族如何組合這些要素。
+* **`xor_acc`：** 對錨點表或標頭表中的描述子陣列逐一執行 `calculate_checksum` 後累加的 XOR 值。
+* **前序階段 CRC-32（`stage_crc`）：** 對先前階段解密出的明文位元組計算 `calculate_checksum`。
+* **內容衍生種子：** 從剛解密完成的階段讀取一個 dword，並以 `advance_key` 推進後的結果。
+
+由於每把階段金鑰都同時依賴前序明文位元組與標頭校驗和，各階段必須嚴格依序解碼；只要位移、旋轉位數或任一位元組有誤，後續的階段解密與 Huffman 解壓縮便會立即失敗。

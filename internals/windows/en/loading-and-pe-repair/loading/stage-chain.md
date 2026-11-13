@@ -1,109 +1,113 @@
 ---
-description: "The common stage-decrypt pattern and the marker-based 64-bit loader sequence."
+description: "Composite stage decryption and the nine-phase 64-bit marker-layout section recovery sequence."
+icon: link
 ---
 
 # Stage chain and marker layout
 
-The payload body decrypted by the [rolling XOR chain](../../data-transforms/rolling-and-rotation.md#the-rolling-key-family) isn't the program. It's the loader's configuration tables, encrypted stage code, and the descriptors that will eventually recover the program's sections. The loader is **self-decrypting**: its code is split into stages, each stage encrypted with a key derived from content that only exists after the previous stage decrypted correctly. Control (or, statically, analysis) must pass through the stages in order; there's no shortcut to the final stage's tables.
+`payload_xor_chain` decrypts the outer loader workspace rather than the application itself. Inside that workspace, stages 1 through 5 unwrap sequentially: each stage's key combines header checksums, CRC-32 over the preceding decrypted stage, and a content seed passed through `advance_key`.
 
 ```mermaid
 flowchart LR
-    H["info header"] --> P["payload body"] --> S1["stage 1"] --> S2["stage 2"]
-    S2 --> S3["stage 3"] --> S3b["stage 3b"] --> S4["stage 4"] --> S5["stage 5"]
-    S5 --> SEC["section descriptors"] --> IMG["original image sections"]
-    C1["crc32 + accumulator keys"] -.-> S1
-    C2["crc32 + seed keys"] -.-> S3
-    C3["bytecode stub 1"] -.-> S5
-    C4["bytecode stub 2"] -.-> SEC
+    H["info[0..7]"] --> P["Payload XOR"] --> S1["Stage 1"] --> S2["Stage 2"]
+    S2 --> S3["Stage 3"] --> S3b["Stage 3b"] --> S4["Stage 4"] --> S5["Stage 5"]
+    S5 --> SEC["walk4 blocks"] --> IMG["Recovered sections"]
+    C1["xor_acc + CRC32"] -.-> S1
+    C2["CRC32 + advance_key"] -.-> S3
+    C3["Bytecode stub 1"] -.-> S5
+    C4["Bytecode stub 2"] -.-> SEC
 ```
 
-## The common stage-decrypt shape
+## Composite stage decryptor (Stages 3..5)
 
-Every stage after stage 2 is decrypted with the same composite, defined by a `(src, src_len, dest, dest_len)` quad in the buffer:
+Every stage after Stage 2 is described by a 16-byte `{src, src_len, dest, dest_len}` quad and decoded in four steps:
 
-1. **AES-CBC decrypt** `src..src+src_len` with the stage AES schedule (`key_offsets[3]`).
-2. **XOR + rotate-right** over the descriptor with the stage key ([xor_ror_dwords, shift 19](../../data-transforms/rolling-and-rotation.md#xor--rotate-right-dword-cipher)).
-3. If a per-build bytecode stub applies, translate every byte through it.
-4. If `src_len != dest_len`, **Huffman/LZ-decompress** `src → dest` with the stage Huffman table (`key_offsets[1]`).
+1. **AES-CBC decrypt** `d[src .. src + src_len]` in place using stage schedule `key_offsets[3]`.
+2. **XOR + rotate-right** (`xor_ror_dwords`, shift `19`) over `{src, src_len}` with the derived stage key.
+3. **Bytecode translate** (Stage 5 only): map every byte in `src .. src + src_len` through bytecode stub 1.
+4. **Huffman/LZ decompress:** when `src_len != dest_len`, expand `src -> dest` using stage Huffman table `key_offsets[1]`.
 
-Stages 3–5 are this composite applied to quads at computed offsets with keys from the checksum chain.
+## Nine-phase 64-bit marker pipeline
 
-## The 64-bit EXE flow (marker layout)
+{% stepper %}
+{% step %}
+### Phases 1 and 2: `info` header and payload prefix
 
-This is the reference flow; the other families are variations on it. It proceeds in nine numbered phases.
+Decode `info[0..7]` at `0x1000` with `header_kdf`, verify `info[1] == 0x4E4E4F4B` (`KONN`), allocate a zeroed `SizeOfImage` working buffer, run `payload_xor_chain` over `decrypt_size = info[6] - info[3] + 8192` bytes from `info[4] + 4096` into `info[3]`, copy the remaining `info[5] - decrypt_size` tail verbatim, write `0x1000` at `info[3]`, and copy file bytes `[0, 0x1000)` to the front of the image.
+{% endstep %}
 
-### Phase 1–2: header and payload
+{% step %}
+### Phase 3: Configuration anchor and Stage 1
 
-Derive `info` with the [KDF](../../file-structure/container-layout.md#the-info-header-and-its-key-derivation), verify the magic, allocate a zeroed image buffer of `SizeOfImage` bytes, run the [payload XOR chain](../../data-transforms/rolling-and-rotation.md#the-rolling-key-family) over `decrypt_size = info[6] - info[3] + 8192` bytes, copy the remaining `info[5] - decrypt_size` bytes verbatim, and overlay the first 4096 header bytes.
+Scan `[info[6] + 1000, info[6] + 8000)` for `anchor` where `u32@anchor == info[3]` and `u32@(anchor + 8)` lies below `info[6]` within `0x1000` on a `0x200` boundary. Test `extra in (0, 8)` against the Stage 1 `{base, length}` descriptor at `anchor + 120 + extra` (`base >= info[3]`, `length >= 16`, in-image).
 
-### Phase 3: the configuration anchor
+Restore `DD[1]` (Import Directory) `(RVA, size)` from `anchor + 8` and `anchor + 4`, accumulate `xor_acc` across the `(offset, length)` chain at `anchor + 184 + extra`, compute `chk1 = calculate_checksum(d, anchor + 56 + extra)` and `v = u32@(anchor + 20)`, and unwrap Stage 1 with `xor_ror_dwords(d, anchor + 120 + extra, xor_acc ^ chk1 ^ v, 21)`.
+{% endstep %}
 
-The configuration block floats between builds, so it's located by scanning the region `[info[6] + 1000, info[6] + 8000)` for the **anchor**: a dword equal to `info[3]`, followed at `+8` by a value slightly less than `info[6]` (delta ≤ `0x1000`, a multiple of `0x200`). Fields from offset 40 onward then shift by `anchor_extra ∈ {0, 8}`.
+{% step %}
+### Phase 4: Stage 2 and the four `key_offsets`
 
-The reliable discriminator is the stage-1 descriptor itself at `anchor + 120 + extra`: its `(base, length)` pair must satisfy `base ≥ info[3]`, `length ≥ 16`, and `base + length` inside the image. Try `extra = 0` then `extra = 8` and keep the first pair that validates. A nearby version-like dword (often at `anchor + 104` or `anchor + 112`, with top nibble `0x4`) is common on older families but isn't stable across every build, so it's only a supporting signal.
+Scan Stage 1 for the unique 16-byte Stage 2 quad (`stage2_off`) where `d0 == d2` in payload range, `d1 > 0x10000`, and `0 < d3 < d1`. Walk backward to `chk_src_start` (four valid consecutive `(src, len)` pairs), read the Stage 2 key at `chk_src_start - 20`, and unwrap Stage 2 with shift `19`.
 
-From the anchor:
+Locate `(1, 0, info[3], 0)` inside Stage 2 (`table_start`), process the two `head` entries at `table_start + 32` (kind `1`/`0x11` -> `byte_rotate3`; kind `2` -> `(src, len, dst, chk)` copy list), and `byte_rotate3`-decrypt the four `walk2` slots at `head - 88`:
 
-- The import directory `(RVA, size)` is restored into the PE header from `anchor + 8` / `anchor + 4`.
-- A walk over the `(offset, length)` descriptor table at `anchor + 184 (+extra)` accumulates `xor_acc`, the XOR of every region's `crc32 ^ length` checksum.
-- **Stage 1** is unwrapped with `xor_ror_dwords(anchor + 120 (+extra), xor_acc ^ chk1 ^ v, 21)`, where `chk1` is the checksum of the region described at `anchor + 56 (+extra)` and `v` is the dword at `anchor + 20`.
-
-### Phase 4: stage 2
-
-Inside stage 1, the stage-2 quad is the unique 16-byte entry where `d0 == d2`, `d0` lies in the payload range, `d1 > 0x10000`, and `0 < d3 < d1`. Call its offset `stage2_off`. Walking back from it, `chk_src_start` is the first position where four consecutive `(src, len)` pairs are all plausible. The stage-2 key is the dword at `chk_src_start - 20`, and stage 2 is unwrapped with shift 19.
-
-Inside stage 2, a 16-byte entry `(1, 0, info[3], 0)` marks `table_start`; the **head** table is at `table_start + 32` and **walk2** at `head - 88`. The two head entries dispatch on their kind dword: kind `1` (or `0x11`; the upper nibble is a build stamp) runs `byte_rotate3` over a descriptor; kind `2` walks a `(src, len, dst, chk)` copy list, moving already-decrypted regions to their working positions. The walk2 entries then yield the four **key offsets** (each `byte_rotate3`-decrypted):
-
-| Slot | Role |
+| Slot | Table role |
 | --- | --- |
-| `key_offsets[0]` | Huffman table for **section data** blocks |
+| `key_offsets[0]` | Huffman table for **section** decompression |
 | `key_offsets[1]` | Huffman table for **stage** decompression |
-| `key_offsets[2]` | AES key schedule for **section data** blocks |
-| `key_offsets[3]` | AES key schedule for **stage** decryption |
+| `key_offsets[2]` | AES schedule for **section** decryption |
+| `key_offsets[3]` | AES schedule for **stage** decryption |
+{% endstep %}
 
-### Phase 5: stages 3, 3b, 4, 5
+{% step %}
+### Phase 5: Stages 3, 3b, 4, and 5
 
-Each stage's quad sits at a fixed offset past `stage2_off`, and each key mixes the running `xor_acc`, a fresh checksum, and a seed recovered from the stage decrypted just before:
+Decode the four stage quads relative to `stage2_off`:
 
-| Stage | Quad offset | Key composition |
+| Stage | Quad offset | Key formula |
 | --- | --- | --- |
-| stage 3 | `stage2_off + 88` | `xor_acc ^ chk2 ^ accum`, where `accum` is a dword from `chk_src_start - 16` run through four rounds of the [triangular schedule](../../data-transforms/checksums.md#the-triangular-key-schedule) |
-| stage 3b | `stage2_off + 104` | `xor_acc ^ chk3 ^ v4`, where `v4` is the last nonzero dword of stage 3, anchored by the `C3 CC CC CC` (function epilogue + `int3` padding) before it |
-| stage 4 | `stage2_off + 136` | `xor_acc ^ chk4 ^ ~v5`, where `v5` is the dword 8 bytes before the first `"Virtual..."` API-name string in stage 3b |
-| stage 5 | `stage2_off + 216` | `xor_acc ^ chk4 ^ chk5 ^ accum2`, plus bytecode stub 1 |
+| Stage 3 | `stage2_off + 88` | `xor_acc ^ chk2 ^ advance_key(u32@(chk_src_start - 16), rounds)` (`rounds = 4` default; retries `0..=8` if decompression or `v4` lookup fails) |
+| Stage 3b | `stage2_off + 104` | `xor_acc ^ chk3 ^ v4`, where `v4` is the last nonzero dword after `C3 CC CC CC` in Stage 3 |
+| Stage 4 | `stage2_off + 136` | `xor_acc ^ chk4 ^ ~v5`, where `v5 = u32@(first "Virtual..." string in Stage 3b - 8)` |
+| Stage 5 | `stage2_off + 216` | `xor_acc ^ chk4 ^ chk5 ^ advance_key(accum2, rounds)` (`rounds = 3` default; retries `0..=8` on decompression failure), translated through **bytecode stub 1** |
 
-Stage 4 is where the first embedded **bytecode stub** appears. Its neighbors are the anti-debug API name strings (`IsDebuggerPresent`, `CheckRemoteDebuggerPresent`); the stub itself is located by [trial LFSR-decoding and parsing](../../data-transforms/bytecode-transform.md#the-per-build-bytecode-permutation) rather than a fixed offset. The `accum2` seed sits after the last occurrence of the byte pattern `48 EB 01 B9` (plus any `CC` padding), advanced through three triangular rounds. Stage 5 is the only stage decrypted through a bytecode stub. Stub 1 is baked into its transform.
+In Stage 4, LFSR-scan for bytecode stub 1 near the anti-debug API strings (`IsDebuggerPresent`, `CheckRemoteDebuggerPresent`), and read `accum2` immediately past the last `48 EB 01 B9` sequence (skipping any `0xCC` padding).
+{% endstep %}
 
-### Phase 6: the stage-5 tables
+{% step %}
+### Phase 6: Stage 5 marker geometry and bytecode stub 2
 
-Stage 5 holds the tables that recover the program sections. In the marker layout they hang off two byte markers:
+Locate `"pm\0\0cm\0\0"` (`70 6D 00 00 63 6D 00 00`) and the kind marker `0x40000000, 1` (`00 00 00 40 01 00 00 00`) inside Stage 5:
 
-- `70 6D 00 00 63 6D 00 00` (`"pm\0\0cm\0\0"`), which names the `pm`/`cm` submodule codes.
-- `00 00 00 40 01 00 00 00`, the "kind marker" (dword pair `0x40000000, 1`).
-
-Relative to the kind marker: **walk4** (the section-load descriptor table pointer) at `−0x20`, **walk3** (a checksum chain) at `−0x18`, and **walk5** (the import-name pointer table) at `+8`. The second **bytecode stub** sits at a discovered offset (marker `+960` in the oldest builds; trial-located otherwise), with the **file checksum chain** pointer `0x58` bytes before it.
-
-- **walk3** is *validation-only*: its 16-byte entries are transiently decrypted, fed into a chained CRC-32 over the original file bytes, and then **restored to their encrypted form**. The chain exists to detect tampering, not to produce output.
-- The **file checksum chain** is decrypted permanently in place (16-byte `byte_rotate2` entries until a zero length).
-- Stub 2 is LFSR-decrypted and parsed into the op list applied to every section block.
-
-### Phase 7: section recovery
-
-The walk4 table is a positional chain of 16-byte descriptors, each `byte_rotate2`-decrypted in place, of the form `(src, len, dst, plain_len)`, ending on a zero `len`. Per block:
-
-```
-copy file[src + section_data_file_base .. +len] → image[dst]
-aes_decrypt(dst, len, key_offsets[2])
-translate dst..dst+len through bytecode stub 2
-if len != plain_len: huffman_decompress(dst → dst, key_offsets[0], len, plain_len)
+```mermaid
+flowchart LR
+    W4["kind_marker - 0x20:\nwalk4 (section descriptors)"] --- W3["kind_marker - 0x18:\nwalk3 (transient file CRC)"]
+    W3 --- KM["kind_marker:\n0x40000000, 1"]
+    KM --- W5["kind_marker + 0x08:\nwalk5 (import-name table)"]
+    KM -. scan .-> FCS["stub2 - 0x58:\nfileCS pointer"]
+    FCS --- STUB2["stub2:\n96B LFSR bytecode stub 2"]
 ```
 
-`section_data_file_base` is the complement-encoded base from [Section data and companion files](../../file-structure/companion-layout.md#locating-section-data-in-the-file). A second walk4 chain then lists regions to zero-fill (the `.bss`-equivalent). Because blocks write disjoint image spans and read only immutable file bytes, the phase can run in parallel: a property of the format, not of any tool.
+* **`walk3`** is decrypted transiently to verify the chained CRC-32 over original file regions, then restored to its encrypted bytes.
+* **`fileCS`** (`stub2 - 0x58`) is decrypted permanently in place (`byte_rotate2` over 16-byte entries until `len == 0`).
+* **Stub 2** is LFSR-decrypted and compiled into its 256-byte lookup table.
+{% endstep %}
 
-### Phase 8: import-name decryption
+{% step %}
+### Phase 7: Parallelizable section recovery (`walk4`)
 
-walk5 entries (20 bytes each) point at encrypted DLL names (`+12`) and thunk chains (`+0` or `+16`). Each name is decrypted with the [string cipher](../../data-transforms/lfsr-strings-pages.md#the-import-name-string-cipher), lowercased, and each by-name thunk (bit 63 clear on PE32+) has its hint/name string decrypted and its hint field zeroed. Ordinal imports (bit 63 set) are left alone. A null walk5 pointer means there's no table to walk: managed assemblies leave the slot empty because their imports are the CLR bootstrap stub.
+`walk4` chains 16-byte `{src, len, dst, plain_len}` descriptors (`byte_rotate2`-decrypted at their own RVAs) terminated by `len == 0`. Each block copies `file[src + section_data_file_base .. +len]` to `image[dst]`, runs `aes_decrypt` (`key_offsets[2]`), translates through stub 2, and runs `decompress` (`key_offsets[0]`) when `len != plain_len`. A second `walk4` chain zero-fills `.bss` ranges afterward. Because destination spans are disjoint, block recovery is deterministic whether run sequentially or in parallel.
+{% endstep %}
 
-### Phase 9: PE reconstruction
+{% step %}
+### Phase 8: `walk5` import-name decryption
 
-The final phase rebuilds the PE header: section table conversion, the encrypted entry-point/data-directory block, TLS handling, `/FIXED` policy, the code-page scramble, and managed-metadata handling. These are format transformations rather than loader stages, covered in [PE reconstruction](../pe-reconstruction/README.md).
+When `walk5` is non-null (native modules), each 20-byte entry references an encrypted DLL name (`+12`, decrypted with `string_cipher` at `name_rva & 0xFF` and lowercased) and thunk array (`+0` or `+16`). Each by-name thunk (bit 63 clear) decrypts its symbol name at `hint_name_rva + 2` using initial key `hint_name_rva & 0xFF` (preserving symbol case) and zeroes its 2-byte `Hint`. Managed modules have a null `walk5` pointer.
+{% endstep %}
+
+{% step %}
+### Phase 9: PE header, scramble, and directory finalization
+
+Convert section raw pointers to RVA layout, apply the `.text` page scramble (`dd8`), transiently decrypt and restore the entry point and data directories, and apply TLS, relocation, and CLR metadata overlays (see [PE reconstruction](../pe-reconstruction/README.md)).
+{% endstep %}
+{% endstepper %}
